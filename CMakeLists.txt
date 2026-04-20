@@ -13,9 +13,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Find dependencies
 find_package(Vulkan REQUIRED)
-find_package(SDL2 REQUIRED)
 
-# === KERA CORE (SDL Platform Layer) ===
+# Add SDL3 submodule
+add_subdirectory(third_party/SDL)
+
+# === KERA CORE (SDL3 Platform Layer) ===
 set(KERA_CORE_SOURCES
     src/core/window.cpp
     src/core/surface.cpp
@@ -115,7 +117,7 @@ target_link_libraries(kera
     PUBLIC
         Vulkan::Vulkan
     PRIVATE
-        SDL2::SDL2
+        SDL3::SDL3-static
 )
 
 # Compiler warnings
