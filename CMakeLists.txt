@@ -12,22 +12,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Find dependencies
+if(NOT DEFINED ENV{VULKAN_SDK})
+    set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.4.341.1")
+endif()
 find_package(Vulkan REQUIRED)
 
 # Add SDL3 submodule
+set(SDL_SHARED ON CACHE BOOL "" FORCE)
+set(SDL_STATIC OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/SDL)
 
 # === KERA CORE (SDL3 Platform Layer) ===
 set(KERA_CORE_SOURCES
     src/core/window.cpp
-    src/core/surface.cpp
     src/core/input.cpp
     src/core/audio.cpp
 )
 
 set(KERA_CORE_HEADERS
     include/kera/core/window.h
-    include/kera/core/surface.h
     include/kera/core/input.h
     include/kera/core/audio.h
 )
@@ -71,7 +74,6 @@ set(KERA_UTILITIES_SOURCES
 set(KERA_UTILITIES_HEADERS
     include/kera/utilities/logger.h
     include/kera/utilities/validation.h
-    include/kera/utilities/result.h
     include/kera/utilities/file_utils.h
 )
 
@@ -79,6 +81,7 @@ set(KERA_UTILITIES_HEADERS
 set(KERA_COMMON_HEADERS
     include/kera/kera.h
     include/kera/types.h
+    include/kera/result.h
 )
 
 # Combine all sources
@@ -116,8 +119,7 @@ target_include_directories(kera
 target_link_libraries(kera
     PUBLIC
         Vulkan::Vulkan
-    PRIVATE
-        SDL3::SDL3-static
+        SDL3::SDL3
 )
 
 # Compiler warnings
@@ -134,7 +136,6 @@ endif()
 
 # Install rules
 install(TARGETS kera
-    EXPORT KeraTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
@@ -142,10 +143,4 @@ install(TARGETS kera
 
 install(DIRECTORY include/kera
     DESTINATION include
-)
-
-install(EXPORT KeraTargets
-    FILE KeraTargets.cmake
-    NAMESPACE Kera::
-    DESTINATION lib/cmake/Kera
 )

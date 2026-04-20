@@ -1,13 +1,13 @@
 # Samples for Kera Rendering Library
 
 # Main sample application
-add_executable(kera_samples 
-    main.cpp 
+add_executable(kera_samples
+    main.cpp
     samples.cpp
     basic_triangle_sample.cpp
     compute_sample.cpp
 )
-target_link_libraries(kera_samples PRIVATE kera)
+target_link_libraries(kera_samples PRIVATE kera SDL3::SDL3)
 
 # Add sample subdirectories here if needed for additional organization
 # add_subdirectory(basic_triangle)
