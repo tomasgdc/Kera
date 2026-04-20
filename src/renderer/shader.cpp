@@ -1,5 +1,6 @@
 #include "kera/renderer/shader.h"
 #include "kera/renderer/device.h"
+#include "kera/renderer/slang_compiler.h"
 #include <vulkan/vulkan.h>
 #include <fstream>
 #include <iostream>
@@ -23,7 +24,8 @@ VkShaderStageFlagBits shaderTypeToStageFlag(ShaderType type) {
 } // anonymous namespace
 
 Shader::Shader()
-    : shader_module_(VK_NULL_HANDLE)
+    : device_(VK_NULL_HANDLE)
+    , shader_module_(VK_NULL_HANDLE)
     , type_(ShaderType::Vertex) {
 }
 
@@ -32,8 +34,10 @@ Shader::~Shader() {
 }
 
 Shader::Shader(Shader&& other) noexcept
-    : shader_module_(other.shader_module_)
+    : device_(other.device_)
+    , shader_module_(other.shader_module_)
     , type_(other.type_) {
+    other.device_ = VK_NULL_HANDLE;
     other.shader_module_ = VK_NULL_HANDLE;
     other.type_ = ShaderType::Vertex;
 }
@@ -41,9 +45,11 @@ Shader::Shader(Shader&& other) noexcept
 Shader& Shader::operator=(Shader&& other) noexcept {
     if (this != &other) {
         shutdown();
+        device_ = other.device_;
         shader_module_ = other.shader_module_;
         type_ = other.type_;
 
+        other.device_ = VK_NULL_HANDLE;
         other.shader_module_ = VK_NULL_HANDLE;
         other.type_ = ShaderType::Vertex;
     }
@@ -56,6 +62,7 @@ bool Shader::initialize(const Device& device, ShaderType type, const std::vector
     }
 
     VkDevice vkDevice = device.getVulkanDevice();
+    device_ = vkDevice;
     type_ = type;
 
     VkShaderModuleCreateInfo createInfo{};
@@ -91,12 +98,33 @@ bool Shader::initializeFromFile(const Device& device, ShaderType type, const std
     return initialize(device, type, buffer);
 }
 
+bool Shader::initializeFromSlangFile(
+    const Device& device,
+    ShaderType type,
+    const std::string& shaderPath,
+    const std::string& entryPoint,
+    const std::vector<std::string>& searchPaths) {
+    std::vector<uint32_t> spirvCode;
+    SlangCompileRequest request{
+        .shaderPath = shaderPath,
+        .entryPoint = entryPoint,
+        .shaderType = type,
+        .searchPaths = searchPaths,
+    };
+
+    if (!SlangCompiler::compileToSpirv(request, spirvCode)) {
+        return false;
+    }
+
+    return initialize(device, type, spirvCode);
+}
+
 void Shader::shutdown() {
-    if (shader_module_) {
-        // TODO: Need device reference
-        // vkDestroyShaderModule(device, shader_module_, nullptr);
+    if (shader_module_ != VK_NULL_HANDLE && device_ != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(device_, shader_module_, nullptr);
         shader_module_ = VK_NULL_HANDLE;
     }
+    device_ = VK_NULL_HANDLE;
 }
 
 VkPipelineShaderStageCreateInfo Shader::getPipelineStageInfo() const {

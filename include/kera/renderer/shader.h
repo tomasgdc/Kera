@@ -33,6 +33,12 @@ public:
 
     bool initialize(const Device& device, ShaderType type, const std::vector<uint32_t>& spirvCode);
     bool initializeFromFile(const Device& device, ShaderType type, const std::string& filepath);
+    bool initializeFromSlangFile(
+        const Device& device,
+        ShaderType type,
+        const std::string& shaderPath,
+        const std::string& entryPoint,
+        const std::vector<std::string>& searchPaths = {});
     void shutdown();
 
     VkShaderModule getVulkanShaderModule() const { return shader_module_; }
@@ -44,6 +50,7 @@ public:
     VkPipelineShaderStageCreateInfo getPipelineStageInfo() const;
 
 private:
+    VkDevice device_;
     VkShaderModule shader_module_;
     ShaderType type_;
 };

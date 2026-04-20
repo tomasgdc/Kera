@@ -72,6 +72,7 @@ set(KERA_RENDERER_SOURCES
     src/renderer/render_pass.cpp
     src/renderer/framebuffer.cpp
     src/renderer/shader.cpp
+    src/renderer/slang_compiler.cpp
     src/renderer/buffer.cpp
     src/renderer/image.cpp
 )
@@ -87,6 +88,7 @@ set(KERA_RENDERER_HEADERS
     include/kera/renderer/render_pass.h
     include/kera/renderer/framebuffer.h
     include/kera/renderer/shader.h
+    include/kera/renderer/slang_compiler.h
     include/kera/renderer/buffer.h
     include/kera/renderer/image.h
 )

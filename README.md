@@ -39,10 +39,10 @@ git submodule update --init --recursive
 cmake --preset windows-debug  # or linux-debug
 
 # Build
-cmake --build buildwindows-debug  # or buildlinux-debug
+cmake --build --preset windows-debug  # or linux-debug
 
 # Run samples
-./buildwindows-debug/samples/kera_samples
+./build/windows-debug/samples/kera_samples
 ```
 
 ## Project Structure
@@ -70,7 +70,15 @@ cmake --build buildwindows-debug  # or buildlinux-debug
 
 - **SDL3**: Window management and input (included as submodule)
 - **Vulkan**: Graphics API (requires Vulkan SDK)
-- **Slang**: Shader compilation (to be integrated)
+- **Slang**: Shader compilation from `.slang` source at startup
+
+## Shader Compilation
+
+Kera is set up to compile `.slang` shaders to SPIR-V at application startup.
+
+- Add shader source files to your project, for example `basic_triangle.slang`
+- Call `Shader::initializeFromSlangFile(...)` with the shader path and entry point name
+- Kera will compile the Slang source in process and create the Vulkan shader module from the generated SPIR-V
 
 ## License
 

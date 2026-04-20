@@ -16,6 +16,7 @@
 #include "kera/renderer/render_pass.h"
 #include "kera/renderer/framebuffer.h"
 #include "kera/renderer/shader.h"
+#include "kera/renderer/slang_compiler.h"
 #include "kera/renderer/buffer.h"
 #include "kera/renderer/image.h"
 
