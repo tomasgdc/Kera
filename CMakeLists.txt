@@ -5,6 +5,7 @@ project(Kera VERSION 0.1.0 LANGUAGES CXX)
 # Options
 option(KERA_BUILD_SAMPLES "Build Kera samples" ON)
 option(KERA_BUILD_SHARED "Build Kera as shared library" OFF)
+option(KERA_ENABLE_SLANG "Enable Slang shader compilation support" ON)
 
 # C++ Standard
 set(CMAKE_CXX_STANDARD 20)
@@ -21,6 +22,30 @@ find_package(Vulkan REQUIRED)
 set(SDL_SHARED ON CACHE BOOL "" FORCE)
 set(SDL_STATIC OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/SDL)
+
+# Add Slang when available. This keeps configuration working before the
+# submodule is fetched, while making the intended dependency explicit.
+set(KERA_SLANG_TARGET "")
+if(KERA_ENABLE_SLANG)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/CMakeLists.txt")
+        set(SLANG_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+        set(SLANG_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(SLANG_ENABLE_SLANGD OFF CACHE BOOL "" FORCE)
+        set(SLANG_ENABLE_SLANGI OFF CACHE BOOL "" FORCE)
+        set(SLANG_ENABLE_REPLAYER OFF CACHE BOOL "" FORCE)
+        set(SLANG_ENABLE_DXIL OFF CACHE BOOL "" FORCE)
+        set(SLANG_ENABLE_SLANG_RHI OFF CACHE BOOL "" FORCE)
+        add_subdirectory(third_party/slang EXCLUDE_FROM_ALL)
+
+        if(TARGET slang::slang)
+            set(KERA_SLANG_TARGET slang::slang)
+        elseif(TARGET slang)
+            set(KERA_SLANG_TARGET slang)
+        endif()
+    else()
+        message(STATUS "Slang submodule not found at third_party/slang. Run 'git submodule update --init --recursive'.")
+    endif()
+endif()
 
 # === KERA CORE (SDL3 Platform Layer) ===
 set(KERA_CORE_SOURCES
@@ -40,6 +65,7 @@ set(KERA_RENDERER_SOURCES
     src/renderer/instance.cpp
     src/renderer/device.cpp
     src/renderer/physical_device.cpp
+    src/renderer/surface.cpp
     src/renderer/swapchain.cpp
     src/renderer/command_buffer.cpp
     src/renderer/pipeline.cpp
@@ -54,6 +80,7 @@ set(KERA_RENDERER_HEADERS
     include/kera/renderer/instance.h
     include/kera/renderer/device.h
     include/kera/renderer/physical_device.h
+    include/kera/renderer/surface.h
     include/kera/renderer/swapchain.h
     include/kera/renderer/command_buffer.h
     include/kera/renderer/pipeline.h
@@ -121,6 +148,11 @@ target_link_libraries(kera
         Vulkan::Vulkan
         SDL3::SDL3
 )
+
+if(KERA_SLANG_TARGET)
+    target_link_libraries(kera PUBLIC ${KERA_SLANG_TARGET})
+    target_compile_definitions(kera PUBLIC KERA_HAS_SLANG=1)
+endif()
 
 # Compiler warnings
 if(MSVC)
