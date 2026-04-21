@@ -23,27 +23,52 @@ set(SDL_SHARED ON CACHE BOOL "" FORCE)
 set(SDL_STATIC OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/SDL)
 
-# Add Slang when available. This keeps configuration working before the
-# submodule is fetched, while making the intended dependency explicit.
+# Add pre-compiled Slang libraries
 set(KERA_SLANG_TARGET "")
 if(KERA_ENABLE_SLANG)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/CMakeLists.txt")
-        set(SLANG_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-        set(SLANG_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-        set(SLANG_ENABLE_SLANGD OFF CACHE BOOL "" FORCE)
-        set(SLANG_ENABLE_SLANGI OFF CACHE BOOL "" FORCE)
-        set(SLANG_ENABLE_REPLAYER OFF CACHE BOOL "" FORCE)
-        set(SLANG_ENABLE_DXIL OFF CACHE BOOL "" FORCE)
-        set(SLANG_ENABLE_SLANG_RHI OFF CACHE BOOL "" FORCE)
-        add_subdirectory(third_party/slang EXCLUDE_FROM_ALL)
-
-        if(TARGET slang::slang)
-            set(KERA_SLANG_TARGET slang::slang)
-        elseif(TARGET slang)
-            set(KERA_SLANG_TARGET slang)
+    set(SLANG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/include")
+    
+    if(WIN32)
+        set(SLANG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/lib/windows")
+        set(SLANG_LIBS 
+            "${SLANG_LIB_DIR}/slang.lib"
+            "${SLANG_LIB_DIR}/slang-compiler.lib"
+            "${SLANG_LIB_DIR}/slang-rt.lib"
+            "${SLANG_LIB_DIR}/gfx.lib"
+        )
+    else()  # Linux/Unix
+        set(SLANG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/lib/linux")
+        set(SLANG_LIBS 
+            "${SLANG_LIB_DIR}/libslang.so"
+            "${SLANG_LIB_DIR}/libslang-compiler.so"
+            "${SLANG_LIB_DIR}/libslang-rt.so"
+            "${SLANG_LIB_DIR}/libgfx.so"
+        )
+    endif()
+    
+    if(EXISTS "${SLANG_INCLUDE_DIR}/slang.h")
+        # Create imported target for Slang
+        add_library(slang SHARED IMPORTED)
+        
+        set_target_properties(slang PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${SLANG_INCLUDE_DIR}"
+        )
+        
+        if(WIN32)
+            set_target_properties(slang PROPERTIES
+                IMPORTED_LOCATION "${SLANG_LIB_DIR}/slang.lib"
+                IMPORTED_IMPLIB "${SLANG_LIB_DIR}/slang.lib"
+            )
+        else()
+            set_target_properties(slang PROPERTIES
+                IMPORTED_LOCATION "${SLANG_LIB_DIR}/libslang.so"
+            )
         endif()
+        
+        set(KERA_SLANG_TARGET slang)
+        message(STATUS "Using pre-compiled Slang from ${SLANG_LIB_DIR}")
     else()
-        message(STATUS "Slang submodule not found at third_party/slang. Run 'git submodule update --init --recursive'.")
+        message(WARNING "Slang headers not found at ${SLANG_INCLUDE_DIR}. Slang support disabled.")
     endif()
 endif()
 
