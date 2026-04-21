@@ -18,6 +18,9 @@ if(NOT DEFINED ENV{VULKAN_SDK})
 endif()
 find_package(Vulkan REQUIRED)
 
+# Add GLM (header-only math library)
+add_subdirectory(third_party/glm EXCLUDE_FROM_ALL)
+
 # Add SDL3 submodule
 set(SDL_SHARED ON CACHE BOOL "" FORCE)
 set(SDL_STATIC OFF CACHE BOOL "" FORCE)
@@ -174,6 +177,7 @@ target_link_libraries(kera
     PUBLIC
         Vulkan::Vulkan
         SDL3::SDL3
+        glm::glm
 )
 
 if(KERA_SLANG_TARGET)
