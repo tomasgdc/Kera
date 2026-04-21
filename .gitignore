@@ -1,2 +1,6 @@
 build/
 .vs/
+
+# Allow slang directory to be tracked
+!third_party/slang/
+
