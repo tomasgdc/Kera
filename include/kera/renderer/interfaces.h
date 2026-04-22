@@ -45,6 +45,7 @@ public:
 
     virtual GraphicsBackend getBackend() const = 0;
     virtual Extent2D getDrawableExtent() const = 0;
+    virtual void shutdown() = 0;
     virtual Result<void> resize(Extent2D newExtent) = 0;
 
     virtual Result<std::shared_ptr<IShaderModule>> createShaderModule(const ShaderModuleDesc& desc) = 0;

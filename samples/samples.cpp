@@ -1,8 +1,8 @@
 #include "samples.h"
 #include "basic_triangle_sample.h"
 #include "compute_sample.h"
-#include "kera/renderer/vulkan_renderer.h"
 #include "kera/core/window.h"
+#include "kera/renderer/factory.h"
 #include "kera/utilities/logger.h"
 
 namespace kera {
@@ -50,11 +50,12 @@ namespace kera {
         }
         Logger::getInstance().info("Window created successfully (1280x720)");
 
-        renderer_ = std::make_shared<VulkanRenderer>();
-        if (!renderer_->initialize(*window_)) {
-            Logger::getInstance().error("Failed to initialize Vulkan renderer");
+        const auto createRendererResult = CreateRenderer(GraphicsBackend::Vulkan, *window_);
+        if (createRendererResult.hasError()) {
+            Logger::getInstance().error(createRendererResult.error());
             return false;
         }
+        renderer_ = createRendererResult.value();
 
         Logger::getInstance().info("Renderer initialized successfully");
         return true;

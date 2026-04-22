@@ -7,20 +7,8 @@
 
 // Renderer includes
 #include "kera/renderer/descriptors.h"
+#include "kera/renderer/factory.h"
 #include "kera/renderer/interfaces.h"
-#include "kera/renderer/instance.h"
-#include "kera/renderer/physical_device.h"
-#include "kera/renderer/device.h"
-#include "kera/renderer/surface.h"
-#include "kera/renderer/swapchain.h"
-#include "kera/renderer/command_buffer.h"
-#include "kera/renderer/pipeline.h"
-#include "kera/renderer/render_pass.h"
-#include "kera/renderer/framebuffer.h"
-#include "kera/renderer/shader.h"
-#include "kera/renderer/slang_compiler.h"
-#include "kera/renderer/buffer.h"
-#include "kera/renderer/image.h"
 
 // Utilities includes
 #include "kera/utilities/logger.h"

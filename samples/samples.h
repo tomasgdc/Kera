@@ -9,7 +9,6 @@ namespace kera {
 // Forward declarations
 class Sample;
 class IRenderer;
-class VulkanRenderer;
 class Window;
 
 class SampleApplication {
@@ -31,7 +30,7 @@ private:
 
     // Window and renderer resources
     std::unique_ptr<Window> window_;
-    std::shared_ptr<VulkanRenderer> renderer_;
+    std::shared_ptr<IRenderer> renderer_;
 };
 
 class Sample {
