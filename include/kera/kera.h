@@ -6,6 +6,8 @@
 #include "kera/core/audio.h"
 
 // Renderer includes
+#include "kera/renderer/descriptors.h"
+#include "kera/renderer/interfaces.h"
 #include "kera/renderer/instance.h"
 #include "kera/renderer/physical_device.h"
 #include "kera/renderer/device.h"

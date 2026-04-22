@@ -21,45 +21,6 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-// Vulkan forward declarations
-struct VkInstance_T;
-struct VkPhysicalDevice_T;
-struct VkDevice_T;
-struct VkSurfaceKHR_T;
-struct VkSwapchainKHR_T;
-struct VkImage_T;
-struct VkImageView_T;
-struct VkBuffer_T;
-struct VkDeviceMemory_T;
-struct VkShaderModule_T;
-struct VkPipeline_T;
-struct VkPipelineLayout_T;
-struct VkRenderPass_T;
-struct VkFramebuffer_T;
-struct VkCommandPool_T;
-struct VkCommandBuffer_T;
-struct VkSemaphore_T;
-struct VkFence_T;
-
-using VkInstance = VkInstance_T*;
-using VkPhysicalDevice = VkPhysicalDevice_T*;
-using VkDevice = VkDevice_T*;
-using VkSurfaceKHR = VkSurfaceKHR_T*;
-using VkSwapchainKHR = VkSwapchainKHR_T*;
-using VkImage = VkImage_T*;
-using VkImageView = VkImageView_T*;
-using VkBuffer = VkBuffer_T*;
-using VkDeviceMemory = VkDeviceMemory_T*;
-using VkShaderModule = VkShaderModule_T*;
-using VkPipeline = VkPipeline_T*;
-using VkPipelineLayout = VkPipelineLayout_T*;
-using VkRenderPass = VkRenderPass_T*;
-using VkFramebuffer = VkFramebuffer_T*;
-using VkCommandPool = VkCommandPool_T*;
-using VkCommandBuffer = VkCommandBuffer_T*;
-using VkSemaphore = VkSemaphore_T*;
-using VkFence = VkFence_T*;
-
 // SDL forward declarations
 struct SDL_Window;
 

@@ -7,6 +7,27 @@
 
 namespace kera {
 
+namespace {
+
+VkPrimitiveTopology toVkPrimitiveTopology(PrimitiveTopologyKind topology) {
+    switch (topology) {
+        case PrimitiveTopologyKind::TriangleList:
+        default:
+            return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    }
+}
+
+VkFormat toVkVertexFormat(VertexFormat format) {
+    switch (format) {
+        case VertexFormat::Float2: return VK_FORMAT_R32G32_SFLOAT;
+        case VertexFormat::Float3: return VK_FORMAT_R32G32B32_SFLOAT;
+        case VertexFormat::Float4: return VK_FORMAT_R32G32B32A32_SFLOAT;
+        default: return VK_FORMAT_R32G32B32_SFLOAT;
+    }
+}
+
+} // anonymous namespace
+
 Pipeline::Pipeline()
     : device_(VK_NULL_HANDLE)
     , pipeline_(VK_NULL_HANDLE)
@@ -40,7 +61,12 @@ Pipeline& Pipeline::operator=(Pipeline&& other) noexcept {
     return *this;
 }
 
-bool Pipeline::initialize(const Device& device, const RenderPass& renderPass, const Shader& vertexShader, const Shader& fragmentShader) {
+bool Pipeline::initialize(
+    const Device& device,
+    const RenderPass& renderPass,
+    const Shader& vertexShader,
+    const Shader& fragmentShader,
+    const GraphicsPipelineDesc& desc) {
     if (pipeline_) {
         shutdown();
     }
@@ -64,34 +90,38 @@ bool Pipeline::initialize(const Device& device, const RenderPass& renderPass, co
         fragmentShader.getPipelineStageInfo()
     };
 
-    // Vertex input
-    VkVertexInputBindingDescription bindingDescription{};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(float) * 6;
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    std::vector<VkVertexInputBindingDescription> bindingDescriptions;
+    bindingDescriptions.reserve(desc.vertexLayout.bindings.size());
+    for (const VertexBindingDesc& binding : desc.vertexLayout.bindings) {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = binding.binding;
+        bindingDescription.stride = binding.stride;
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        bindingDescriptions.push_back(bindingDescription);
+    }
 
-    VkVertexInputAttributeDescription attributeDescriptions[2]{};
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[0].offset = 0;
-
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = sizeof(float) * 3;
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+    attributeDescriptions.reserve(desc.vertexLayout.attributes.size());
+    for (const VertexAttributeDesc& attribute : desc.vertexLayout.attributes) {
+        VkVertexInputAttributeDescription attributeDescription{};
+        attributeDescription.location = attribute.location;
+        attributeDescription.binding = attribute.binding;
+        attributeDescription.format = toVkVertexFormat(attribute.format);
+        attributeDescription.offset = attribute.offset;
+        attributeDescriptions.push_back(attributeDescription);
+    }
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.vertexAttributeDescriptionCount = 2;
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
+    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.empty() ? nullptr : bindingDescriptions.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.empty() ? nullptr : attributeDescriptions.data();
 
     // Input assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.topology = toVkPrimitiveTopology(desc.topology);
 
     // Viewport and scissor
     VkPipelineViewportStateCreateInfo viewportState{};

@@ -1,14 +1,9 @@
 #include "samples.h"
 #include "basic_triangle_sample.h"
 #include "compute_sample.h"
-#include "kera/renderer/instance.h"
-#include "kera/renderer/device.h"
-#include "kera/renderer/physical_device.h"
-#include "kera/renderer/surface.h"
-#include "kera/renderer/swapchain.h"
+#include "kera/renderer/vulkan_renderer.h"
 #include "kera/core/window.h"
 #include "kera/utilities/logger.h"
-#include <iostream>
 
 namespace kera {
 
@@ -45,7 +40,7 @@ namespace kera {
     }
 
     bool SampleApplication::initializeRenderer() {
-        Logger::getInstance().info("Initializing Vulkan renderer");
+        Logger::getInstance().info("Initializing renderer");
 
         // Create window
         window_ = std::make_unique<Window>();
@@ -55,54 +50,18 @@ namespace kera {
         }
         Logger::getInstance().info("Window created successfully (1280x720)");
 
-        // Create Vulkan instance
-        instance_ = std::make_shared<Instance>();
-        if (!instance_->initialize("Kera Sample", VK_MAKE_VERSION(0, 1, 0), true)) {
-            Logger::getInstance().error("Failed to create Vulkan instance");
+        renderer_ = std::make_shared<VulkanRenderer>();
+        if (!renderer_->initialize(*window_)) {
+            Logger::getInstance().error("Failed to initialize Vulkan renderer");
             return false;
         }
-        Logger::getInstance().info("Vulkan instance created successfully");
 
-        // Create surface from window
-        surface_ = std::make_shared<Surface>();
-        if (!surface_->create(instance_->getVulkanInstance(), *window_)) {
-            Logger::getInstance().error("Failed to create Vulkan surface");
-            return false;
-        }
-        Logger::getInstance().info("Vulkan surface created successfully");
-
-        // Create physical device
-        physicalDevice_ = std::make_shared<PhysicalDevice>();
-        if (!physicalDevice_->initialize(instance_->getVulkanInstance(), surface_->getVulkanSurface())) {
-            Logger::getInstance().error("Failed to select physical device");
-            return false;
-        }
-        Logger::getInstance().info("Physical device selected successfully");
-
-        // Create logical device
-        device_ = std::make_shared<Device>();
-        if (!device_->initialize(*physicalDevice_)) {
-            Logger::getInstance().error("Failed to create logical device");
-            return false;
-        }
-        Logger::getInstance().info("Logical device created successfully");
-
-        // Create swapchain
-        swapchain_ = std::make_shared<SwapChain>();
-        if (!swapchain_->initialize(*physicalDevice_, *device_, surface_->getVulkanSurface(), 
-                                    static_cast<uint32_t>(window_->getWidth()), 
-                                    static_cast<uint32_t>(window_->getHeight()))) {
-            Logger::getInstance().error("Failed to create swapchain");
-            return false;
-        }
-        Logger::getInstance().info("Swapchain created successfully");
-
-        Logger::getInstance().info("Vulkan renderer initialized successfully");
+        Logger::getInstance().info("Renderer initialized successfully");
         return true;
     }
 
     bool SampleApplication::recreateSwapchainResources() {
-        if (!window_ || !device_ || !surface_ || !instance_ || !physicalDevice_ || !swapchain_) {
+        if (!window_ || !renderer_) {
             return false;
         }
 
@@ -116,26 +75,16 @@ namespace kera {
             "Recreating swapchain resources for window size " +
             std::to_string(width) + "x" + std::to_string(height));
 
-        vkDeviceWaitIdle(device_->getVulkanDevice());
-
         if (activeSampleIndex_ >= 0 && activeSampleIndex_ < static_cast<int>(samples_.size())) {
             samples_[activeSampleIndex_]->cleanup();
         }
 
-        swapchain_->shutdown();
-
-        if (!physicalDevice_->initialize(instance_->getVulkanInstance(), surface_->getVulkanSurface())) {
-            Logger::getInstance().error("Failed to refresh physical device swapchain support");
-            return false;
-        }
-
-        if (!swapchain_->initialize(
-                *physicalDevice_,
-                *device_,
-                surface_->getVulkanSurface(),
-                static_cast<uint32_t>(width),
-                static_cast<uint32_t>(height))) {
-            Logger::getInstance().error("Failed to recreate swapchain");
+        const auto resizeResult = renderer_->resize({
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height),
+        });
+        if (resizeResult.hasError()) {
+            Logger::getInstance().error(resizeResult.error());
             return false;
         }
 
@@ -149,20 +98,9 @@ namespace kera {
     }
 
     void SampleApplication::cleanupRenderer() {
-        if (swapchain_) {
-            swapchain_->shutdown();
-        }
-        if (surface_) {
-            surface_->destroy();
-        }
-        if (device_) {
-            device_->shutdown();
-        }
-        if (physicalDevice_) {
-            // PhysicalDevice doesn't have shutdown - it's just a wrapper
-        }
-        if (instance_) {
-            instance_->shutdown();
+        if (renderer_) {
+            renderer_->shutdown();
+            renderer_.reset();
         }
         if (window_) {
             window_->shutdown();
@@ -179,7 +117,7 @@ namespace kera {
         }
 
         // Register available samples with renderer resources
-        addSample(std::make_unique<BasicTriangleSample>(instance_, device_, surface_, swapchain_));
+        addSample(std::make_unique<BasicTriangleSample>(renderer_));
         // addSample(std::make_unique<ComputeSample>());
 
         Logger::getInstance().info("Available samples:");
@@ -217,8 +155,9 @@ namespace kera {
             samples_[activeSampleIndex_]->render();
         }
 
-        if (device_) {
-            vkDeviceWaitIdle(device_->getVulkanDevice());
+        if (renderer_) {
+            renderer_->shutdown();
+            renderer_.reset();
         }
     }
 } // namespace kera

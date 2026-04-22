@@ -8,11 +8,8 @@ namespace kera {
 
 // Forward declarations
 class Sample;
-class Instance;
-class Device;
-class PhysicalDevice;
-class Surface;
-class SwapChain;
+class IRenderer;
+class VulkanRenderer;
 class Window;
 
 class SampleApplication {
@@ -34,11 +31,7 @@ private:
 
     // Window and renderer resources
     std::unique_ptr<Window> window_;
-    std::shared_ptr<Instance> instance_;
-    std::shared_ptr<PhysicalDevice> physicalDevice_;
-    std::shared_ptr<Device> device_;
-    std::shared_ptr<Surface> surface_;
-    std::shared_ptr<SwapChain> swapchain_;
+    std::shared_ptr<VulkanRenderer> renderer_;
 };
 
 class Sample {

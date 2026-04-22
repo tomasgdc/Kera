@@ -90,6 +90,7 @@ set(KERA_CORE_HEADERS
 
 # === KERA RENDERER (Cross-platform Vulkan) ===
 set(KERA_RENDERER_SOURCES
+    src/renderer/vulkan_renderer.cpp
     src/renderer/instance.cpp
     src/renderer/device.cpp
     src/renderer/physical_device.cpp
@@ -106,6 +107,9 @@ set(KERA_RENDERER_SOURCES
 )
 
 set(KERA_RENDERER_HEADERS
+    include/kera/renderer/descriptors.h
+    include/kera/renderer/interfaces.h
+    include/kera/renderer/vulkan_renderer.h
     include/kera/renderer/instance.h
     include/kera/renderer/device.h
     include/kera/renderer/physical_device.h

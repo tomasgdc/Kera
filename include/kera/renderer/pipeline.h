@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kera/renderer/descriptors.h"
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -23,7 +24,12 @@ public:
     Pipeline(Pipeline&& other) noexcept;
     Pipeline& operator=(Pipeline&& other) noexcept;
 
-    bool initialize(const Device& device, const RenderPass& renderPass, const Shader& vertexShader, const Shader& fragmentShader);
+    bool initialize(
+        const Device& device,
+        const RenderPass& renderPass,
+        const Shader& vertexShader,
+        const Shader& fragmentShader,
+        const GraphicsPipelineDesc& desc = {});
     void shutdown();
 
     VkPipeline getVulkanPipeline() const { return pipeline_; }
