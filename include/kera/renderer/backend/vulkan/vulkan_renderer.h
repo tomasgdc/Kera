@@ -2,6 +2,7 @@
 
 #include "kera/renderer/interfaces.h"
 #include <memory>
+#include <vector>
 #include <vulkan/vulkan.h>
 
 namespace kera {
@@ -57,7 +58,7 @@ private:
     std::unique_ptr<CommandBuffer> commandBuffer_;
 
     VkSemaphore imageAvailableSemaphore_;
-    VkSemaphore renderFinishedSemaphore_;
+    std::vector<VkSemaphore> renderFinishedSemaphores_;
     VkFence inFlightFence_;
 };
 

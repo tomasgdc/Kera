@@ -224,7 +224,6 @@ private:
 VulkanRenderer::VulkanRenderer()
     : window_(nullptr)
     , imageAvailableSemaphore_(VK_NULL_HANDLE)
-    , renderFinishedSemaphore_(VK_NULL_HANDLE)
     , inFlightFence_(VK_NULL_HANDLE) {}
 
 VulkanRenderer::~VulkanRenderer() {
@@ -332,6 +331,10 @@ Result<void> VulkanRenderer::resize(Extent2D newExtent) {
 
     if (!recreateSwapchainResources(newExtent.width, newExtent.height)) {
         return failure("Failed to recreate Vulkan swapchain resources.");
+    }
+
+    if (!createSyncObjects()) {
+        return failure("Failed to recreate Vulkan frame synchronization objects.");
     }
 
     return success();
@@ -525,6 +528,13 @@ Result<void> VulkanRenderer::endFrame(std::unique_ptr<IFrame> frame) {
         return failure("Failed to end Vulkan command buffer.");
     }
 
+    const uint32_t imageIndex = vulkanFrame->imageIndex();
+    if (imageIndex >= renderFinishedSemaphores_.size()) {
+        return failure("Swapchain image index exceeded available render-finished semaphores.");
+    }
+
+    VkSemaphore renderFinishedSemaphore = renderFinishedSemaphores_[imageIndex];
+
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     VkCommandBuffer commandBuffers[] = { commandBuffer_->getVulkanCommandBuffer() };
 
@@ -536,15 +546,15 @@ Result<void> VulkanRenderer::endFrame(std::unique_ptr<IFrame> frame) {
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = commandBuffers;
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &renderFinishedSemaphore_;
+    submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
 
     if (vkQueueSubmit(device_->getGraphicsQueue(), 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
         return failure("Failed to submit Vulkan draw command buffer.");
     }
 
     const VkResult presentResult = swapchain_->present(
-        vulkanFrame->imageIndex(),
-        renderFinishedSemaphore_,
+        imageIndex,
+        renderFinishedSemaphore,
         device_->getPresentQueue());
     if (presentResult != VK_SUCCESS && presentResult != VK_SUBOPTIMAL_KHR) {
         return failure("Failed to present Vulkan swapchain image.");
@@ -612,10 +622,12 @@ void VulkanRenderer::destroySyncObjects() {
         vkDestroyFence(vkDevice, inFlightFence_, nullptr);
         inFlightFence_ = VK_NULL_HANDLE;
     }
-    if (renderFinishedSemaphore_ != VK_NULL_HANDLE) {
-        vkDestroySemaphore(vkDevice, renderFinishedSemaphore_, nullptr);
-        renderFinishedSemaphore_ = VK_NULL_HANDLE;
+    for (VkSemaphore semaphore : renderFinishedSemaphores_) {
+        if (semaphore != VK_NULL_HANDLE) {
+            vkDestroySemaphore(vkDevice, semaphore, nullptr);
+        }
     }
+    renderFinishedSemaphores_.clear();
     if (imageAvailableSemaphore_ != VK_NULL_HANDLE) {
         vkDestroySemaphore(vkDevice, imageAvailableSemaphore_, nullptr);
         imageAvailableSemaphore_ = VK_NULL_HANDLE;
@@ -625,6 +637,10 @@ void VulkanRenderer::destroySyncObjects() {
 bool VulkanRenderer::createSyncObjects() {
     destroySyncObjects();
 
+    if (!swapchain_) {
+        return false;
+    }
+
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -633,9 +649,24 @@ bool VulkanRenderer::createSyncObjects() {
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     VkDevice vkDevice = device_->getVulkanDevice();
-    return vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphore_) == VK_SUCCESS &&
-           vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphore_) == VK_SUCCESS &&
-           vkCreateFence(vkDevice, &fenceInfo, nullptr, &inFlightFence_) == VK_SUCCESS;
+    if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphore_) != VK_SUCCESS) {
+        return false;
+    }
+
+    renderFinishedSemaphores_.resize(swapchain_->getImageCount(), VK_NULL_HANDLE);
+    for (VkSemaphore& semaphore : renderFinishedSemaphores_) {
+        if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS) {
+            destroySyncObjects();
+            return false;
+        }
+    }
+
+    if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &inFlightFence_) != VK_SUCCESS) {
+        destroySyncObjects();
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace kera
