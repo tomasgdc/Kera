@@ -18,6 +18,12 @@ enum class ShaderStage {
     Compute
 };
 
+enum class ShaderSourceKind {
+    SlangFile,
+    SpirvFile,
+    SpirvBinary
+};
+
 enum class BufferUsageKind {
     Vertex,
     Index,
@@ -49,6 +55,9 @@ struct ShaderModuleDesc {
     std::string path;
     std::string entryPoint = "main";
     ShaderStage stage = ShaderStage::Vertex;
+    ShaderSourceKind source = ShaderSourceKind::SlangFile;
+    std::vector<std::string> searchPaths;
+    std::vector<uint32_t> spirvCode;
 };
 
 struct BufferDesc {

@@ -308,8 +308,34 @@ Result<std::shared_ptr<IShaderModule>> VulkanRenderer::createShaderModule(const 
     }
 
     auto shader = std::make_shared<Shader>();
-    if (!shader->initializeFromSlangFile(*device_, toShaderType(desc.stage), desc.path, desc.entryPoint)) {
-        return failure<std::shared_ptr<IShaderModule>>("Failed to create Vulkan shader module.");
+    const ShaderType shaderType = toShaderType(desc.stage);
+    bool initialized = false;
+
+    switch (desc.source) {
+        case ShaderSourceKind::SlangFile:
+            initialized = shader->initializeFromSlangFile(
+                *device_,
+                shaderType,
+                desc.path,
+                desc.entryPoint,
+                desc.searchPaths);
+            break;
+        case ShaderSourceKind::SpirvFile:
+            initialized = shader->initializeFromFile(*device_, shaderType, desc.path);
+            break;
+        case ShaderSourceKind::SpirvBinary:
+            if (desc.spirvCode.empty()) {
+                return failure<std::shared_ptr<IShaderModule>>(
+                    "ShaderModuleDesc.spirvCode must not be empty for SpirvBinary source.");
+            }
+            initialized = shader->initialize(*device_, shaderType, desc.spirvCode);
+            break;
+        default:
+            return failure<std::shared_ptr<IShaderModule>>("Unsupported shader source kind.");
+    }
+
+    if (!initialized) {
+        return failure<std::shared_ptr<IShaderModule>>("Failed to create Vulkan shader module from requested source.");
     }
 
     return success<std::shared_ptr<IShaderModule>>(std::make_shared<VulkanShaderModule>(shader, desc.stage));
