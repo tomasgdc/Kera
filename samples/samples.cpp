@@ -7,15 +7,28 @@
 
 namespace kera {
 
+    namespace {
+
+    void cleanupActiveSample(
+        std::vector<std::unique_ptr<Sample>>& samples,
+        int& activeSampleIndex) {
+        if (activeSampleIndex < 0 || activeSampleIndex >= static_cast<int>(samples.size())) {
+            return;
+        }
+
+        samples[activeSampleIndex]->cleanup();
+        activeSampleIndex = -1;
+    }
+
+    } // namespace
+
     // SampleApplication implementation
     SampleApplication::SampleApplication() : activeSampleIndex_(-1) {
         // Samples will be registered after renderer is initialized
     }
 
     SampleApplication::~SampleApplication() {
-        if (activeSampleIndex_ >= 0 && activeSampleIndex_ < samples_.size()) {
-            samples_[activeSampleIndex_]->cleanup();
-        }
+        cleanupActiveSample(samples_, activeSampleIndex_);
         cleanupRenderer();
     }
 
@@ -30,9 +43,7 @@ namespace kera {
         }
 
         // Cleanup current sample
-        if (activeSampleIndex_ >= 0 && activeSampleIndex_ < static_cast<int>(samples_.size())) {
-            samples_[activeSampleIndex_]->cleanup();
-        }
+        cleanupActiveSample(samples_, activeSampleIndex_);
 
         activeSampleIndex_ = index;
         samples_[activeSampleIndex_]->initialize();
@@ -91,6 +102,8 @@ namespace kera {
     }
 
     void SampleApplication::cleanupRenderer() {
+        cleanupActiveSample(samples_, activeSampleIndex_);
+
         if (renderer_) {
             renderer_->shutdown();
             renderer_.reset();
@@ -148,9 +161,6 @@ namespace kera {
             samples_[activeSampleIndex_]->render();
         }
 
-        if (renderer_) {
-            renderer_->shutdown();
-            renderer_.reset();
-        }
+        cleanupRenderer();
     }
 } // namespace kera
