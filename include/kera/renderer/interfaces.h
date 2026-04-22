@@ -15,6 +15,11 @@ public:
     virtual ShaderStage getStage() const = 0;
 };
 
+class IShaderProgram {
+public:
+    virtual ~IShaderProgram() = default;
+};
+
 class IBuffer {
 public:
     virtual ~IBuffer() = default;
@@ -46,14 +51,16 @@ public:
     virtual GraphicsBackend getBackend() const = 0;
     virtual Extent2D getDrawableExtent() const = 0;
     virtual void shutdown() = 0;
+    // Recreates swapchain-dependent backend state only. Sample-owned buffers,
+    // shader programs, and pipelines must remain valid across resize.
     virtual Result<void> resize(Extent2D newExtent) = 0;
 
     virtual Result<std::shared_ptr<IShaderModule>> createShaderModule(const ShaderModuleDesc& desc) = 0;
+    virtual Result<std::shared_ptr<IShaderProgram>> createShaderProgram(const ShaderProgramDesc& desc) = 0;
     virtual Result<std::shared_ptr<IBuffer>> createBuffer(const BufferDesc& desc) = 0;
     virtual Result<std::shared_ptr<IGraphicsPipeline>> createGraphicsPipeline(
         const GraphicsPipelineDesc& desc,
-        IShaderModule& vertexShader,
-        IShaderModule& fragmentShader) = 0;
+        IShaderProgram& program) = 0;
 
     virtual Result<std::unique_ptr<IFrame>> beginFrame() = 0;
     virtual Result<void> endFrame(std::unique_ptr<IFrame> frame) = 0;

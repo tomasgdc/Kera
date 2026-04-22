@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kera/renderer/descriptors.h"
+#include <span>
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -27,8 +28,7 @@ public:
     bool initialize(
         const Device& device,
         const RenderPass& renderPass,
-        const Shader& vertexShader,
-        const Shader& fragmentShader,
+        std::span<const Shader* const> shaders,
         const GraphicsPipelineDesc& desc = {});
     void shutdown();
 

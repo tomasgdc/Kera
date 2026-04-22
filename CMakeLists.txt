@@ -111,6 +111,7 @@ set(KERA_RENDERER_HEADERS
     include/kera/renderer/descriptors.h
     include/kera/renderer/factory.h
     include/kera/renderer/interfaces.h
+    include/kera/renderer/backend/vulkan/vulkan_renderer.h
     include/kera/renderer/vulkan_renderer.h
     include/kera/renderer/instance.h
     include/kera/renderer/device.h

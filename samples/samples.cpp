@@ -76,10 +76,6 @@ namespace kera {
             "Recreating swapchain resources for window size " +
             std::to_string(width) + "x" + std::to_string(height));
 
-        if (activeSampleIndex_ >= 0 && activeSampleIndex_ < static_cast<int>(samples_.size())) {
-            samples_[activeSampleIndex_]->cleanup();
-        }
-
         const auto resizeResult = renderer_->resize({
             static_cast<uint32_t>(width),
             static_cast<uint32_t>(height),
@@ -87,10 +83,6 @@ namespace kera {
         if (resizeResult.hasError()) {
             Logger::getInstance().error(resizeResult.error());
             return false;
-        }
-
-        if (activeSampleIndex_ >= 0 && activeSampleIndex_ < static_cast<int>(samples_.size())) {
-            samples_[activeSampleIndex_]->initialize();
         }
 
         window_->clearResizeFlag();

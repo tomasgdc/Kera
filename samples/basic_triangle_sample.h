@@ -16,14 +16,13 @@ public:
     void cleanup() override;
 
 private:
-    bool compileShaders();
+    bool createShaderProgram();
     bool createGeometry();
     bool createPipeline();
     std::shared_ptr<IRenderer> renderer_;
 
-    // Shaders
-    std::shared_ptr<IShaderModule> vertexShader_;
-    std::shared_ptr<IShaderModule> fragmentShader_;
+    // Shader program
+    std::shared_ptr<IShaderProgram> shaderProgram_;
 
     // Geometry
     std::shared_ptr<IBuffer> vertexBuffer_;

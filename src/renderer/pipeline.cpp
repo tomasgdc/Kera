@@ -64,8 +64,7 @@ Pipeline& Pipeline::operator=(Pipeline&& other) noexcept {
 bool Pipeline::initialize(
     const Device& device,
     const RenderPass& renderPass,
-    const Shader& vertexShader,
-    const Shader& fragmentShader,
+    std::span<const Shader* const> shaders,
     const GraphicsPipelineDesc& desc) {
     if (pipeline_) {
         shutdown();
@@ -84,11 +83,17 @@ bool Pipeline::initialize(
         return false;
     }
 
-    // Shader stages
-    VkPipelineShaderStageCreateInfo shaderStages[] = {
-        vertexShader.getPipelineStageInfo(),
-        fragmentShader.getPipelineStageInfo()
-    };
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+    shaderStages.reserve(shaders.size());
+    for (const Shader* shader : shaders) {
+        if (!shader) {
+            std::cerr << "Graphics pipeline initialization received a null shader stage." << std::endl;
+            vkDestroyPipelineLayout(vkDevice, pipeline_layout_, nullptr);
+            pipeline_layout_ = VK_NULL_HANDLE;
+            return false;
+        }
+        shaderStages.push_back(shader->getPipelineStageInfo());
+    }
 
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
     bindingDescriptions.reserve(desc.vertexLayout.bindings.size());
@@ -165,8 +170,8 @@ bool Pipeline::initialize(
     // Pipeline creation
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+    pipelineInfo.pStages = shaderStages.data();
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
     pipelineInfo.pViewportState = &viewportState;

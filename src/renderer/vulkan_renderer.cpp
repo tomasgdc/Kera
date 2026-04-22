@@ -1,4 +1,4 @@
-#include "kera/renderer/vulkan_renderer.h"
+#include "kera/renderer/backend/vulkan/vulkan_renderer.h"
 
 #include "kera/core/window.h"
 #include "kera/renderer/buffer.h"
@@ -14,6 +14,7 @@
 #include "kera/renderer/swapchain.h"
 #include "kera/utilities/logger.h"
 
+#include <array>
 #include <utility>
 
 namespace kera {
@@ -84,6 +85,40 @@ public:
 
 private:
     std::shared_ptr<Buffer> buffer_;
+};
+
+class VulkanShaderProgram final : public IShaderProgram {
+public:
+    explicit VulkanShaderProgram(std::vector<std::shared_ptr<Shader>> shaders)
+        : shaders_(std::move(shaders)) {}
+
+    const Shader* findShader(ShaderStage stage) const {
+        for (const auto& shader : shaders_) {
+            if (shader && shaderTypeToStage(shader->getType()) == stage) {
+                return shader.get();
+            }
+        }
+        return nullptr;
+    }
+
+    std::array<const Shader*, 2> getGraphicsShaders() const {
+        return {
+            findShader(ShaderStage::Vertex),
+            findShader(ShaderStage::Fragment),
+        };
+    }
+
+private:
+    static ShaderStage shaderTypeToStage(ShaderType type) {
+        switch (type) {
+            case ShaderType::Vertex: return ShaderStage::Vertex;
+            case ShaderType::Fragment: return ShaderStage::Fragment;
+            case ShaderType::Compute: return ShaderStage::Compute;
+            default: return ShaderStage::Vertex;
+        }
+    }
+
+    std::vector<std::shared_ptr<Shader>> shaders_;
 };
 
 class VulkanGraphicsPipeline final : public IGraphicsPipeline {
@@ -302,11 +337,11 @@ Result<void> VulkanRenderer::resize(Extent2D newExtent) {
     return success();
 }
 
-Result<std::shared_ptr<IShaderModule>> VulkanRenderer::createShaderModule(const ShaderModuleDesc& desc) {
-    if (!device_) {
-        return failure<std::shared_ptr<IShaderModule>>("Renderer is not initialized.");
-    }
+namespace {
 
+Result<std::shared_ptr<Shader>> createVulkanShaderFromDesc(
+    const Device& device,
+    const ShaderModuleDesc& desc) {
     auto shader = std::make_shared<Shader>();
     const ShaderType shaderType = toShaderType(desc.stage);
     bool initialized = false;
@@ -314,31 +349,84 @@ Result<std::shared_ptr<IShaderModule>> VulkanRenderer::createShaderModule(const 
     switch (desc.source) {
         case ShaderSourceKind::SlangFile:
             initialized = shader->initializeFromSlangFile(
-                *device_,
+                device,
                 shaderType,
                 desc.path,
                 desc.entryPoint,
                 desc.searchPaths);
             break;
         case ShaderSourceKind::SpirvFile:
-            initialized = shader->initializeFromFile(*device_, shaderType, desc.path);
+            initialized = shader->initializeFromFile(device, shaderType, desc.path);
             break;
         case ShaderSourceKind::SpirvBinary:
             if (desc.spirvCode.empty()) {
-                return failure<std::shared_ptr<IShaderModule>>(
+                return failure<std::shared_ptr<Shader>>(
                     "ShaderModuleDesc.spirvCode must not be empty for SpirvBinary source.");
             }
-            initialized = shader->initialize(*device_, shaderType, desc.spirvCode);
+            initialized = shader->initialize(device, shaderType, desc.spirvCode);
             break;
         default:
-            return failure<std::shared_ptr<IShaderModule>>("Unsupported shader source kind.");
+            return failure<std::shared_ptr<Shader>>("Unsupported shader source kind.");
     }
 
     if (!initialized) {
-        return failure<std::shared_ptr<IShaderModule>>("Failed to create Vulkan shader module from requested source.");
+        return failure<std::shared_ptr<Shader>>("Failed to create Vulkan shader module from requested source.");
     }
 
-    return success<std::shared_ptr<IShaderModule>>(std::make_shared<VulkanShaderModule>(shader, desc.stage));
+    return success<std::shared_ptr<Shader>>(std::move(shader));
+}
+
+} // namespace
+
+Result<std::shared_ptr<IShaderModule>> VulkanRenderer::createShaderModule(const ShaderModuleDesc& desc) {
+    if (!device_) {
+        return failure<std::shared_ptr<IShaderModule>>("Renderer is not initialized.");
+    }
+
+    auto shaderResult = createVulkanShaderFromDesc(*device_, desc);
+    if (shaderResult.hasError()) {
+        return failure<std::shared_ptr<IShaderModule>>(shaderResult.error());
+    }
+
+    return success<std::shared_ptr<IShaderModule>>(
+        std::make_shared<VulkanShaderModule>(shaderResult.value(), desc.stage));
+}
+
+Result<std::shared_ptr<IShaderProgram>> VulkanRenderer::createShaderProgram(const ShaderProgramDesc& desc) {
+    if (!device_) {
+        return failure<std::shared_ptr<IShaderProgram>>("Renderer is not initialized.");
+    }
+
+    if (desc.stages.empty()) {
+        return failure<std::shared_ptr<IShaderProgram>>("ShaderProgramDesc.stages must not be empty.");
+    }
+
+    std::vector<std::shared_ptr<Shader>> shaders;
+    shaders.reserve(desc.stages.size());
+
+    bool hasVertexStage = false;
+    bool hasFragmentStage = false;
+    for (const ShaderModuleDesc& stageDesc : desc.stages) {
+        if (stageDesc.stage == ShaderStage::Vertex) {
+            if (hasVertexStage) {
+                return failure<std::shared_ptr<IShaderProgram>>("Shader program contains duplicate vertex stages.");
+            }
+            hasVertexStage = true;
+        } else if (stageDesc.stage == ShaderStage::Fragment) {
+            if (hasFragmentStage) {
+                return failure<std::shared_ptr<IShaderProgram>>("Shader program contains duplicate fragment stages.");
+            }
+            hasFragmentStage = true;
+        }
+
+        auto shaderResult = createVulkanShaderFromDesc(*device_, stageDesc);
+        if (shaderResult.hasError()) {
+            return failure<std::shared_ptr<IShaderProgram>>(shaderResult.error());
+        }
+        shaders.push_back(shaderResult.value());
+    }
+
+    return success<std::shared_ptr<IShaderProgram>>(std::make_shared<VulkanShaderProgram>(std::move(shaders)));
 }
 
 Result<std::shared_ptr<IBuffer>> VulkanRenderer::createBuffer(const BufferDesc& desc) {
@@ -360,21 +448,28 @@ Result<std::shared_ptr<IBuffer>> VulkanRenderer::createBuffer(const BufferDesc& 
 
 Result<std::shared_ptr<IGraphicsPipeline>> VulkanRenderer::createGraphicsPipeline(
     const GraphicsPipelineDesc& desc,
-    IShaderModule& vertexShader,
-    IShaderModule& fragmentShader) {
+    IShaderProgram& program) {
     if (!device_ || !renderPass_) {
         return failure<std::shared_ptr<IGraphicsPipeline>>("Renderer is not initialized.");
     }
 
-    auto& vkVertexShader = dynamic_cast<VulkanShaderModule&>(vertexShader);
-    auto& vkFragmentShader = dynamic_cast<VulkanShaderModule&>(fragmentShader);
+    auto* vkProgram = dynamic_cast<VulkanShaderProgram*>(&program);
+    if (!vkProgram) {
+        return failure<std::shared_ptr<IGraphicsPipeline>>(
+            "Unexpected shader program implementation passed to VulkanRenderer::createGraphicsPipeline.");
+    }
+
+    const auto graphicsShaders = vkProgram->getGraphicsShaders();
+    if (!graphicsShaders[0] || !graphicsShaders[1]) {
+        return failure<std::shared_ptr<IGraphicsPipeline>>(
+            "Graphics pipeline creation requires shader program stages for both vertex and fragment shaders.");
+    }
 
     auto pipeline = std::make_shared<Pipeline>();
     if (!pipeline->initialize(
             *device_,
             *renderPass_,
-            vkVertexShader.shader(),
-            vkFragmentShader.shader(),
+            graphicsShaders,
             desc)) {
         return failure<std::shared_ptr<IGraphicsPipeline>>("Failed to create Vulkan graphics pipeline.");
     }

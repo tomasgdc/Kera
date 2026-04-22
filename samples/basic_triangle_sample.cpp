@@ -26,8 +26,8 @@ BasicTriangleSample::BasicTriangleSample(std::shared_ptr<IRenderer> renderer)
 void BasicTriangleSample::initialize() {
     Logger::getInstance().info("Initializing " + std::string(getName()));
 
-    if (!compileShaders()) {
-        Logger::getInstance().error("Failed to compile shaders");
+    if (!createShaderProgram()) {
+        Logger::getInstance().error("Failed to create shader program");
         return;
     }
 
@@ -44,29 +44,29 @@ void BasicTriangleSample::initialize() {
     Logger::getInstance().info("Triangle sample initialized successfully");
 }
 
-bool BasicTriangleSample::compileShaders() {
-    const auto vertexShaderResult = renderer_->createShaderModule({
-        .path = "shaders/triangle.vert.slang",
-        .entryPoint = "main",
-        .stage = ShaderStage::Vertex,
+bool BasicTriangleSample::createShaderProgram() {
+    const auto shaderProgramResult = renderer_->createShaderProgram({
+        .stages = {
+            {
+                .path = "shaders/triangle.vert.slang",
+                .entryPoint = "main",
+                .stage = ShaderStage::Vertex,
+                .source = ShaderSourceKind::SlangFile,
+            },
+            {
+                .path = "shaders/triangle.frag.slang",
+                .entryPoint = "main",
+                .stage = ShaderStage::Fragment,
+                .source = ShaderSourceKind::SlangFile,
+            },
+        },
     });
-    if (vertexShaderResult.hasError()) {
-        Logger::getInstance().error(vertexShaderResult.error());
+    if (shaderProgramResult.hasError()) {
+        Logger::getInstance().error(shaderProgramResult.error());
         return false;
     }
-    vertexShader_ = vertexShaderResult.value();
 
-    const auto fragmentShaderResult = renderer_->createShaderModule({
-        .path = "shaders/triangle.frag.slang",
-        .entryPoint = "main",
-        .stage = ShaderStage::Fragment,
-    });
-    if (fragmentShaderResult.hasError()) {
-        Logger::getInstance().error(fragmentShaderResult.error());
-        return false;
-    }
-    fragmentShader_ = fragmentShaderResult.value();
-
+    shaderProgram_ = shaderProgramResult.value();
     return true;
 }
 
@@ -139,8 +139,7 @@ bool BasicTriangleSample::createPipeline() {
 
     const auto pipelineResult = renderer_->createGraphicsPipeline(
         pipelineDesc,
-        *vertexShader_,
-        *fragmentShader_);
+        *shaderProgram_);
     if (pipelineResult.hasError()) {
         Logger::getInstance().error(pipelineResult.error());
         return false;
@@ -190,8 +189,7 @@ void BasicTriangleSample::cleanup() {
     pipeline_.reset();
     indexBuffer_.reset();
     vertexBuffer_.reset();
-    fragmentShader_.reset();
-    vertexShader_.reset();
+    shaderProgram_.reset();
 }
 
 } // namespace kera

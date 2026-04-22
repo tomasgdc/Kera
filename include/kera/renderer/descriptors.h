@@ -60,6 +60,10 @@ struct ShaderModuleDesc {
     std::vector<uint32_t> spirvCode;
 };
 
+struct ShaderProgramDesc {
+    std::vector<ShaderModuleDesc> stages;
+};
+
 struct BufferDesc {
     std::size_t size = 0;
     BufferUsageKind usage = BufferUsageKind::Vertex;
