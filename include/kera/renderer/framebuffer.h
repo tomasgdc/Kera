@@ -33,6 +33,7 @@ public:
     bool isValid() const { return !framebuffers_.empty(); }
 
 private:
+    VkDevice device_;
     std::vector<VkFramebuffer> framebuffers_;
 };
 

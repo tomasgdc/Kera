@@ -16,10 +16,12 @@ const std::vector<const char*> deviceExtensions = {
 } // anonymous namespace
 
 Device::Device()
-    : device_(VK_NULL_HANDLE)
+    : physical_device_(VK_NULL_HANDLE)
+    , device_(VK_NULL_HANDLE)
     , graphics_queue_(VK_NULL_HANDLE)
     , present_queue_(VK_NULL_HANDLE)
-    , command_pool_(VK_NULL_HANDLE) {
+    , command_pool_(VK_NULL_HANDLE)
+    , graphics_queue_family_index_(0) {
 }
 
 Device::~Device() {
@@ -27,28 +29,36 @@ Device::~Device() {
 }
 
 Device::Device(Device&& other) noexcept
-    : device_(other.device_)
+    : physical_device_(other.physical_device_)
+    , device_(other.device_)
     , graphics_queue_(other.graphics_queue_)
     , present_queue_(other.present_queue_)
-    , command_pool_(other.command_pool_) {
+    , command_pool_(other.command_pool_)
+    , graphics_queue_family_index_(other.graphics_queue_family_index_) {
+    other.physical_device_ = VK_NULL_HANDLE;
     other.device_ = VK_NULL_HANDLE;
     other.graphics_queue_ = VK_NULL_HANDLE;
     other.present_queue_ = VK_NULL_HANDLE;
     other.command_pool_ = VK_NULL_HANDLE;
+    other.graphics_queue_family_index_ = 0;
 }
 
 Device& Device::operator=(Device&& other) noexcept {
     if (this != &other) {
         shutdown();
+        physical_device_ = other.physical_device_;
         device_ = other.device_;
         graphics_queue_ = other.graphics_queue_;
         present_queue_ = other.present_queue_;
         command_pool_ = other.command_pool_;
+        graphics_queue_family_index_ = other.graphics_queue_family_index_;
 
+        other.physical_device_ = VK_NULL_HANDLE;
         other.device_ = VK_NULL_HANDLE;
         other.graphics_queue_ = VK_NULL_HANDLE;
         other.present_queue_ = VK_NULL_HANDLE;
         other.command_pool_ = VK_NULL_HANDLE;
+        other.graphics_queue_family_index_ = 0;
     }
     return *this;
 }
@@ -60,6 +70,8 @@ bool Device::initialize(const PhysicalDevice& physicalDevice) {
 
     VkPhysicalDevice vkPhysicalDevice = physicalDevice.getVulkanPhysicalDevice();
     const auto& queueFamilies = physicalDevice.getQueueFamilyIndices();
+    physical_device_ = vkPhysicalDevice;
+    graphics_queue_family_index_ = static_cast<uint32_t>(queueFamilies.graphicsFamily);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
@@ -114,9 +126,11 @@ void Device::shutdown() {
 
     if (device_) {
         vkDestroyDevice(device_, nullptr);
+        physical_device_ = VK_NULL_HANDLE;
         device_ = VK_NULL_HANDLE;
         graphics_queue_ = VK_NULL_HANDLE;
         present_queue_ = VK_NULL_HANDLE;
+        graphics_queue_family_index_ = 0;
         std::cout << "Logical device destroyed" << std::endl;
     }
 }
@@ -129,7 +143,7 @@ bool Device::createCommandPool() {
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolInfo.queueFamilyIndex = 0; // TODO: Use graphics queue family index
+    poolInfo.queueFamilyIndex = graphics_queue_family_index_;
 
     VkResult result = vkCreateCommandPool(device_, &poolInfo, nullptr, &command_pool_);
     if (result != VK_SUCCESS) {

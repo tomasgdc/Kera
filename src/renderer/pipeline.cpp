@@ -8,7 +8,8 @@
 namespace kera {
 
 Pipeline::Pipeline()
-    : pipeline_(VK_NULL_HANDLE)
+    : device_(VK_NULL_HANDLE)
+    , pipeline_(VK_NULL_HANDLE)
     , pipeline_layout_(VK_NULL_HANDLE) {
 }
 
@@ -17,8 +18,10 @@ Pipeline::~Pipeline() {
 }
 
 Pipeline::Pipeline(Pipeline&& other) noexcept
-    : pipeline_(other.pipeline_)
+    : device_(other.device_)
+    , pipeline_(other.pipeline_)
     , pipeline_layout_(other.pipeline_layout_) {
+    other.device_ = VK_NULL_HANDLE;
     other.pipeline_ = VK_NULL_HANDLE;
     other.pipeline_layout_ = VK_NULL_HANDLE;
 }
@@ -26,9 +29,11 @@ Pipeline::Pipeline(Pipeline&& other) noexcept
 Pipeline& Pipeline::operator=(Pipeline&& other) noexcept {
     if (this != &other) {
         shutdown();
+        device_ = other.device_;
         pipeline_ = other.pipeline_;
         pipeline_layout_ = other.pipeline_layout_;
 
+        other.device_ = VK_NULL_HANDLE;
         other.pipeline_ = VK_NULL_HANDLE;
         other.pipeline_layout_ = VK_NULL_HANDLE;
     }
@@ -41,6 +46,7 @@ bool Pipeline::initialize(const Device& device, const RenderPass& renderPass, co
     }
 
     VkDevice vkDevice = device.getVulkanDevice();
+    device_ = vkDevice;
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -59,8 +65,28 @@ bool Pipeline::initialize(const Device& device, const RenderPass& renderPass, co
     };
 
     // Vertex input
+    VkVertexInputBindingDescription bindingDescription{};
+    bindingDescription.binding = 0;
+    bindingDescription.stride = sizeof(float) * 6;
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkVertexInputAttributeDescription attributeDescriptions[2]{};
+    attributeDescriptions[0].binding = 0;
+    attributeDescriptions[0].location = 0;
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[0].offset = 0;
+
+    attributeDescriptions[1].binding = 0;
+    attributeDescriptions[1].location = 1;
+    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[1].offset = sizeof(float) * 3;
+
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
     // Input assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -136,16 +162,15 @@ bool Pipeline::initialize(const Device& device, const RenderPass& renderPass, co
 
 void Pipeline::shutdown() {
     if (pipeline_) {
-        // TODO: Need device reference
-        // vkDestroyPipeline(device, pipeline_, nullptr);
+        vkDestroyPipeline(device_, pipeline_, nullptr);
         pipeline_ = VK_NULL_HANDLE;
     }
 
     if (pipeline_layout_) {
-        // TODO: Need device reference
-        // vkDestroyPipelineLayout(device, pipeline_layout_, nullptr);
+        vkDestroyPipelineLayout(device_, pipeline_layout_, nullptr);
         pipeline_layout_ = VK_NULL_HANDLE;
     }
+    device_ = VK_NULL_HANDLE;
 }
 
 } // namespace kera

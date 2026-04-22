@@ -7,7 +7,8 @@
 
 namespace kera {
 
-Framebuffer::Framebuffer() {
+Framebuffer::Framebuffer()
+    : device_(VK_NULL_HANDLE) {
 }
 
 Framebuffer::~Framebuffer() {
@@ -15,13 +16,17 @@ Framebuffer::~Framebuffer() {
 }
 
 Framebuffer::Framebuffer(Framebuffer&& other) noexcept
-    : framebuffers_(std::move(other.framebuffers_)) {
+    : device_(other.device_)
+    , framebuffers_(std::move(other.framebuffers_)) {
+    other.device_ = VK_NULL_HANDLE;
 }
 
 Framebuffer& Framebuffer::operator=(Framebuffer&& other) noexcept {
     if (this != &other) {
         shutdown();
+        device_ = other.device_;
         framebuffers_ = std::move(other.framebuffers_);
+        other.device_ = VK_NULL_HANDLE;
     }
     return *this;
 }
@@ -30,6 +35,7 @@ bool Framebuffer::initialize(const Device& device, const RenderPass& renderPass,
     shutdown();
 
     VkDevice vkDevice = device.getVulkanDevice();
+    device_ = vkDevice;
     const auto& imageViews = swapChain.getImageViews();
     VkExtent2D extent = swapChain.getExtent();
 
@@ -62,15 +68,13 @@ bool Framebuffer::initialize(const Device& device, const RenderPass& renderPass,
 }
 
 void Framebuffer::shutdown() {
-    // TODO: Need device reference to destroy framebuffers
-    /*
     for (auto framebuffer : framebuffers_) {
         if (framebuffer) {
-            vkDestroyFramebuffer(device, framebuffer, nullptr);
+            vkDestroyFramebuffer(device_, framebuffer, nullptr);
         }
     }
-    */
     framebuffers_.clear();
+    device_ = VK_NULL_HANDLE;
 }
 
 VkFramebuffer Framebuffer::getFramebuffer(uint32_t index) const {

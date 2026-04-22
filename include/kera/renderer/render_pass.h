@@ -28,6 +28,7 @@ public:
     bool isValid() const { return render_pass_ != VK_NULL_HANDLE; }
 
 private:
+    VkDevice device_;
     VkRenderPass render_pass_;
 };
 

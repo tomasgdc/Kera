@@ -45,6 +45,7 @@ public:
     bool copyFrom(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
 
 private:
+    VkDevice device_;
     VkBuffer buffer_;
     VkDeviceMemory memory_;
     VkDeviceSize size_;

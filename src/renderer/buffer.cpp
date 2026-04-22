@@ -1,7 +1,9 @@
 #include "kera/renderer/buffer.h"
 #include "kera/renderer/device.h"
 #include <vulkan/vulkan.h>
+#include <cstring>
 #include <iostream>
+#include <stdexcept>
 
 namespace kera {
 
@@ -23,7 +25,8 @@ uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, Vk
 } // anonymous namespace
 
 Buffer::Buffer()
-    : buffer_(VK_NULL_HANDLE)
+    : device_(VK_NULL_HANDLE)
+    , buffer_(VK_NULL_HANDLE)
     , memory_(VK_NULL_HANDLE)
     , size_(0)
     , mapped_data_(nullptr) {
@@ -34,10 +37,12 @@ Buffer::~Buffer() {
 }
 
 Buffer::Buffer(Buffer&& other) noexcept
-    : buffer_(other.buffer_)
+    : device_(other.device_)
+    , buffer_(other.buffer_)
     , memory_(other.memory_)
     , size_(other.size_)
     , mapped_data_(other.mapped_data_) {
+    other.device_ = VK_NULL_HANDLE;
     other.buffer_ = VK_NULL_HANDLE;
     other.memory_ = VK_NULL_HANDLE;
     other.size_ = 0;
@@ -47,11 +52,13 @@ Buffer::Buffer(Buffer&& other) noexcept
 Buffer& Buffer::operator=(Buffer&& other) noexcept {
     if (this != &other) {
         shutdown();
+        device_ = other.device_;
         buffer_ = other.buffer_;
         memory_ = other.memory_;
         size_ = other.size_;
         mapped_data_ = other.mapped_data_;
 
+        other.device_ = VK_NULL_HANDLE;
         other.buffer_ = VK_NULL_HANDLE;
         other.memory_ = VK_NULL_HANDLE;
         other.size_ = 0;
@@ -66,6 +73,8 @@ bool Buffer::initialize(const Device& device, VkDeviceSize size, BufferUsage usa
     }
 
     VkDevice vkDevice = device.getVulkanDevice();
+    VkPhysicalDevice vkPhysicalDevice = device.getVulkanPhysicalDevice();
+    device_ = vkDevice;
     size_ = size;
 
     VkBufferCreateInfo bufferInfo{};
@@ -107,7 +116,7 @@ bool Buffer::initialize(const Device& device, VkDeviceSize size, BufferUsage usa
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(VK_NULL_HANDLE, memRequirements.memoryTypeBits, properties); // TODO: Need physical device
+    allocInfo.memoryTypeIndex = findMemoryType(vkPhysicalDevice, memRequirements.memoryTypeBits, properties);
 
     result = vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory_);
     if (result != VK_SUCCESS) {
@@ -129,17 +138,16 @@ void Buffer::shutdown() {
     }
 
     if (buffer_) {
-        // TODO: Need device reference
-        // vkDestroyBuffer(device, buffer_, nullptr);
+        vkDestroyBuffer(device_, buffer_, nullptr);
         buffer_ = VK_NULL_HANDLE;
     }
 
     if (memory_) {
-        // TODO: Need device reference
-        // vkFreeMemory(device, memory_, nullptr);
+        vkFreeMemory(device_, memory_, nullptr);
         memory_ = VK_NULL_HANDLE;
     }
 
+    device_ = VK_NULL_HANDLE;
     size_ = 0;
 }
 
@@ -148,11 +156,10 @@ bool Buffer::map(void** data) {
         return false;
     }
 
-    // TODO: Need device reference
-    // VkResult result = vkMapMemory(device, memory_, 0, size_, 0, &mapped_data_);
-    // if (result != VK_SUCCESS) {
-    //     return false;
-    // }
+    VkResult result = vkMapMemory(device_, memory_, 0, size_, 0, &mapped_data_);
+    if (result != VK_SUCCESS) {
+        return false;
+    }
 
     *data = mapped_data_;
     return true;
@@ -160,8 +167,7 @@ bool Buffer::map(void** data) {
 
 void Buffer::unmap() {
     if (mapped_data_ && memory_) {
-        // TODO: Need device reference
-        // vkUnmapMemory(device, memory_);
+        vkUnmapMemory(device_, memory_);
         mapped_data_ = nullptr;
     }
 }

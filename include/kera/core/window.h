@@ -25,6 +25,8 @@ public:
 
     bool shouldClose() const;
     void processEvents();
+    bool wasResized() const { return was_resized_; }
+    void clearResizeFlag() { was_resized_ = false; }
 
     SDL_Window* getSDLWindow() const { return window_; }
     int getWidth() const { return width_; }
@@ -35,6 +37,7 @@ private:
     int width_;
     int height_;
     bool should_close_;
+    bool was_resized_;
 };
 
 } // namespace kera

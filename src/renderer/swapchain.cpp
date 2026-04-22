@@ -4,24 +4,29 @@
 #include <vulkan/vulkan.h>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
 namespace kera {
 
 SwapChain::SwapChain()
-    : swap_chain_(VK_NULL_HANDLE)
-    , image_format_(VK_FORMAT_UNDEFINED) {
-}
+    : device_(VK_NULL_HANDLE)
+    , swap_chain_(VK_NULL_HANDLE)
+    , image_format_(VK_FORMAT_UNDEFINED)
+    , extent_({0, 0})
+{}
 
 SwapChain::~SwapChain() {
     shutdown();
 }
 
 SwapChain::SwapChain(SwapChain&& other) noexcept
-    : swap_chain_(other.swap_chain_)
+    : device_(other.device_)
+    , swap_chain_(other.swap_chain_)
     , image_format_(other.image_format_)
     , extent_(other.extent_)
     , images_(std::move(other.images_))
     , image_views_(std::move(other.image_views_)) {
+    other.device_ = VK_NULL_HANDLE;
     other.swap_chain_ = VK_NULL_HANDLE;
     other.image_format_ = VK_FORMAT_UNDEFINED;
 }
@@ -29,12 +34,14 @@ SwapChain::SwapChain(SwapChain&& other) noexcept
 SwapChain& SwapChain::operator=(SwapChain&& other) noexcept {
     if (this != &other) {
         shutdown();
+        device_ = other.device_;
         swap_chain_ = other.swap_chain_;
         image_format_ = other.image_format_;
         extent_ = other.extent_;
         images_ = std::move(other.images_);
         image_views_ = std::move(other.image_views_);
 
+        other.device_ = VK_NULL_HANDLE;
         other.swap_chain_ = VK_NULL_HANDLE;
         other.image_format_ = VK_FORMAT_UNDEFINED;
     }
@@ -48,6 +55,7 @@ bool SwapChain::initialize(const PhysicalDevice& physicalDevice, const Device& d
 
     //VkPhysicalDevice vkPhysicalDevice = physicalDevice.getVulkanPhysicalDevice();
     VkDevice vkDevice = device.getVulkanDevice();
+    device_ = vkDevice;
     const auto& swapChainSupport = physicalDevice.getSwapChainSupport();
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -113,15 +121,20 @@ bool SwapChain::initialize(const PhysicalDevice& physicalDevice, const Device& d
 }
 
 void SwapChain::shutdown() {
+    for (VkImageView imageView : image_views_) {
+        if (imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device_, imageView, nullptr);
+        }
+    }
     image_views_.clear();
     images_.clear();
 
     if (swap_chain_) {
-        // TODO: Need device reference to destroy
-        // vkDestroySwapchainKHR(device, swap_chain_, nullptr);
+        vkDestroySwapchainKHR(device_, swap_chain_, nullptr);
         swap_chain_ = VK_NULL_HANDLE;
         std::cout << "Swap chain destroyed" << std::endl;
     }
+    device_ = VK_NULL_HANDLE;
 }
 
 VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const {
@@ -154,10 +167,51 @@ VkExtent2D SwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilit
 }
 
 bool SwapChain::createImageViews() {
-    // TODO: Implement image view creation
-    // This requires device reference
     image_views_.resize(images_.size());
+    for (size_t i = 0; i < images_.size(); ++i) {
+        VkImageViewCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image = images_[i];
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = image_format_;
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.layerCount = 1;
+
+        VkResult result = vkCreateImageView(device_, &createInfo, nullptr, &image_views_[i]);
+        if (result != VK_SUCCESS) {
+            std::cerr << "Failed to create image view " << i << ": " << result << std::endl;
+            return false;
+        }
+    }
     return true;
+}
+
+VkResult SwapChain::acquireNextImage(VkSemaphore imageAvailableSemaphore, VkFence fence, uint32_t* imageIndex) const {
+    return vkAcquireNextImageKHR(
+        device_,
+        swap_chain_,
+        std::numeric_limits<uint64_t>::max(),
+        imageAvailableSemaphore,
+        fence,
+        imageIndex);
+}
+
+VkResult SwapChain::present(uint32_t imageIndex, VkSemaphore renderFinishedSemaphore, VkQueue presentQueue) const {
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &swap_chain_;
+    presentInfo.pImageIndices = &imageIndex;
+    return vkQueuePresentKHR(presentQueue, &presentInfo);
 }
 
 } // namespace kera

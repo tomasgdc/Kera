@@ -28,11 +28,15 @@ public:
     VkSwapchainKHR getVulkanSwapChain() const { return swap_chain_; }
     VkFormat getImageFormat() const { return image_format_; }
     VkExtent2D getExtent() const { return extent_; }
+    const std::vector<VkImage>& getImages() const { return images_; }
     const std::vector<VkImageView>& getImageViews() const { return image_views_; }
 
     uint32_t getImageCount() const { return static_cast<uint32_t>(images_.size()); }
 
     bool isValid() const { return swap_chain_ != VK_NULL_HANDLE; }
+
+    VkResult acquireNextImage(VkSemaphore imageAvailableSemaphore, VkFence fence, uint32_t* imageIndex) const;
+    VkResult present(uint32_t imageIndex, VkSemaphore renderFinishedSemaphore, VkQueue presentQueue) const;
 
 private:
     struct SwapChainSupportDetails {
@@ -47,6 +51,7 @@ private:
 
     bool createImageViews();
 
+    VkDevice device_;
     VkSwapchainKHR swap_chain_;
     VkFormat image_format_;
     VkExtent2D extent_;

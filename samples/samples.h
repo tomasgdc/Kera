@@ -8,6 +8,12 @@ namespace kera {
 
 // Forward declarations
 class Sample;
+class Instance;
+class Device;
+class PhysicalDevice;
+class Surface;
+class SwapChain;
+class Window;
 
 class SampleApplication {
 public:
@@ -19,8 +25,20 @@ public:
     void setActiveSample(int index);
 
 private:
+    bool initializeRenderer();
+    bool recreateSwapchainResources();
+    void cleanupRenderer();
+
     std::vector<std::unique_ptr<Sample>> samples_;
     int activeSampleIndex_;
+
+    // Window and renderer resources
+    std::unique_ptr<Window> window_;
+    std::shared_ptr<Instance> instance_;
+    std::shared_ptr<PhysicalDevice> physicalDevice_;
+    std::shared_ptr<Device> device_;
+    std::shared_ptr<Surface> surface_;
+    std::shared_ptr<SwapChain> swapchain_;
 };
 
 class Sample {

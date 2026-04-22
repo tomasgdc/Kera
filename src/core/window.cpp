@@ -8,7 +8,8 @@ Window::Window()
     : window_(nullptr)
     , width_(0)
     , height_(0)
-    , should_close_(false) {
+    , should_close_(false)
+    , was_resized_(false) {
 }
 
 Window::~Window() {
@@ -19,11 +20,13 @@ Window::Window(Window&& other) noexcept
     : window_(other.window_)
     , width_(other.width_)
     , height_(other.height_)
-    , should_close_(other.should_close_) {
+    , should_close_(other.should_close_)
+    , was_resized_(other.was_resized_) {
     other.window_ = nullptr;
     other.width_ = 0;
     other.height_ = 0;
     other.should_close_ = false;
+    other.was_resized_ = false;
 }
 
 Window& Window::operator=(Window&& other) noexcept {
@@ -33,11 +36,13 @@ Window& Window::operator=(Window&& other) noexcept {
         width_ = other.width_;
         height_ = other.height_;
         should_close_ = other.should_close_;
+        was_resized_ = other.was_resized_;
 
         other.window_ = nullptr;
         other.width_ = 0;
         other.height_ = 0;
         other.should_close_ = false;
+        other.was_resized_ = false;
     }
     return *this;
 }
@@ -63,6 +68,7 @@ bool Window::initialize(const std::string& title, int width, int height) {
     width_ = width;
     height_ = height;
     should_close_ = false;
+    was_resized_ = false;
 
     std::cout << "Window initialized: " << title << " (" << width << "x" << height << ")" << std::endl;
     return true;
@@ -75,6 +81,7 @@ void Window::shutdown() {
         width_ = 0;
         height_ = 0;
         should_close_ = false;
+        was_resized_ = false;
         std::cout << "Window shutdown" << std::endl;
     }
 }
@@ -91,8 +98,10 @@ void Window::processEvents() {
                 should_close_ = true;
                 break;
             case SDL_EVENT_WINDOW_RESIZED:
+            case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 width_ = event.window.data1;
                 height_ = event.window.data2;
+                was_resized_ = true;
                 break;
             // TODO: Handle other events (keyboard, mouse, etc.)
             default:

@@ -32,6 +32,7 @@ public:
     bool isValid() const { return pipeline_ != VK_NULL_HANDLE; }
 
 private:
+    VkDevice device_;
     VkPipeline pipeline_;
     VkPipelineLayout pipeline_layout_;
 };

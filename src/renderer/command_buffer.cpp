@@ -6,7 +6,9 @@
 namespace kera {
 
 CommandBuffer::CommandBuffer()
-    : command_buffer_(VK_NULL_HANDLE) {
+    : device_(VK_NULL_HANDLE)
+    , command_pool_(VK_NULL_HANDLE)
+    , command_buffer_(VK_NULL_HANDLE) {
 }
 
 CommandBuffer::~CommandBuffer() {
@@ -14,14 +16,22 @@ CommandBuffer::~CommandBuffer() {
 }
 
 CommandBuffer::CommandBuffer(CommandBuffer&& other) noexcept
-    : command_buffer_(other.command_buffer_) {
+    : device_(other.device_)
+    , command_pool_(other.command_pool_)
+    , command_buffer_(other.command_buffer_) {
+    other.device_ = VK_NULL_HANDLE;
+    other.command_pool_ = VK_NULL_HANDLE;
     other.command_buffer_ = VK_NULL_HANDLE;
 }
 
 CommandBuffer& CommandBuffer::operator=(CommandBuffer&& other) noexcept {
     if (this != &other) {
         shutdown();
+        device_ = other.device_;
+        command_pool_ = other.command_pool_;
         command_buffer_ = other.command_buffer_;
+        other.device_ = VK_NULL_HANDLE;
+        other.command_pool_ = VK_NULL_HANDLE;
         other.command_buffer_ = VK_NULL_HANDLE;
     }
     return *this;
@@ -32,9 +42,11 @@ bool CommandBuffer::initialize(const Device& device) {
         shutdown();
     }
 
+    device_ = device.getVulkanDevice();
+    command_pool_ = device.getCommandPool();
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = device.getCommandPool();
+    allocInfo.commandPool = command_pool_;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = 1;
 
@@ -49,10 +61,11 @@ bool CommandBuffer::initialize(const Device& device) {
 
 void CommandBuffer::shutdown() {
     if (command_buffer_) {
-        // TODO: Need device reference to free command buffer
-        // vkFreeCommandBuffers(device, commandPool, 1, &command_buffer_);
+        vkFreeCommandBuffers(device_, command_pool_, 1, &command_buffer_);
         command_buffer_ = VK_NULL_HANDLE;
     }
+    command_pool_ = VK_NULL_HANDLE;
+    device_ = VK_NULL_HANDLE;
 }
 
 bool CommandBuffer::begin() {

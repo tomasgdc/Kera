@@ -33,6 +33,8 @@ public:
     void reset();
 
 private:
+    VkDevice device_;
+    VkCommandPool command_pool_;
     VkCommandBuffer command_buffer_;
 };
 

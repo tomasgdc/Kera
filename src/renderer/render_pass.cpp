@@ -7,7 +7,8 @@
 namespace kera {
 
 RenderPass::RenderPass()
-    : render_pass_(VK_NULL_HANDLE) {
+    : device_(VK_NULL_HANDLE)
+    , render_pass_(VK_NULL_HANDLE) {
 }
 
 RenderPass::~RenderPass() {
@@ -15,14 +16,18 @@ RenderPass::~RenderPass() {
 }
 
 RenderPass::RenderPass(RenderPass&& other) noexcept
-    : render_pass_(other.render_pass_) {
+    : device_(other.device_)
+    , render_pass_(other.render_pass_) {
+    other.device_ = VK_NULL_HANDLE;
     other.render_pass_ = VK_NULL_HANDLE;
 }
 
 RenderPass& RenderPass::operator=(RenderPass&& other) noexcept {
     if (this != &other) {
         shutdown();
+        device_ = other.device_;
         render_pass_ = other.render_pass_;
+        other.device_ = VK_NULL_HANDLE;
         other.render_pass_ = VK_NULL_HANDLE;
     }
     return *this;
@@ -34,6 +39,7 @@ bool RenderPass::initialize(const Device& device, const SwapChain& swapChain) {
     }
 
     VkDevice vkDevice = device.getVulkanDevice();
+    device_ = vkDevice;
 
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = swapChain.getImageFormat();
@@ -83,10 +89,10 @@ bool RenderPass::initialize(const Device& device, const SwapChain& swapChain) {
 
 void RenderPass::shutdown() {
     if (render_pass_) {
-        // TODO: Need device reference
-        // vkDestroyRenderPass(device, render_pass_, nullptr);
+        vkDestroyRenderPass(device_, render_pass_, nullptr);
         render_pass_ = VK_NULL_HANDLE;
     }
+    device_ = VK_NULL_HANDLE;
 }
 
 } // namespace kera
