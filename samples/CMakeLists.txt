@@ -14,7 +14,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/shaders"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-            "${CMAKE_BINARY_DIR}/shaders"
+            "${CMAKE_BINARY_DIR}/samples/shaders"
     )
 endif()
 
