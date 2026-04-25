@@ -1,20 +1,23 @@
 #include "kera/renderer/factory.h"
 
 #include "kera/renderer/backend/vulkan/vulkan_renderer.h"
+#include "kera/utilities/logger.h"
 
 namespace kera {
 
-Result<std::shared_ptr<IRenderer>> CreateRenderer(GraphicsBackend backend, Window& window) {
+std::shared_ptr<IRenderer> CreateRenderer(GraphicsBackend backend, Window& window) {
     switch (backend) {
         case GraphicsBackend::Vulkan: {
             auto renderer = std::make_shared<VulkanRenderer>();
             if (!renderer->initialize(window)) {
-                return failure<std::shared_ptr<IRenderer>>("Failed to initialize Vulkan renderer.");
+                Logger::getInstance().error("Failed to initialize Vulkan renderer.");
+                return nullptr;
             }
-            return success<std::shared_ptr<IRenderer>>(std::move(renderer));
+            return renderer;
         }
         default:
-            return failure<std::shared_ptr<IRenderer>>("Requested graphics backend is not supported.");
+            Logger::getInstance().error("Requested graphics backend is not supported.");
+            return nullptr;
     }
 }
 

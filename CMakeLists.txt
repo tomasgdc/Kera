@@ -133,19 +133,20 @@ set(KERA_UTILITIES_SOURCES
     src/utilities/logger.cpp
     src/utilities/validation.cpp
     src/utilities/file_utils.cpp
+    src/utilities/json.cpp
 )
 
 set(KERA_UTILITIES_HEADERS
     include/kera/utilities/logger.h
     include/kera/utilities/validation.h
     include/kera/utilities/file_utils.h
+    include/kera/utilities/json.h
 )
 
 # === COMMON HEADERS ===
 set(KERA_COMMON_HEADERS
     include/kera/kera.h
     include/kera/types.h
-    include/kera/result.h
 )
 
 # Combine all sources

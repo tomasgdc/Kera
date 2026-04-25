@@ -1,0 +1,14 @@
+{
+  "shaders": [
+    {
+      "path": "shaders/triangle.vert.slang",
+      "stage": "vertex",
+      "entryPoint": "main"
+    },
+    {
+      "path": "shaders/triangle.frag.slang",
+      "stage": "fragment",
+      "entryPoint": "main"
+    }
+  ]
+}

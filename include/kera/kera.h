@@ -17,7 +17,6 @@
 
 // Common includes
 #include "kera/types.h"
-#include "kera/result.h"
 
 // Standard library includes commonly used
 #include <memory>

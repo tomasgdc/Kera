@@ -74,11 +74,12 @@ public:
         return static_cast<std::size_t>(buffer_->getSize());
     }
 
-    Result<void> upload(const void* data, std::size_t size, std::size_t offset = 0) override {
+    bool upload(const void* data, std::size_t size, std::size_t offset = 0) override {
         if (!buffer_->copyFrom(data, size, offset)) {
-            return failure("Failed to upload data to Vulkan buffer.");
+            Logger::getInstance().error("Failed to upload data to Vulkan buffer.");
+            return false;
         }
-        return success();
+        return true;
     }
 
     Buffer& buffer() const { return *buffer_; }
@@ -318,31 +319,34 @@ Extent2D VulkanRenderer::getDrawableExtent() const {
     return { extent.width, extent.height };
 }
 
-Result<void> VulkanRenderer::resize(Extent2D newExtent) {
+bool VulkanRenderer::resize(Extent2D newExtent) {
     if (!device_ || !surface_ || !physicalDevice_ || !swapchain_) {
-        return failure("Renderer is not initialized.");
+        Logger::getInstance().error("Renderer is not initialized.");
+        return false;
     }
 
     if (newExtent.width == 0 || newExtent.height == 0) {
-        return success();
+        return true;
     }
 
     vkDeviceWaitIdle(device_->getVulkanDevice());
 
     if (!recreateSwapchainResources(newExtent.width, newExtent.height)) {
-        return failure("Failed to recreate Vulkan swapchain resources.");
+        Logger::getInstance().error("Failed to recreate Vulkan swapchain resources.");
+        return false;
     }
 
     if (!createSyncObjects()) {
-        return failure("Failed to recreate Vulkan frame synchronization objects.");
+        Logger::getInstance().error("Failed to recreate Vulkan frame synchronization objects.");
+        return false;
     }
 
-    return success();
+    return true;
 }
 
 namespace {
 
-Result<std::shared_ptr<Shader>> createVulkanShaderFromDesc(
+std::shared_ptr<Shader> createVulkanShaderFromDesc(
     const Device& device,
     const ShaderModuleDesc& desc) {
     auto shader = std::make_shared<Shader>();
@@ -363,45 +367,49 @@ Result<std::shared_ptr<Shader>> createVulkanShaderFromDesc(
             break;
         case ShaderSourceKind::SpirvBinary:
             if (desc.spirvCode.empty()) {
-                return failure<std::shared_ptr<Shader>>(
-                    "ShaderModuleDesc.spirvCode must not be empty for SpirvBinary source.");
+                Logger::getInstance().error("ShaderModuleDesc.spirvCode must not be empty for SpirvBinary source.");
+                return nullptr;
             }
             initialized = shader->initialize(device, shaderType, desc.spirvCode);
             break;
         default:
-            return failure<std::shared_ptr<Shader>>("Unsupported shader source kind.");
+            Logger::getInstance().error("Unsupported shader source kind.");
+            return nullptr;
     }
 
     if (!initialized) {
-        return failure<std::shared_ptr<Shader>>("Failed to create Vulkan shader module from requested source.");
+        Logger::getInstance().error("Failed to create Vulkan shader module from requested source.");
+        return nullptr;
     }
 
-    return success<std::shared_ptr<Shader>>(std::move(shader));
+    return shader;
 }
 
 } // namespace
 
-Result<std::shared_ptr<IShaderModule>> VulkanRenderer::createShaderModule(const ShaderModuleDesc& desc) {
+std::shared_ptr<IShaderModule> VulkanRenderer::createShaderModule(const ShaderModuleDesc& desc) {
     if (!device_) {
-        return failure<std::shared_ptr<IShaderModule>>("Renderer is not initialized.");
+        Logger::getInstance().error("Renderer is not initialized.");
+        return nullptr;
     }
 
-    auto shaderResult = createVulkanShaderFromDesc(*device_, desc);
-    if (shaderResult.hasError()) {
-        return failure<std::shared_ptr<IShaderModule>>(shaderResult.error());
+    auto shader = createVulkanShaderFromDesc(*device_, desc);
+    if (!shader) {
+        return nullptr;
     }
 
-    return success<std::shared_ptr<IShaderModule>>(
-        std::make_shared<VulkanShaderModule>(shaderResult.value(), desc.stage));
+    return std::make_shared<VulkanShaderModule>(shader, desc.stage);
 }
 
-Result<std::shared_ptr<IShaderProgram>> VulkanRenderer::createShaderProgram(const ShaderProgramDesc& desc) {
+std::shared_ptr<IShaderProgram> VulkanRenderer::createShaderProgram(const ShaderProgramDesc& desc) {
     if (!device_) {
-        return failure<std::shared_ptr<IShaderProgram>>("Renderer is not initialized.");
+        Logger::getInstance().error("Renderer is not initialized.");
+        return nullptr;
     }
 
     if (desc.stages.empty()) {
-        return failure<std::shared_ptr<IShaderProgram>>("ShaderProgramDesc.stages must not be empty.");
+        Logger::getInstance().error("ShaderProgramDesc.stages must not be empty.");
+        return nullptr;
     }
 
     std::vector<std::shared_ptr<Shader>> shaders;
@@ -412,29 +420,32 @@ Result<std::shared_ptr<IShaderProgram>> VulkanRenderer::createShaderProgram(cons
     for (const ShaderModuleDesc& stageDesc : desc.stages) {
         if (stageDesc.stage == ShaderStage::Vertex) {
             if (hasVertexStage) {
-                return failure<std::shared_ptr<IShaderProgram>>("Shader program contains duplicate vertex stages.");
+                Logger::getInstance().error("Shader program contains duplicate vertex stages.");
+                return nullptr;
             }
             hasVertexStage = true;
         } else if (stageDesc.stage == ShaderStage::Fragment) {
             if (hasFragmentStage) {
-                return failure<std::shared_ptr<IShaderProgram>>("Shader program contains duplicate fragment stages.");
+                Logger::getInstance().error("Shader program contains duplicate fragment stages.");
+                return nullptr;
             }
             hasFragmentStage = true;
         }
 
-        auto shaderResult = createVulkanShaderFromDesc(*device_, stageDesc);
-        if (shaderResult.hasError()) {
-            return failure<std::shared_ptr<IShaderProgram>>(shaderResult.error());
+        auto shader = createVulkanShaderFromDesc(*device_, stageDesc);
+        if (!shader) {
+            return nullptr;
         }
-        shaders.push_back(shaderResult.value());
+        shaders.push_back(shader);
     }
 
-    return success<std::shared_ptr<IShaderProgram>>(std::make_shared<VulkanShaderProgram>(std::move(shaders)));
+    return std::make_shared<VulkanShaderProgram>(std::move(shaders));
 }
 
-Result<std::shared_ptr<IBuffer>> VulkanRenderer::createBuffer(const BufferDesc& desc) {
+std::shared_ptr<IBuffer> VulkanRenderer::createBuffer(const BufferDesc& desc) {
     if (!device_) {
-        return failure<std::shared_ptr<IBuffer>>("Renderer is not initialized.");
+        Logger::getInstance().error("Renderer is not initialized.");
+        return nullptr;
     }
 
     auto buffer = std::make_shared<Buffer>();
@@ -443,29 +454,33 @@ Result<std::shared_ptr<IBuffer>> VulkanRenderer::createBuffer(const BufferDesc& 
             static_cast<VkDeviceSize>(desc.size),
             toBufferUsage(desc.usage),
             toMemoryFlags(desc.memoryAccess))) {
-        return failure<std::shared_ptr<IBuffer>>("Failed to create Vulkan buffer.");
+        Logger::getInstance().error("Failed to create Vulkan buffer.");
+        return nullptr;
     }
 
-    return success<std::shared_ptr<IBuffer>>(std::make_shared<VulkanBuffer>(buffer));
+    return std::make_shared<VulkanBuffer>(buffer);
 }
 
-Result<std::shared_ptr<IGraphicsPipeline>> VulkanRenderer::createGraphicsPipeline(
+std::shared_ptr<IGraphicsPipeline> VulkanRenderer::createGraphicsPipeline(
     const GraphicsPipelineDesc& desc,
     IShaderProgram& program) {
     if (!device_ || !renderPass_) {
-        return failure<std::shared_ptr<IGraphicsPipeline>>("Renderer is not initialized.");
+        Logger::getInstance().error("Renderer is not initialized.");
+        return nullptr;
     }
 
     auto* vkProgram = dynamic_cast<VulkanShaderProgram*>(&program);
     if (!vkProgram) {
-        return failure<std::shared_ptr<IGraphicsPipeline>>(
+        Logger::getInstance().error(
             "Unexpected shader program implementation passed to VulkanRenderer::createGraphicsPipeline.");
+        return nullptr;
     }
 
     const auto graphicsShaders = vkProgram->getGraphicsShaders();
     if (!graphicsShaders[0] || !graphicsShaders[1]) {
-        return failure<std::shared_ptr<IGraphicsPipeline>>(
+        Logger::getInstance().error(
             "Graphics pipeline creation requires shader program stages for both vertex and fragment shaders.");
+        return nullptr;
     }
 
     auto pipeline = std::make_shared<Pipeline>();
@@ -474,15 +489,17 @@ Result<std::shared_ptr<IGraphicsPipeline>> VulkanRenderer::createGraphicsPipelin
             *renderPass_,
             graphicsShaders,
             desc)) {
-        return failure<std::shared_ptr<IGraphicsPipeline>>("Failed to create Vulkan graphics pipeline.");
+        Logger::getInstance().error("Failed to create Vulkan graphics pipeline.");
+        return nullptr;
     }
 
-    return success<std::shared_ptr<IGraphicsPipeline>>(std::make_shared<VulkanGraphicsPipeline>(pipeline));
+    return std::make_shared<VulkanGraphicsPipeline>(pipeline);
 }
 
-Result<std::unique_ptr<IFrame>> VulkanRenderer::beginFrame() {
+std::unique_ptr<IFrame> VulkanRenderer::beginFrame() {
     if (!device_ || !swapchain_ || !commandBuffer_ || !framebuffer_ || !renderPass_) {
-        return failure<std::unique_ptr<IFrame>>("Renderer frame resources are not initialized.");
+        Logger::getInstance().error("Renderer frame resources are not initialized.");
+        return nullptr;
     }
 
     VkDevice vkDevice = device_->getVulkanDevice();
@@ -492,45 +509,52 @@ Result<std::unique_ptr<IFrame>> VulkanRenderer::beginFrame() {
     uint32_t imageIndex = 0;
     const VkResult acquireResult = swapchain_->acquireNextImage(imageAvailableSemaphore_, VK_NULL_HANDLE, &imageIndex);
     if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) {
-        return failure<std::unique_ptr<IFrame>>("Failed to acquire Vulkan swapchain image.");
+        Logger::getInstance().error("Failed to acquire Vulkan swapchain image.");
+        return nullptr;
     }
 
     commandBuffer_->reset();
     if (!commandBuffer_->begin()) {
-        return failure<std::unique_ptr<IFrame>>("Failed to begin Vulkan command buffer.");
+        Logger::getInstance().error("Failed to begin Vulkan command buffer.");
+        return nullptr;
     }
 
     VkFramebuffer framebuffer = framebuffer_->getFramebuffer(imageIndex);
     if (framebuffer == VK_NULL_HANDLE) {
-        return failure<std::unique_ptr<IFrame>>("Failed to get Vulkan framebuffer.");
+        Logger::getInstance().error("Failed to get Vulkan framebuffer.");
+        return nullptr;
     }
 
-    return success<std::unique_ptr<IFrame>>(std::make_unique<VulkanFrame>(
+    return std::make_unique<VulkanFrame>(
         *this,
         commandBuffer_->getVulkanCommandBuffer(),
         renderPass_->getVulkanRenderPass(),
         framebuffer,
         swapchain_->getExtent(),
-        imageIndex));
+        imageIndex);
 }
 
-Result<void> VulkanRenderer::endFrame(std::unique_ptr<IFrame> frame) {
+bool VulkanRenderer::endFrame(std::unique_ptr<IFrame> frame) {
     if (!device_ || !commandBuffer_ || !swapchain_) {
-        return failure("Renderer frame resources are not initialized.");
+        Logger::getInstance().error("Renderer frame resources are not initialized.");
+        return false;
     }
 
     auto* vulkanFrame = dynamic_cast<VulkanFrame*>(frame.get());
     if (!vulkanFrame) {
-        return failure("Unexpected frame implementation passed to VulkanRenderer::endFrame.");
+        Logger::getInstance().error("Unexpected frame implementation passed to VulkanRenderer::endFrame.");
+        return false;
     }
 
     if (!commandBuffer_->end()) {
-        return failure("Failed to end Vulkan command buffer.");
+        Logger::getInstance().error("Failed to end Vulkan command buffer.");
+        return false;
     }
 
     const uint32_t imageIndex = vulkanFrame->imageIndex();
     if (imageIndex >= renderFinishedSemaphores_.size()) {
-        return failure("Swapchain image index exceeded available render-finished semaphores.");
+        Logger::getInstance().error("Swapchain image index exceeded available render-finished semaphores.");
+        return false;
     }
 
     VkSemaphore renderFinishedSemaphore = renderFinishedSemaphores_[imageIndex];
@@ -549,7 +573,8 @@ Result<void> VulkanRenderer::endFrame(std::unique_ptr<IFrame> frame) {
     submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
 
     if (vkQueueSubmit(device_->getGraphicsQueue(), 1, &submitInfo, inFlightFence_) != VK_SUCCESS) {
-        return failure("Failed to submit Vulkan draw command buffer.");
+        Logger::getInstance().error("Failed to submit Vulkan draw command buffer.");
+        return false;
     }
 
     const VkResult presentResult = swapchain_->present(
@@ -557,10 +582,11 @@ Result<void> VulkanRenderer::endFrame(std::unique_ptr<IFrame> frame) {
         renderFinishedSemaphore,
         device_->getPresentQueue());
     if (presentResult != VK_SUCCESS && presentResult != VK_SUBOPTIMAL_KHR) {
-        return failure("Failed to present Vulkan swapchain image.");
+        Logger::getInstance().error("Failed to present Vulkan swapchain image.");
+        return false;
     }
 
-    return success();
+    return true;
 }
 
 bool VulkanRenderer::recreateSwapchainResources(uint32_t width, uint32_t height) {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "kera/renderer/descriptors.h"
-#include "kera/result.h"
 #include "kera/types.h"
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +23,7 @@ class IBuffer {
 public:
     virtual ~IBuffer() = default;
     virtual std::size_t getSize() const = 0;
-    virtual Result<void> upload(const void* data, std::size_t size, std::size_t offset = 0) = 0;
+    virtual bool upload(const void* data, std::size_t size, std::size_t offset = 0) = 0;
 };
 
 class IGraphicsPipeline {
@@ -53,17 +52,17 @@ public:
     virtual void shutdown() = 0;
     // Recreates swapchain-dependent backend state only. Sample-owned buffers,
     // shader programs, and pipelines must remain valid across resize.
-    virtual Result<void> resize(Extent2D newExtent) = 0;
+    virtual bool resize(Extent2D newExtent) = 0;
 
-    virtual Result<std::shared_ptr<IShaderModule>> createShaderModule(const ShaderModuleDesc& desc) = 0;
-    virtual Result<std::shared_ptr<IShaderProgram>> createShaderProgram(const ShaderProgramDesc& desc) = 0;
-    virtual Result<std::shared_ptr<IBuffer>> createBuffer(const BufferDesc& desc) = 0;
-    virtual Result<std::shared_ptr<IGraphicsPipeline>> createGraphicsPipeline(
+    virtual std::shared_ptr<IShaderModule> createShaderModule(const ShaderModuleDesc& desc) = 0;
+    virtual std::shared_ptr<IShaderProgram> createShaderProgram(const ShaderProgramDesc& desc) = 0;
+    virtual std::shared_ptr<IBuffer> createBuffer(const BufferDesc& desc) = 0;
+    virtual std::shared_ptr<IGraphicsPipeline> createGraphicsPipeline(
         const GraphicsPipelineDesc& desc,
         IShaderProgram& program) = 0;
 
-    virtual Result<std::unique_ptr<IFrame>> beginFrame() = 0;
-    virtual Result<void> endFrame(std::unique_ptr<IFrame> frame) = 0;
+    virtual std::unique_ptr<IFrame> beginFrame() = 0;
+    virtual bool endFrame(std::unique_ptr<IFrame> frame) = 0;
 };
 
 } // namespace kera

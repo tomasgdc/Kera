@@ -61,12 +61,11 @@ namespace kera {
         }
         Logger::getInstance().info("Window created successfully (1280x720)");
 
-        const auto createRendererResult = CreateRenderer(GraphicsBackend::Vulkan, *window_);
-        if (createRendererResult.hasError()) {
-            Logger::getInstance().error(createRendererResult.error());
+        renderer_ = CreateRenderer(GraphicsBackend::Vulkan, *window_);
+        if (!renderer_) {
+            Logger::getInstance().error("Failed to create renderer");
             return false;
         }
-        renderer_ = createRendererResult.value();
 
         Logger::getInstance().info("Renderer initialized successfully");
         return true;
@@ -87,12 +86,11 @@ namespace kera {
             "Recreating swapchain resources for window size " +
             std::to_string(width) + "x" + std::to_string(height));
 
-        const auto resizeResult = renderer_->resize({
+        if (!renderer_->resize({
             static_cast<uint32_t>(width),
             static_cast<uint32_t>(height),
-        });
-        if (resizeResult.hasError()) {
-            Logger::getInstance().error(resizeResult.error());
+        })) {
+            Logger::getInstance().error("Failed to resize renderer");
             return false;
         }
 

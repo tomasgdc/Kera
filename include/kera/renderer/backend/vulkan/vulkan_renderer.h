@@ -30,17 +30,17 @@ public:
 
     GraphicsBackend getBackend() const override { return GraphicsBackend::Vulkan; }
     Extent2D getDrawableExtent() const override;
-    Result<void> resize(Extent2D newExtent) override;
+    bool resize(Extent2D newExtent) override;
 
-    Result<std::shared_ptr<IShaderModule>> createShaderModule(const ShaderModuleDesc& desc) override;
-    Result<std::shared_ptr<IShaderProgram>> createShaderProgram(const ShaderProgramDesc& desc) override;
-    Result<std::shared_ptr<IBuffer>> createBuffer(const BufferDesc& desc) override;
-    Result<std::shared_ptr<IGraphicsPipeline>> createGraphicsPipeline(
+    std::shared_ptr<IShaderModule> createShaderModule(const ShaderModuleDesc& desc) override;
+    std::shared_ptr<IShaderProgram> createShaderProgram(const ShaderProgramDesc& desc) override;
+    std::shared_ptr<IBuffer> createBuffer(const BufferDesc& desc) override;
+    std::shared_ptr<IGraphicsPipeline> createGraphicsPipeline(
         const GraphicsPipelineDesc& desc,
         IShaderProgram& program) override;
 
-    Result<std::unique_ptr<IFrame>> beginFrame() override;
-    Result<void> endFrame(std::unique_ptr<IFrame> frame) override;
+    std::unique_ptr<IFrame> beginFrame() override;
+    bool endFrame(std::unique_ptr<IFrame> frame) override;
 
 private:
     bool recreateSwapchainResources(uint32_t width, uint32_t height);

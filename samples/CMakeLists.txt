@@ -18,6 +18,15 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
     )
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
+    add_custom_command(TARGET kera_samples POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/config"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/config"
+            "${CMAKE_BINARY_DIR}/samples/config"
+    )
+endif()
+
 # Add sample subdirectories here if needed for additional organization
 # add_subdirectory(basic_triangle)
 # add_subdirectory(compute_example)

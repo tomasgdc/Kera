@@ -1,7 +1,6 @@
 #include "basic_triangle_sample.h"
 #include "kera/utilities/logger.h"
 
-#include <cstddef>
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -45,7 +44,7 @@ void BasicTriangleSample::initialize() {
 }
 
 bool BasicTriangleSample::createShaderProgram() {
-    const auto shaderProgramResult = renderer_->createShaderProgram({
+    ShaderProgramDesc programDesc{
         .stages = {
             {
                 .path = "shaders/triangle.vert.slang",
@@ -60,13 +59,13 @@ bool BasicTriangleSample::createShaderProgram() {
                 .source = ShaderSourceKind::SlangFile,
             },
         },
-    });
-    if (shaderProgramResult.hasError()) {
-        Logger::getInstance().error(shaderProgramResult.error());
+    };
+
+    shaderProgram_ = renderer_->createShaderProgram(programDesc);
+    if (!shaderProgram_) {
         return false;
     }
 
-    shaderProgram_ = shaderProgramResult.value();
     return true;
 }
 
@@ -80,37 +79,29 @@ bool BasicTriangleSample::createGeometry() {
     std::vector<uint16_t> indices = { 0, 1, 2 };
     indexCount_ = static_cast<uint32_t>(indices.size());
 
-    const auto vertexBufferResult = renderer_->createBuffer({
+    vertexBuffer_ = renderer_->createBuffer({
         .size = vertices.size() * sizeof(Vertex),
         .usage = BufferUsageKind::Vertex,
         .memoryAccess = MemoryAccess::CpuWrite,
     });
-    if (vertexBufferResult.hasError()) {
-        Logger::getInstance().error(vertexBufferResult.error());
-        return false;
-    }
-    vertexBuffer_ = vertexBufferResult.value();
-
-    const auto vertexUploadResult = vertexBuffer_->upload(vertices.data(), vertices.size() * sizeof(Vertex));
-    if (vertexUploadResult.hasError()) {
-        Logger::getInstance().error(vertexUploadResult.error());
+    if (!vertexBuffer_) {
         return false;
     }
 
-    const auto indexBufferResult = renderer_->createBuffer({
+    if (!vertexBuffer_->upload(vertices.data(), vertices.size() * sizeof(Vertex))) {
+        return false;
+    }
+
+    indexBuffer_ = renderer_->createBuffer({
         .size = indices.size() * sizeof(uint16_t),
         .usage = BufferUsageKind::Index,
         .memoryAccess = MemoryAccess::CpuWrite,
     });
-    if (indexBufferResult.hasError()) {
-        Logger::getInstance().error(indexBufferResult.error());
+    if (!indexBuffer_) {
         return false;
     }
-    indexBuffer_ = indexBufferResult.value();
 
-    const auto indexUploadResult = indexBuffer_->upload(indices.data(), indices.size() * sizeof(uint16_t));
-    if (indexUploadResult.hasError()) {
-        Logger::getInstance().error(indexUploadResult.error());
+    if (!indexBuffer_->upload(indices.data(), indices.size() * sizeof(uint16_t))) {
         return false;
     }
 
@@ -137,15 +128,13 @@ bool BasicTriangleSample::createPipeline() {
         .format = VertexFormat::Float3,
     });
 
-    const auto pipelineResult = renderer_->createGraphicsPipeline(
+    pipeline_ = renderer_->createGraphicsPipeline(
         pipelineDesc,
         *shaderProgram_);
-    if (pipelineResult.hasError()) {
-        Logger::getInstance().error(pipelineResult.error());
+    if (!pipeline_) {
         return false;
     }
 
-    pipeline_ = pipelineResult.value();
     return true;
 }
 
@@ -162,13 +151,11 @@ void BasicTriangleSample::render() {
         return;
     }
 
-    auto frameResult = renderer_->beginFrame();
-    if (frameResult.hasError()) {
-        Logger::getInstance().error(frameResult.error());
+    std::unique_ptr<IFrame> frame = renderer_->beginFrame();
+    if (!frame) {
         return;
     }
 
-    std::unique_ptr<IFrame> frame = std::move(frameResult.value());
     frame->beginRenderPass({
         .clearColor = {0.0f, 0.0f, 0.1f, 1.0f},
     });
@@ -178,9 +165,8 @@ void BasicTriangleSample::render() {
     frame->drawIndexed(indexCount_);
     frame->endRenderPass();
 
-    auto endFrameResult = renderer_->endFrame(std::move(frame));
-    if (endFrameResult.hasError()) {
-        Logger::getInstance().error(endFrameResult.error());
+    if (!renderer_->endFrame(std::move(frame))) {
+        Logger::getInstance().error("Failed to end frame");
     }
 }
 
