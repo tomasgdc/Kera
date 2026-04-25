@@ -1,17 +1,28 @@
 # Samples for Kera Rendering Library
 
+# Collect shader files for Visual Studio project
+file(GLOB SHADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/shaders/*.slang")
+
 # Main sample application
 add_executable(kera_samples
     main.cpp
     samples.cpp
     basic_triangle_sample.cpp
     compute_sample.cpp
+    ${SHADER_FILES}  # Include shaders in the project
 )
 target_link_libraries(kera_samples PRIVATE kera SDL3::SDL3)
 
+# Organize shaders in Visual Studio
+source_group("Shaders" FILES ${SHADER_FILES})
+
+# Compile Slang shaders to SPIR-V
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+    set(SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/samples/shaders")
+    compile_slang_shaders(kera_samples "${CMAKE_CURRENT_SOURCE_DIR}/shaders" "${SHADER_OUTPUT_DIR}")
+    
+    # Copy any non-slang shader files (like compiled SPIR-V if not using slangc)
     add_custom_command(TARGET kera_samples POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/shaders"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
             "${CMAKE_BINARY_DIR}/samples/shaders"

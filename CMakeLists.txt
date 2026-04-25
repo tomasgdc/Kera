@@ -33,6 +33,7 @@ if(KERA_ENABLE_SLANG)
     
     if(WIN32)
         set(SLANG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/lib/windows")
+        set(SLANG_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/bin/windows")
         set(SLANG_LIBS 
             "${SLANG_LIB_DIR}/slang.lib"
             "${SLANG_LIB_DIR}/slang-compiler.lib"
@@ -41,6 +42,7 @@ if(KERA_ENABLE_SLANG)
         )
     else()  # Linux/Unix
         set(SLANG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/lib/linux")
+        set(SLANG_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/bin/linux")
         set(SLANG_LIBS 
             "${SLANG_LIB_DIR}/libslang.so"
             "${SLANG_LIB_DIR}/libslang-compiler.so"
@@ -74,6 +76,72 @@ if(KERA_ENABLE_SLANG)
         message(WARNING "Slang headers not found at ${SLANG_INCLUDE_DIR}. Slang support disabled.")
     endif()
 endif()
+
+# Function to compile Slang shaders to SPIR-V
+function(compile_slang_shaders TARGET_NAME SHADER_DIR OUTPUT_DIR)
+    if(NOT KERA_ENABLE_SLANG)
+        return()
+    endif()
+    
+    # Find slangc executable
+    if(WIN32)
+        set(SLANGC_EXECUTABLE "${SLANG_BIN_DIR}/slangc.exe")
+    else()
+        set(SLANGC_EXECUTABLE "${SLANG_BIN_DIR}/slangc")
+    endif()
+    
+    if(NOT EXISTS "${SLANGC_EXECUTABLE}")
+        message(WARNING "slangc executable not found at ${SLANGC_EXECUTABLE}. Shader compilation disabled.")
+        return()
+    endif()
+    
+    # Find all .slang files
+    file(GLOB_RECURSE SLANG_FILES "${SHADER_DIR}/*.slang")
+    
+    foreach(SLANG_FILE ${SLANG_FILES})
+        # Get relative path from shader directory
+        file(RELATIVE_PATH REL_PATH "${SHADER_DIR}" "${SLANG_FILE}")
+        
+        # Replace .slang extension with .spv
+        string(REPLACE ".slang" ".spv" SPV_REL_PATH "${REL_PATH}")
+        set(SPV_FILE "${OUTPUT_DIR}/${SPV_REL_PATH}")
+        
+        # Determine shader stage from filename
+        if("${REL_PATH}" MATCHES ".*vert.*" OR "${REL_PATH}" MATCHES ".*vertex.*")
+            set(SHADER_STAGE "vertex")
+        elseif("${REL_PATH}" MATCHES ".*frag.*" OR "${REL_PATH}" MATCHES ".*fragment.*")
+            set(SHADER_STAGE "fragment")
+        elseif("${REL_PATH}" MATCHES ".*comp.*" OR "${REL_PATH}" MATCHES ".*compute.*")
+            set(SHADER_STAGE "compute")
+        elseif("${REL_PATH}" MATCHES ".*geom.*" OR "${REL_PATH}" MATCHES ".*geometry.*")
+            set(SHADER_STAGE "geometry")
+        else()
+            set(SHADER_STAGE "vertex")  # default
+        endif()
+        
+        # Create output directory
+        get_filename_component(SPV_DIR "${SPV_FILE}" DIRECTORY)
+        file(MAKE_DIRECTORY "${SPV_DIR}")
+        
+        # Add custom command to compile shader
+        add_custom_command(
+            OUTPUT "${SPV_FILE}"
+            COMMAND "${SLANGC_EXECUTABLE}" "${SLANG_FILE}" -o "${SPV_FILE}" -target spirv -stage ${SHADER_STAGE} -entry main
+            DEPENDS "${SLANG_FILE}"
+            COMMENT "Compiling ${REL_PATH} to SPIR-V (${SHADER_STAGE})"
+            VERBATIM
+        )
+        
+        # Collect output files for dependency
+        list(APPEND SPV_OUTPUTS "${SPV_FILE}")
+    endforeach()
+    
+    # Create a custom target that depends on all compiled shaders
+    if(SPV_OUTPUTS)
+        add_custom_target(${TARGET_NAME}_shaders DEPENDS ${SPV_OUTPUTS})
+        add_dependencies(${TARGET_NAME} ${TARGET_NAME}_shaders)
+    endif()
+endfunction()
 
 # === KERA CORE (SDL3 Platform Layer) ===
 set(KERA_CORE_SOURCES
