@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
+# Enable compiler detection and set default compiler
+enable_language(CXX)
 project(Kera VERSION 0.1.0 LANGUAGES CXX)
 
 # Options
@@ -179,6 +181,7 @@ set(KERA_RENDERER_HEADERS
     include/kera/renderer/descriptors.h
     include/kera/renderer/factory.h
     include/kera/renderer/interfaces.h
+    include/kera/renderer/resource_registry.h
     include/kera/renderer/backend/vulkan/vulkan_renderer.h
     include/kera/renderer/vulkan_renderer.h
     include/kera/renderer/instance.h

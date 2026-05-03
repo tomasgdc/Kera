@@ -5,60 +5,69 @@
 #include <vulkan/vulkan.h>
 #include <iostream>
 
-namespace kera {
+namespace kera 
+{
+    Surface::Surface()
+        : instance_(VK_NULL_HANDLE)
+        , surface_(VK_NULL_HANDLE) 
+    {
+    }
 
-Surface::Surface()
-    : instance_(VK_NULL_HANDLE)
-    , surface_(VK_NULL_HANDLE) {
-}
-
-Surface::~Surface() {
-    destroy();
-}
-
-Surface::Surface(Surface&& other) noexcept
-    : instance_(other.instance_)
-    , surface_(other.surface_) {
-    other.instance_ = VK_NULL_HANDLE;
-    other.surface_ = VK_NULL_HANDLE;
-}
-
-Surface& Surface::operator=(Surface&& other) noexcept {
-    if (this != &other) {
+    Surface::~Surface() 
+    {
         destroy();
-        instance_ = other.instance_;
-        surface_ = other.surface_;
+    }
 
+    Surface::Surface(Surface&& other) noexcept
+        : instance_(other.instance_)
+        , surface_(other.surface_) 
+    {
         other.instance_ = VK_NULL_HANDLE;
         other.surface_ = VK_NULL_HANDLE;
     }
-    return *this;
-}
 
-bool Surface::create(VkInstance instance, const Window& window) {
-    if (surface_) {
-        destroy();
+    Surface& Surface::operator=(Surface&& other) noexcept 
+    {
+        if (this != &other) 
+        {
+            destroy();
+            instance_ = other.instance_;
+            surface_ = other.surface_;
+
+            other.instance_ = VK_NULL_HANDLE;
+            other.surface_ = VK_NULL_HANDLE;
+        }
+        return *this;
     }
 
-    instance_ = instance;
+    bool Surface::create(VkInstance instance, const Window& window) 
+    {
+        if (surface_) 
+        {
+            destroy();
+        }
 
-    // Create Vulkan surface from SDL window
-    if (!SDL_Vulkan_CreateSurface(window.getSDLWindow(), instance, nullptr, &surface_)) {
-        std::cerr << "Failed to create Vulkan surface: " << SDL_GetError() << std::endl;
-        return false;
+        instance_ = instance;
+
+        // Create Vulkan surface from SDL window
+        if (!SDL_Vulkan_CreateSurface(window.getSDLWindow(), instance, nullptr, &surface_)) 
+        {
+            std::cerr << "Failed to create Vulkan surface: " << SDL_GetError() << std::endl;
+            return false;
+        }
+
+        std::cout << "Vulkan surface created successfully" << std::endl;
+        return true;
     }
 
-    std::cout << "Vulkan surface created successfully" << std::endl;
-    return true;
-}
-
-void Surface::destroy() {
-    if (surface_ && instance_) {
-        vkDestroySurfaceKHR(instance_, surface_, nullptr);
-        surface_ = VK_NULL_HANDLE;
-        instance_ = VK_NULL_HANDLE;
-        std::cout << "Vulkan surface destroyed" << std::endl;
+    void Surface::destroy() 
+    {
+        if (surface_ && instance_) 
+        {
+            vkDestroySurfaceKHR(instance_, surface_, nullptr);
+            surface_ = VK_NULL_HANDLE;
+            instance_ = VK_NULL_HANDLE;
+            std::cout << "Vulkan surface destroyed" << std::endl;
+        }
     }
-}
-
 } // namespace kera

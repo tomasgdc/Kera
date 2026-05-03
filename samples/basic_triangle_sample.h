@@ -1,39 +1,31 @@
 #pragma once
 
-#include "samples.h"
 #include "kera/renderer/interfaces.h"
-#include <memory>
+#include "samples.h"
 
 namespace kera {
 
 class BasicTriangleSample : public Sample {
-public:
-    explicit BasicTriangleSample(std::shared_ptr<IRenderer> renderer);
+ public:
+  explicit BasicTriangleSample(IRenderer& renderer);
 
-    void initialize() override;
-    void update(float deltaTime) override;
-    void render() override;
-    void cleanup() override;
+  void initialize() override;
+  void update(float deltaTime) override;
+  void render() override;
+  void cleanup() override;
 
-private:
-    bool createShaderProgram();
-    bool createGeometry();
-    bool createPipeline();
-    std::shared_ptr<IRenderer> renderer_;
+ private:
+  bool createShaderProgram();
+  bool createGeometry();
+  bool createPipeline();
 
-    // Shader program
-    std::shared_ptr<IShaderProgram> shaderProgram_;
-
-    // Geometry
-    std::shared_ptr<IBuffer> vertexBuffer_;
-    std::shared_ptr<IBuffer> indexBuffer_;
-    uint32_t indexCount_;
-
-    // Pipeline
-    std::shared_ptr<IGraphicsPipeline> pipeline_;
-
-    // Animation
-    float rotationAngle_;
+  IRenderer& m_renderer;
+  ShaderProgramHandle m_shaderProgram;
+  BufferHandle m_vertexBuffer;
+  BufferHandle m_indexBuffer;
+  uint32_t m_indexCount;
+  GraphicsPipelineHandle m_pipeline;
+  float m_rotationAngle;
 };
 
-} // namespace kera
+}  // namespace kera
