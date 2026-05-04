@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
 # Enable compiler detection and set default compiler
-enable_language(CXX)
 project(Kera VERSION 0.1.0 LANGUAGES CXX)
 
 # Options
@@ -24,9 +23,21 @@ find_package(Vulkan REQUIRED)
 add_subdirectory(third_party/glm EXCLUDE_FROM_ALL)
 
 # Add SDL3 submodule
-set(SDL_SHARED ON CACHE BOOL "" FORCE)
-set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+if(KERA_BUILD_SHARED)
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(KERA_SDL_TARGET SDL3::SDL3-shared)
+else()
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    set(KERA_SDL_TARGET SDL3::SDL3-static)
+endif()
+
 add_subdirectory(third_party/SDL)
+
+if(NOT TARGET ${KERA_SDL_TARGET})
+    message(FATAL_ERROR "Failed to find SDL3 library target")
+endif()
 
 # Add pre-compiled Slang libraries
 set(KERA_SLANG_TARGET "")
@@ -63,7 +74,7 @@ if(KERA_ENABLE_SLANG)
         
         if(WIN32)
             set_target_properties(slang PROPERTIES
-                IMPORTED_LOCATION "${SLANG_LIB_DIR}/slang.lib"
+                IMPORTED_LOCATION "${SLANG_BIN_DIR}/slang.dll"
                 IMPORTED_IMPLIB "${SLANG_LIB_DIR}/slang.lib"
             )
         else()
@@ -255,7 +266,7 @@ target_include_directories(kera
 target_link_libraries(kera
     PUBLIC
         Vulkan::Vulkan
-        SDL3::SDL3
+        ${KERA_SDL_TARGET}
         glm::glm
 )
 

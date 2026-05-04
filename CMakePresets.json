@@ -23,7 +23,8 @@
       "displayName": "Windows Debug",
       "binaryDir": "${sourceDir}/build/windows-debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "KERA_BUILD_SHARED": "OFF"
       },
       "condition": {
         "type": "equals",
@@ -37,7 +38,8 @@
       "displayName": "Windows Release",
       "binaryDir": "${sourceDir}/build/windows-release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "KERA_BUILD_SHARED": "OFF"
       }
     },
     {
@@ -46,7 +48,8 @@
       "displayName": "Linux Debug",
       "binaryDir": "${sourceDir}/build/linux-debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "KERA_BUILD_SHARED": "OFF"
       },
       "condition": {
         "type": "equals",
@@ -60,7 +63,8 @@
       "displayName": "Linux Release",
       "binaryDir": "${sourceDir}/build/linux-release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "KERA_BUILD_SHARED": "OFF"
       }
     }
   ],
