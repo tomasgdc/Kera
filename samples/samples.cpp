@@ -2,6 +2,7 @@
 
 #include "basic_triangle_sample.h"
 #include "compute_sample.h"
+#include "instanced_triangle_many_lights_sample.h"
 #include "instanced_triangle_sample.h"
 #include "kera/core/input.h"
 #include "kera/core/window.h"
@@ -188,6 +189,7 @@ namespace kera
 
         addSample(std::make_unique<BasicTriangleSample>(*m_renderer));
         addSample(std::make_unique<InstancedTriangleSample>(*m_renderer));
+        addSample(std::make_unique<InstancedTriangleManyLightsSample>(*m_renderer));
 
         Logger::getInstance().info("Available samples:");
         for (size_t i = 0; i < m_samples.size(); ++i)

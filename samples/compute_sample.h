@@ -10,7 +10,7 @@ public:
 
     void initialize() override;
     void update(float deltaTime) override;
-    void render() override;
+    void render(RenderContext& context) override;
     void cleanup() override;
 };
 

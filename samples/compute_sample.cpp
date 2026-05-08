@@ -1,4 +1,7 @@
 #include "compute_sample.h"
+
+#include "render_context.h"
+
 #include <iostream>
 
 namespace kera {
@@ -20,7 +23,7 @@ namespace kera {
         // - Change work group sizes
     }
 
-    void ComputeSample::render() {
+    void ComputeSample::render(RenderContext&) {
         std::cout << "Dispatching " << getName() << std::endl;
         // TODO: Dispatch compute work
         // - Bind compute pipeline
