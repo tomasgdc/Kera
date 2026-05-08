@@ -1,0 +1,47 @@
+BasedOnStyle: Google
+
+ColumnLimit: 120
+BreakBeforeBraces: Allman
+TabWidth: 4
+IndentWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+FixNamespaceComments: false
+NamespaceIndentation: All
+BreakConstructorInitializers: BeforeComma
+AllowShortFunctionsOnASingleLine: Empty
+InsertNewlineAtEOF: true
+KeepEmptyLinesAtEOF: true
+
+SortIncludes: CaseSensitive
+
+IncludeCategories:
+  # 1. Project headers
+  - Regex:           '^"\.\./.*\.h(pp)?$'
+    Priority:        1
+    SortPriority:    1
+    CaseSensitive:   true
+
+  # 2. Any other quoted includes
+  - Regex:           '^".*'
+    Priority:        2
+    SortPriority:    2
+    CaseSensitive:   false
+
+  # 3. Third-party libraries when they are included with angles (e.g. <json/json.h>, <gtest/gtest.h>)
+  - Regex:           '^<(cxxopts|json|gtest|spdlog|SDL3|imgui|slang|volk|png|tiny_gltf|meshoptimizer)/.*'
+    Priority:        3
+    SortPriority:    3
+    CaseSensitive:   false
+
+  # 4. System/3rd-party headers with an extension (e.g. <windows.h>, <vulkan/vulkan.h>, <SDL3/SDL.h>)
+  - Regex:           '^<.*\.(h|hpp)>$'
+    Priority:        4
+    SortPriority:    4
+    CaseSensitive:   false
+
+  # 5. System/STL headers without an extension (e.g. <string>, <vector>)
+  - Regex:           '^<[^>./]+>$'
+    Priority:        5
+    SortPriority:    5
+    CaseSensitive:   false
