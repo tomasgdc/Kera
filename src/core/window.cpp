@@ -1,4 +1,6 @@
 #include "kera/core/window.h"
+#include "sdl_input_utils.h"
+
 #include <SDL3/SDL.h>
 #include <iostream>
 
@@ -93,6 +95,10 @@ bool Window::shouldClose() const {
 void Window::processEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        if (event_callback_) {
+            event_callback_(event);
+        }
+
         switch (event.type) {
             case SDL_EVENT_QUIT:
                 should_close_ = true;
@@ -103,7 +109,12 @@ void Window::processEvents() {
                 height_ = event.window.data2;
                 was_resized_ = true;
                 break;
-            // TODO: Handle other events (keyboard, mouse, etc.)
+            case SDL_EVENT_KEY_DOWN:
+            case SDL_EVENT_KEY_UP:
+                if (key_callback_ && !event.key.repeat) {
+                    key_callback_(sdlKeyToKey(event.key.key), event.key.down);
+                }
+                break;
             default:
                 break;
         }

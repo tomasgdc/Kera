@@ -21,9 +21,6 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-// SDL forward declarations
-struct SDL_Window;
-
 // Common data structures
 struct Extent2D {
     u32 width = 0;
