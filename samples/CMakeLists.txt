@@ -7,10 +7,18 @@ file(GLOB SHADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/shaders/*.slang")
 add_executable(kera_samples
     main.cpp
     samples.cpp
+    samples.h
+    render_context.cpp
+    render_context.h
+    stats_overlay.cpp
+    stats_overlay.h
+    sample_utils.cpp
+    sample_utils.h
     basic_triangle_sample.cpp
     compute_sample.cpp
     instanced_triangle.cpp
     ${SHADER_FILES}  # Include shaders in the project
+    ${SHADER_FILES}
 )
 target_link_libraries(kera_samples PRIVATE kera)
 
