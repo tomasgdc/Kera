@@ -17,8 +17,9 @@ add_executable(kera_samples
     basic_triangle_sample.cpp
     basic_triangle_sample.h
     compute_sample.cpp
-    instanced_triangle.cpp
-    ${SHADER_FILES}  # Include shaders in the project
+    compute_sample.h
+    instanced_triangle_sample.cpp
+    instanced_triangle_sample.h
     ${SHADER_FILES}
 )
 target_link_libraries(kera_samples PRIVATE kera)
