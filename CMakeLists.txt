@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.25)
 
-# Enable compiler detection and set default compiler
 project(Kera VERSION 0.1.0 LANGUAGES CXX)
 
 # Options
 option(KERA_BUILD_SAMPLES "Build Kera samples" ON)
 option(KERA_BUILD_SHARED "Build Kera as shared library" OFF)
 option(KERA_ENABLE_SLANG "Enable Slang shader compilation support" ON)
+option(KERA_ENABLE_IMGUI "Enable Dear ImGui debug UI support" ${KERA_BUILD_SAMPLES})
 
 # C++ Standard
 set(CMAKE_CXX_STANDARD 20)
@@ -32,11 +32,35 @@ else()
     set(SDL_STATIC ON CACHE BOOL "" FORCE)
     set(KERA_SDL_TARGET SDL3::SDL3-static)
 endif()
-
 add_subdirectory(third_party/SDL)
 
 if(NOT TARGET ${KERA_SDL_TARGET})
-    message(FATAL_ERROR "Failed to find SDL3 library target")
+    message(FATAL_ERROR "Expected SDL target ${KERA_SDL_TARGET} was not created")
+endif()
+
+if(KERA_ENABLE_IMGUI)
+    set(IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui")
+    if(NOT EXISTS "${IMGUI_DIR}/imgui.cpp")
+        message(FATAL_ERROR "KERA_ENABLE_IMGUI is ON but third_party/imgui is missing")
+    endif()
+
+    add_library(kera_imgui STATIC
+        "${IMGUI_DIR}/imgui.cpp"
+        "${IMGUI_DIR}/imgui_draw.cpp"
+        "${IMGUI_DIR}/imgui_tables.cpp"
+        "${IMGUI_DIR}/imgui_widgets.cpp"
+        "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
+        "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
+    )
+    set_target_properties(kera_imgui PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_include_directories(kera_imgui PUBLIC
+        "${IMGUI_DIR}"
+        "${IMGUI_DIR}/backends"
+    )
+    target_link_libraries(kera_imgui PUBLIC
+        Vulkan::Vulkan
+        ${KERA_SDL_TARGET}
+    )
 endif()
 
 # Add pre-compiled Slang libraries
@@ -84,83 +108,21 @@ if(KERA_ENABLE_SLANG)
         endif()
         
         set(KERA_SLANG_TARGET slang)
+        if(WIN32)
+            file(GLOB KERA_SLANG_RUNTIME_DLLS CONFIGURE_DEPENDS "${SLANG_BIN_DIR}/*.dll")
+        endif()
         message(STATUS "Using pre-compiled Slang from ${SLANG_LIB_DIR}")
     else()
         message(WARNING "Slang headers not found at ${SLANG_INCLUDE_DIR}. Slang support disabled.")
     endif()
 endif()
 
-# Function to compile Slang shaders to SPIR-V
-function(compile_slang_shaders TARGET_NAME SHADER_DIR OUTPUT_DIR)
-    if(NOT KERA_ENABLE_SLANG)
-        return()
-    endif()
-    
-    # Find slangc executable
-    if(WIN32)
-        set(SLANGC_EXECUTABLE "${SLANG_BIN_DIR}/slangc.exe")
-    else()
-        set(SLANGC_EXECUTABLE "${SLANG_BIN_DIR}/slangc")
-    endif()
-    
-    if(NOT EXISTS "${SLANGC_EXECUTABLE}")
-        message(WARNING "slangc executable not found at ${SLANGC_EXECUTABLE}. Shader compilation disabled.")
-        return()
-    endif()
-    
-    # Find all .slang files
-    file(GLOB_RECURSE SLANG_FILES "${SHADER_DIR}/*.slang")
-    
-    foreach(SLANG_FILE ${SLANG_FILES})
-        # Get relative path from shader directory
-        file(RELATIVE_PATH REL_PATH "${SHADER_DIR}" "${SLANG_FILE}")
-        
-        # Replace .slang extension with .spv
-        string(REPLACE ".slang" ".spv" SPV_REL_PATH "${REL_PATH}")
-        set(SPV_FILE "${OUTPUT_DIR}/${SPV_REL_PATH}")
-        
-        # Determine shader stage from filename
-        if("${REL_PATH}" MATCHES ".*vert.*" OR "${REL_PATH}" MATCHES ".*vertex.*")
-            set(SHADER_STAGE "vertex")
-        elseif("${REL_PATH}" MATCHES ".*frag.*" OR "${REL_PATH}" MATCHES ".*fragment.*")
-            set(SHADER_STAGE "fragment")
-        elseif("${REL_PATH}" MATCHES ".*comp.*" OR "${REL_PATH}" MATCHES ".*compute.*")
-            set(SHADER_STAGE "compute")
-        elseif("${REL_PATH}" MATCHES ".*geom.*" OR "${REL_PATH}" MATCHES ".*geometry.*")
-            set(SHADER_STAGE "geometry")
-        else()
-            set(SHADER_STAGE "vertex")  # default
-        endif()
-        
-        # Create output directory
-        get_filename_component(SPV_DIR "${SPV_FILE}" DIRECTORY)
-        file(MAKE_DIRECTORY "${SPV_DIR}")
-        
-        # Add custom command to compile shader
-        add_custom_command(
-            OUTPUT "${SPV_FILE}"
-            COMMAND "${SLANGC_EXECUTABLE}" "${SLANG_FILE}" -o "${SPV_FILE}" -target spirv -stage ${SHADER_STAGE} -entry main
-            DEPENDS "${SLANG_FILE}"
-            COMMENT "Compiling ${REL_PATH} to SPIR-V (${SHADER_STAGE})"
-            VERBATIM
-        )
-        
-        # Collect output files for dependency
-        list(APPEND SPV_OUTPUTS "${SPV_FILE}")
-    endforeach()
-    
-    # Create a custom target that depends on all compiled shaders
-    if(SPV_OUTPUTS)
-        add_custom_target(${TARGET_NAME}_shaders DEPENDS ${SPV_OUTPUTS})
-        add_dependencies(${TARGET_NAME} ${TARGET_NAME}_shaders)
-    endif()
-endfunction()
-
 # === KERA CORE (SDL3 Platform Layer) ===
 set(KERA_CORE_SOURCES
     src/core/window.cpp
     src/core/input.cpp
     src/core/audio.cpp
+    src/core/sdl_input_utils.cpp
 )
 
 set(KERA_CORE_HEADERS
@@ -275,9 +237,14 @@ if(KERA_SLANG_TARGET)
     target_compile_definitions(kera PUBLIC KERA_HAS_SLANG=1)
 endif()
 
+if(TARGET kera_imgui)
+    target_link_libraries(kera PUBLIC kera_imgui)
+    target_compile_definitions(kera PUBLIC KERA_HAS_IMGUI=1)
+endif()
+
 # Compiler warnings
 if(MSVC)
-    target_compile_options(kera PRIVATE /W4 /WX)
+    target_compile_options(kera PRIVATE /W4 /WX /EHsc)
 else()
     target_compile_options(kera PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()

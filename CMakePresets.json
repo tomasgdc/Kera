@@ -33,6 +33,15 @@
       }
     },
     {
+      "name": "windows-debug-shared",
+      "inherits": "windows-debug",
+      "displayName": "Windows Debug Shared",
+      "binaryDir": "${sourceDir}/build/windows-debug-shared",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "ON"
+      }
+    },
+    {
       "name": "windows-release",
       "inherits": "windows-debug",
       "displayName": "Windows Release",
@@ -40,6 +49,15 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "KERA_BUILD_SHARED": "OFF"
+      }
+    },
+    {
+      "name": "windows-release-shared",
+      "inherits": "windows-release",
+      "displayName": "Windows Release Shared",
+      "binaryDir": "${sourceDir}/build/windows-release-shared",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "ON"
       }
     },
     {
@@ -58,6 +76,15 @@
       }
     },
     {
+      "name": "linux-debug-shared",
+      "inherits": "linux-debug",
+      "displayName": "Linux Debug Shared",
+      "binaryDir": "${sourceDir}/build/linux-debug-shared",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "ON"
+      }
+    },
+    {
       "name": "linux-release",
       "inherits": "linux-debug",
       "displayName": "Linux Release",
@@ -65,6 +92,15 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "KERA_BUILD_SHARED": "OFF"
+      }
+    },
+    {
+      "name": "linux-release-shared",
+      "inherits": "linux-release",
+      "displayName": "Linux Release Shared",
+      "binaryDir": "${sourceDir}/build/linux-release-shared",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "ON"
       }
     }
   ],
@@ -74,16 +110,32 @@
       "configurePreset": "windows-debug"
     },
     {
+      "name": "windows-debug-shared",
+      "configurePreset": "windows-debug-shared"
+    },
+    {
       "name": "windows-release",
       "configurePreset": "windows-release"
+    },
+    {
+      "name": "windows-release-shared",
+      "configurePreset": "windows-release-shared"
     },
     {
       "name": "linux-debug",
       "configurePreset": "linux-debug"
     },
     {
+      "name": "linux-debug-shared",
+      "configurePreset": "linux-debug-shared"
+    },
+    {
       "name": "linux-release",
       "configurePreset": "linux-release"
+    },
+    {
+      "name": "linux-release-shared",
+      "configurePreset": "linux-release-shared"
     }
   ]
 }
