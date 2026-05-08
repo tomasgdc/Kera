@@ -1,35 +1,45 @@
 #pragma once
 
-#include <memory>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
 
-class Device;
-class SwapChain;
+namespace kera
+{
 
-class RenderPass {
-public:
-    RenderPass();
-    ~RenderPass();
+    class Device;
+    class SwapChain;
 
-    // Delete copy operations
-    RenderPass(const RenderPass&) = delete;
-    RenderPass& operator=(const RenderPass&) = delete;
+    class RenderPass
+    {
+    public:
+        RenderPass();
+        ~RenderPass();
 
-    // Move operations
-    RenderPass(RenderPass&& other) noexcept;
-    RenderPass& operator=(RenderPass&& other) noexcept;
+        // Delete copy operations
+        RenderPass(const RenderPass&) = delete;
+        RenderPass& operator=(const RenderPass&) = delete;
 
-    bool initialize(const Device& device, const SwapChain& swapChain);
-    void shutdown();
+        // Move operations
+        RenderPass(RenderPass&& other) noexcept;
+        RenderPass& operator=(RenderPass&& other) noexcept;
 
-    VkRenderPass getVulkanRenderPass() const { return render_pass_; }
-    bool isValid() const { return render_pass_ != VK_NULL_HANDLE; }
+        bool initialize(const Device& device, const SwapChain& swapChain);
+        bool initializeColorTarget(const Device& device, VkFormat colorFormat);
+        void shutdown();
 
-private:
-    VkDevice device_;
-    VkRenderPass render_pass_;
-};
+        VkRenderPass getVulkanRenderPass() const
+        {
+            return render_pass_;
+        }
+        bool isValid() const
+        {
+            return render_pass_ != VK_NULL_HANDLE;
+        }
 
-} // namespace kera
+    private:
+        VkDevice device_;
+        VkRenderPass render_pass_;
+    };
+
+}  // namespace kera

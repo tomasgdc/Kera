@@ -52,6 +52,16 @@ class ResourceRegistry {
     return true;
   }
 
+  uint32_t activeCount() const {
+    uint32_t count = 0;
+    for (const Slot& slot : m_slots) {
+      if (slot.m_value) {
+        ++count;
+      }
+    }
+    return count;
+  }
+
   void clear() {
     for (Slot& slot : m_slots) {
       if (slot.m_value) {

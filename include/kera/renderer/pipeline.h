@@ -34,6 +34,7 @@ public:
 
     VkPipeline getVulkanPipeline() const { return pipeline_; }
     VkPipelineLayout getPipelineLayout() const { return pipeline_layout_; }
+    VkDescriptorSetLayout getDescriptorSetLayout(uint32_t set) const;
 
     bool isValid() const { return pipeline_ != VK_NULL_HANDLE; }
 
@@ -41,6 +42,7 @@ private:
     VkDevice device_;
     VkPipeline pipeline_;
     VkPipelineLayout pipeline_layout_;
+    std::vector<VkDescriptorSetLayout> descriptor_set_layouts_;
 };
 
 } // namespace kera

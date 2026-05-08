@@ -126,26 +126,22 @@ bool Image::initialize(const Device& device, uint32_t width, uint32_t height, Im
 
 void Image::shutdown() {
     if (sampler_) {
-        // TODO: Need device reference
-        // vkDestroySampler(device, sampler_, nullptr);
+        // TODO: Store the owning VkDevice so the sampler can be destroyed.
         sampler_ = VK_NULL_HANDLE;
     }
 
     if (image_view_) {
-        // TODO: Need device reference
-        // vkDestroyImageView(device, image_view_, nullptr);
+        // TODO: Store the owning VkDevice so the image view can be destroyed.
         image_view_ = VK_NULL_HANDLE;
     }
 
     if (image_) {
-        // TODO: Need device reference
-        // vkDestroyImage(device, image_, nullptr);
+        // TODO: Store the owning VkDevice so the image can be destroyed.
         image_ = VK_NULL_HANDLE;
     }
 
     if (memory_) {
-        // TODO: Need device reference
-        // vkFreeMemory(device, memory_, nullptr);
+        // TODO: Store the owning VkDevice so image memory can be freed.
         memory_ = VK_NULL_HANDLE;
     }
 

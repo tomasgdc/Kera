@@ -1,40 +1,54 @@
 #pragma once
 
-#include <memory>
-#include <vector>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <vector>
 
-class Device;
-class RenderPass;
-class SwapChain;
+namespace kera
+{
 
-class Framebuffer {
-public:
-    Framebuffer();
-    ~Framebuffer();
+    class Device;
+    class RenderPass;
+    class SwapChain;
 
-    // Delete copy operations
-    Framebuffer(const Framebuffer&) = delete;
-    Framebuffer& operator=(const Framebuffer&) = delete;
+    class Framebuffer
+    {
+    public:
+        Framebuffer();
+        ~Framebuffer();
 
-    // Move operations
-    Framebuffer(Framebuffer&& other) noexcept;
-    Framebuffer& operator=(Framebuffer&& other) noexcept;
+        // Delete copy operations
+        Framebuffer(const Framebuffer&) = delete;
+        Framebuffer& operator=(const Framebuffer&) = delete;
 
-    bool initialize(const Device& device, const RenderPass& renderPass, const SwapChain& swapChain);
-    void shutdown();
+        // Move operations
+        Framebuffer(Framebuffer&& other) noexcept;
+        Framebuffer& operator=(Framebuffer&& other) noexcept;
 
-    const std::vector<VkFramebuffer>& getVulkanFramebuffers() const { return framebuffers_; }
-    VkFramebuffer getFramebuffer(uint32_t index) const;
-    uint32_t getFramebufferCount() const { return static_cast<uint32_t>(framebuffers_.size()); }
+        bool initialize(const Device& device, const RenderPass& renderPass, const SwapChain& swapChain);
+        bool initializeSingleColorTarget(const Device& device, const RenderPass& renderPass, VkImageView colorImageView,
+                                         VkExtent2D extent);
+        void shutdown();
 
-    bool isValid() const { return !framebuffers_.empty(); }
+        const std::vector<VkFramebuffer>& getVulkanFramebuffers() const
+        {
+            return framebuffers_;
+        }
+        VkFramebuffer getFramebuffer(uint32_t index) const;
+        uint32_t getFramebufferCount() const
+        {
+            return static_cast<uint32_t>(framebuffers_.size());
+        }
 
-private:
-    VkDevice device_;
-    std::vector<VkFramebuffer> framebuffers_;
-};
+        bool isValid() const
+        {
+            return !framebuffers_.empty();
+        }
 
-} // namespace kera
+    private:
+        VkDevice device_;
+        std::vector<VkFramebuffer> framebuffers_;
+    };
+
+}  // namespace kera

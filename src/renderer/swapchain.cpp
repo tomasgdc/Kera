@@ -59,7 +59,6 @@ namespace kera
             shutdown();
         }
 
-        //VkPhysicalDevice vkPhysicalDevice = physicalDevice.getVulkanPhysicalDevice();
         VkDevice vkDevice = device.getVulkanDevice();
         device_ = vkDevice;
         const auto& swapChainSupport = physicalDevice.getSwapChainSupport();
