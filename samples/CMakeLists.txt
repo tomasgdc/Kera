@@ -15,6 +15,7 @@ add_executable(kera_samples
     sample_utils.cpp
     sample_utils.h
     basic_triangle_sample.cpp
+    basic_triangle_sample.h
     compute_sample.cpp
     instanced_triangle.cpp
     ${SHADER_FILES}  # Include shaders in the project

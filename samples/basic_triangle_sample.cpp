@@ -3,56 +3,21 @@
 #include <cstddef>
 #include <glm/glm.hpp>
 #include <vector>
-#include <filesystem>
 
-#include "kera/utilities/file_utils.h"
 #include "kera/utilities/logger.h"
+#include "render_context.h"
+#include "sample_utils.h"
 
 namespace kera 
 {
-    namespace 
+    namespace
     {
-        struct Vertex 
+        struct Vertex
         {
             glm::vec3 position;
             glm::vec3 color;
         };
-
     }  // namespace
-
-    std::string resolveShaderPath(const std::string& shaderPath) 
-    {
-        // If the path exists as-is, return it
-        if (kera::FileUtils::fileExists(shaderPath)) 
-        {
-            return shaderPath;
-        }
-
-        // Try relative to current working directory
-        const std::filesystem::path cwdPath = std::filesystem::current_path() / shaderPath;
-        if (std::filesystem::exists(cwdPath) && std::filesystem::is_regular_file(cwdPath)) 
-        {
-            return cwdPath.string();
-        }
-
-        // Try relative to parent directory (for build artifacts)
-        // Assuming executable runs from build/windows-debug or similar
-        const std::filesystem::path parentPath = std::filesystem::current_path().parent_path() / shaderPath;
-        if (std::filesystem::exists(parentPath) && std::filesystem::is_regular_file(parentPath)) 
-        {
-            return parentPath.string();
-        }
-
-        // Try assuming we're in the build directory and shaders are in build/samples/shaders
-        const std::filesystem::path buildPath = std::filesystem::current_path() / "samples" / shaderPath;
-        if (std::filesystem::exists(buildPath) && std::filesystem::is_regular_file(buildPath)) 
-        {
-            return buildPath.string();
-        }
-
-        // Return original path if not found (will fail later with better error message)
-        return shaderPath;
-    }
 
     BasicTriangleSample::BasicTriangleSample(IRenderer& renderer)
         : Sample("Basic Triangle with Slang"),
@@ -94,14 +59,14 @@ namespace kera
             .stages =
                 {
                     {
-                        .path = resolveShaderPath("shaders/triangle.vert.slang"),
-                        .entryPoint = "main",
+                        .path = resolveShaderPath("shaders/triangle.slang"),
+                        .entryPoint = "vertexMain",
                         .stage = ShaderStage::Vertex,
                         .source = ShaderSourceKind::SlangFile,
                     },
                     {
-                        .path = resolveShaderPath("shaders/triangle.frag.slang"),
-                        .entryPoint = "main",
+                        .path = resolveShaderPath("shaders/triangle.slang"),
+                        .entryPoint = "fragmentMain",
                         .stage = ShaderStage::Fragment,
                         .source = ShaderSourceKind::SlangFile,
                     },
@@ -196,7 +161,7 @@ namespace kera
         }
     }
 
-    void BasicTriangleSample::render() 
+    void BasicTriangleSample::render(RenderContext& context)
     {
         if (!m_pipeline.isValid() || !m_vertexBuffer.isValid() || !m_indexBuffer.isValid()) 
         {
@@ -205,27 +170,12 @@ namespace kera
             return;
         }
 
-        FrameHandle frame = m_renderer.beginFrame();
-        if (!frame.isValid()) 
-        {
-            return;
-        }
-
-        m_renderer.beginRenderPass(frame,
-            {
-                .clearColor = {0.0f, 0.0f, 0.1f, 1.0f},
-            });
-
-        m_renderer.bindPipeline(frame, m_pipeline);
-        m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
-        m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
-        m_renderer.drawIndexed(frame, m_indexCount);
-        m_renderer.endRenderPass(frame);
-
-        if (!m_renderer.endFrame(frame)) 
-        {
-            Logger::getInstance().error("Failed to end frame");
-        }
+        context.renderToBackbuffer(getClearColor(), [this](FrameHandle frame) {
+            m_renderer.bindPipeline(frame, m_pipeline);
+            m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
+            m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
+            m_renderer.drawIndexed(frame, m_indexCount);
+        });
     }
 
     void BasicTriangleSample::cleanup()
