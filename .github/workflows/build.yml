@@ -1,0 +1,68 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  style_windows:
+    name: Windows style
+    runs-on: [self-hosted, Windows]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Add LLVM to PATH
+        shell: powershell
+        run: |
+          "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Add Ninja to PATH
+        shell: powershell
+        run: |
+          "C:\Ninja" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Check formatting
+        shell: powershell
+        run: |
+          .\run-clang-format.ps1
+
+      - name: Check clang-tidy
+        shell: powershell
+        run: |
+          .\run-clang-tidy.ps1 --local
+
+  build_windows:
+    name: Windows ${{ matrix.preset }}
+    needs: style_windows
+    runs-on: [self-hosted, Windows]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        preset:
+          - windows-release
+          - windows-release-shared
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure CMake
+        shell: powershell
+        run: |
+          cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        shell: powershell
+        run: |
+          cmake --build --preset ${{ matrix.preset }} --config Release

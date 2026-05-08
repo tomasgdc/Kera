@@ -1,0 +1,231 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version, for example v1.2.3 or 1.2.3."
+        required: true
+      release_branch:
+        description: "Release branch. It must already exist."
+        default: "main"
+
+jobs:
+  create-release:
+    runs-on: [self-hosted, Windows]
+
+    outputs:
+      release_version_validated: ${{ steps.version.outputs.release_version_validated }}
+      upload_url: ${{ steps.create_github_release.outputs.upload_url }}
+
+    permissions:
+      contents: write
+
+    env:
+      GIT_AUTHOR_NAME: "github-actions[bot]"
+      GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
+      GIT_COMMITTER_NAME: "github-actions[bot]"
+      GIT_COMMITTER_EMAIL: "github-actions[bot]@users.noreply.github.com"
+
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.release_branch }}
+
+      - name: Validate release version
+        id: version
+        shell: powershell
+        run: |
+          $version = "${{ github.event.inputs.release_version }}"
+
+          if ($version -notmatch '^v?\d+\.\d+\.\d+[A-Za-z]?(-[\w\.-]+)?$') {
+            throw "Invalid version format: $version. Expected v1.2.3 or 1.2.3."
+          }
+
+          if (-not $version.StartsWith("v")) {
+            $version = "v$version"
+          }
+
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "release_version_validated=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Check tag does not exist
+        shell: powershell
+        run: |
+          $version = "${{ env.RELEASE_VERSION }}"
+          git fetch --tags
+
+          $tag = git tag -l "$version"
+          if ($tag) {
+            throw "Tag $version already exists."
+          }
+
+      - name: Determine previous tag
+        id: prev_tag
+        shell: powershell
+        run: |
+          $prevTag = ""
+          try {
+            $gitOutput = git describe --tags --abbrev=0 HEAD~1 2>$null
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($gitOutput)) {
+              $prevTag = $gitOutput.Trim()
+            }
+          } catch {
+            $prevTag = ""
+          }
+
+          "prev_tag=$prevTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Create and push tag
+        shell: powershell
+        run: |
+          $version = "${{ env.RELEASE_VERSION }}"
+          git tag "$version"
+          git push origin "$version"
+
+      - name: Generate release notes
+        shell: powershell
+        run: |
+          $version = "${{ env.RELEASE_VERSION }}"
+          $prevTag = "${{ steps.prev_tag.outputs.prev_tag }}"
+
+          "# Kera $version" | Out-File -FilePath "RELEASE_NOTES.md" -Encoding utf8
+          "" | Out-File -FilePath "RELEASE_NOTES.md" -Append -Encoding utf8
+          "Previous tag: $prevTag" | Out-File -FilePath "RELEASE_NOTES.md" -Append -Encoding utf8
+          "" | Out-File -FilePath "RELEASE_NOTES.md" -Append -Encoding utf8
+          "Release notes to be filled manually." | Out-File -FilePath "RELEASE_NOTES.md" -Append -Encoding utf8
+
+      - name: Create GitHub Release
+        id: create_github_release
+        shell: powershell
+        run: |
+          $version = "${{ env.RELEASE_VERSION }}"
+          $token = "${{ secrets.GITHUB_TOKEN }}"
+          $repo = "${{ github.repository }}"
+          $baseUrl = "${{ github.server_url }}/api/v3"
+          $releaseNotes = Get-Content "RELEASE_NOTES.md" -Raw
+
+          $releaseBody = @{
+            tag_name = $version
+            target_commitish = "${{ github.event.inputs.release_branch }}"
+            name = $version
+            body = $releaseNotes.Trim()
+            draft = $false
+            prerelease = $false
+            make_latest = "true"
+          } | ConvertTo-Json -Depth 3
+
+          $headers = @{
+            "Authorization" = "Bearer $token"
+            "Accept" = "application/vnd.github.v3+json"
+            "Content-Type" = "application/json"
+          }
+
+          $release = Invoke-RestMethod -Uri "$baseUrl/repos/$repo/releases" -Method Post -Body $releaseBody -Headers $headers
+          "upload_url=$($release.upload_url)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+  upload-windows-artifacts:
+    needs: create-release
+    runs-on: [self-hosted, Windows]
+
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: windows-release
+            package_suffix: release
+            build_dir: build/windows-release
+          - preset: windows-release-shared
+            package_suffix: release-shared
+            build_dir: build/windows-release-shared
+
+    env:
+      RELEASE_VERSION: ${{ needs.create-release.outputs.release_version_validated }}
+      RELEASE_UPLOAD_URL: ${{ needs.create-release.outputs.upload_url }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          ref: ${{ needs.create-release.outputs.release_version_validated }}
+
+      - name: Add LLVM to PATH
+        shell: powershell
+        run: |
+          "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Add Ninja to PATH
+        shell: powershell
+        run: |
+          "C:\Ninja" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Configure CMake
+        shell: powershell
+        run: |
+          cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        shell: powershell
+        run: |
+          cmake --build --preset ${{ matrix.preset }} --config Release
+
+      - name: Package SDK
+        shell: powershell
+        run: |
+          $version = $env:RELEASE_VERSION
+          $artifactName = "kera-windows-${{ matrix.package_suffix }}-$version"
+          $distDir = Join-Path $env:GITHUB_WORKSPACE "dist"
+          $packageDir = Join-Path $distDir $artifactName
+          $buildDir = Join-Path $env:GITHUB_WORKSPACE "${{ matrix.build_dir }}"
+          $sampleDir = Join-Path $buildDir "samples\Release"
+          $binDir = Join-Path $packageDir "bin"
+
+          New-Item -ItemType Directory -Force $distDir | Out-Null
+          cmake --install $buildDir --config Release --prefix $packageDir
+
+          if (Test-Path $sampleDir) {
+            Copy-Item -LiteralPath $sampleDir -Destination (Join-Path $packageDir "samples") -Recurse -Force
+
+            New-Item -ItemType Directory -Force $binDir | Out-Null
+            Get-ChildItem -Path $sampleDir -Filter "*.dll" -File | ForEach-Object {
+              Copy-Item -LiteralPath $_.FullName -Destination $binDir -Force
+            }
+          }
+
+          $version | Out-File -FilePath (Join-Path $packageDir "VERSION") -Encoding utf8 -NoNewline
+
+          $zipPath = Join-Path $distDir "$artifactName.zip"
+          Compress-Archive -Path $packageDir -DestinationPath $zipPath -Force
+
+      - name: Upload Windows SDK artifact
+        shell: powershell
+        run: |
+          $version = $env:RELEASE_VERSION
+          $artifactName = "kera-windows-${{ matrix.package_suffix }}-$version"
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "dist\$artifactName.zip"
+          $uploadUrlTemplate = $env:RELEASE_UPLOAD_URL
+          $token = "${{ secrets.GITHUB_TOKEN }}"
+
+          if (-not (Test-Path $zipPath)) {
+            throw "Artifact not found: $zipPath"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($uploadUrlTemplate)) {
+            throw "Release upload_url was not provided."
+          }
+
+          $headers = @{
+            "Authorization" = "Bearer $token"
+            "Content-Type" = "application/zip"
+          }
+
+          $zipBytes = [System.IO.File]::ReadAllBytes((Resolve-Path $zipPath))
+          $uploadUrl = $uploadUrlTemplate -replace '\{\?name,label\}', "?name=$artifactName.zip"
+          Invoke-RestMethod -Uri $uploadUrl -Method Post -Body $zipBytes -Headers $headers
