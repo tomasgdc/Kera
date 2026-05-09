@@ -1,45 +1,57 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <string>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <string>
+#include <vector>
 
-class Instance {
-public:
-    Instance();
-    ~Instance();
+namespace kera
+{
 
-    // Delete copy operations
-    Instance(const Instance&) = delete;
-    Instance& operator=(const Instance&) = delete;
+    class Instance
+    {
+    public:
+        Instance();
+        ~Instance();
 
-    // Move operations
-    Instance(Instance&& other) noexcept;
-    Instance& operator=(Instance&& other) noexcept;
+        // Delete copy operations
+        Instance(const Instance&) = delete;
+        Instance& operator=(const Instance&) = delete;
 
-    bool initialize(const std::string& appName, uint32_t appVersion, bool enableValidation = true);
-    void shutdown();
+        // Move operations
+        Instance(Instance&& other) noexcept;
+        Instance& operator=(Instance&& other) noexcept;
 
-    VkInstance getVulkanInstance() const { return instance_; }
-    bool isValid() const { return instance_ != VK_NULL_HANDLE; }
+        bool initialize(const std::string& appName, uint32_t appVersion, bool enableValidation = true);
+        void shutdown();
 
-    // Extension and layer queries
-    std::vector<const char*> getRequiredExtensions() const;
-    std::vector<const char*> getRequiredLayers() const;
+        VkInstance getVulkanInstance() const
+        {
+            return instance_;
+        }
+        bool isValid() const
+        {
+            return instance_ != VK_NULL_HANDLE;
+        }
 
-    bool isValidationEnabled() const { return validation_enabled_; }
+        // Extension and layer queries
+        std::vector<const char*> getRequiredExtensions() const;
+        std::vector<const char*> getRequiredLayers() const;
 
-private:
-    bool createInstance(const std::string& appName, uint32_t appVersion);
-    bool setupDebugMessenger();
-    void destroyDebugMessenger();
+        bool isValidationEnabled() const
+        {
+            return validation_enabled_;
+        }
 
-    VkInstance instance_;
-    VkDebugUtilsMessengerEXT debug_messenger_;
-    bool validation_enabled_;
-};
+    private:
+        bool createInstance(const std::string& appName, uint32_t appVersion);
+        bool setupDebugMessenger();
+        void destroyDebugMessenger();
 
-} // namespace kera
+        VkInstance instance_;
+        VkDebugUtilsMessengerEXT debug_messenger_;
+        bool validation_enabled_;
+    };
+
+}  // namespace kera

@@ -1,9 +1,11 @@
 #include "kera/utilities/validation.h"
-#include "kera/utilities/logger.h"
-#include <iostream>
-#include <cstdlib>
 
-namespace kera 
+#include "kera/utilities/logger.h"
+
+#include <cstdlib>
+#include <iostream>
+
+namespace kera
 {
     Validation::AssertHandler Validation::assert_handler_ = nullptr;
 
@@ -12,7 +14,9 @@ namespace kera
         assert_handler_ = handler;
     }
 
-    void Validation::assertCondition(bool condition, const std::string& conditionStr, const std::string& message, const char* file, int line) {
+    void Validation::assertCondition(bool condition, const std::string& conditionStr, const std::string& message,
+                                     const char* file, int line)
+    {
         if (!condition)
         {
             std::string fullMessage = "Assertion failed: " + conditionStr;
@@ -40,4 +44,4 @@ namespace kera
             }
         }
     }
-} // namespace kera
+}  // namespace kera

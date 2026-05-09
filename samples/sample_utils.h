@@ -2,8 +2,9 @@
 
 #include <string>
 
-namespace kera {
+namespace kera
+{
 
-std::string resolveShaderPath(const std::string& shaderPath);
+    std::string resolveShaderPath(const std::string& shaderPath);
 
 }  // namespace kera

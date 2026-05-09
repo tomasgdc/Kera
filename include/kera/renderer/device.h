@@ -1,49 +1,73 @@
 #pragma once
 
-#include <memory>
-#include <vector>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <vector>
 
-class PhysicalDevice;
+namespace kera
+{
 
-class Device {
-public:
-    Device();
-    ~Device();
+    class PhysicalDevice;
 
-    // Delete copy operations
-    Device(const Device&) = delete;
-    Device& operator=(const Device&) = delete;
+    class Device
+    {
+    public:
+        Device();
+        ~Device();
 
-    // Move operations
-    Device(Device&& other) noexcept;
-    Device& operator=(Device&& other) noexcept;
+        // Delete copy operations
+        Device(const Device&) = delete;
+        Device& operator=(const Device&) = delete;
 
-    bool initialize(const PhysicalDevice& physicalDevice);
-    void shutdown();
+        // Move operations
+        Device(Device&& other) noexcept;
+        Device& operator=(Device&& other) noexcept;
 
-    VkDevice getVulkanDevice() const { return device_; }
-    VkPhysicalDevice getVulkanPhysicalDevice() const { return physical_device_; }
-    VkQueue getGraphicsQueue() const { return graphics_queue_; }
-    VkQueue getPresentQueue() const { return present_queue_; }
-    VkCommandPool getCommandPool() const { return command_pool_; }
-    uint32_t getGraphicsQueueFamilyIndex() const { return graphics_queue_family_index_; }
+        bool initialize(const PhysicalDevice& physicalDevice);
+        void shutdown();
 
-    bool isValid() const { return device_ != VK_NULL_HANDLE; }
+        VkDevice getVulkanDevice() const
+        {
+            return device_;
+        }
+        VkPhysicalDevice getVulkanPhysicalDevice() const
+        {
+            return physical_device_;
+        }
+        VkQueue getGraphicsQueue() const
+        {
+            return graphics_queue_;
+        }
+        VkQueue getPresentQueue() const
+        {
+            return present_queue_;
+        }
+        VkCommandPool getCommandPool() const
+        {
+            return command_pool_;
+        }
+        uint32_t getGraphicsQueueFamilyIndex() const
+        {
+            return graphics_queue_family_index_;
+        }
 
-    // Command buffer management
-    bool createCommandPool();
-    void destroyCommandPool();
+        bool isValid() const
+        {
+            return device_ != VK_NULL_HANDLE;
+        }
 
-private:
-    VkPhysicalDevice physical_device_;
-    VkDevice device_;
-    VkQueue graphics_queue_;
-    VkQueue present_queue_;
-    VkCommandPool command_pool_;
-    uint32_t graphics_queue_family_index_;
-};
+        // Command buffer management
+        bool createCommandPool();
+        void destroyCommandPool();
 
-} // namespace kera
+    private:
+        VkPhysicalDevice physical_device_;
+        VkDevice device_;
+        VkQueue graphics_queue_;
+        VkQueue present_queue_;
+        VkCommandPool command_pool_;
+        uint32_t graphics_queue_family_index_;
+    };
+
+}  // namespace kera

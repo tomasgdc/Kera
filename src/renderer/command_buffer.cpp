@@ -1,99 +1,115 @@
 #include "kera/renderer/command_buffer.h"
+
 #include "kera/renderer/device.h"
+
 #include <vulkan/vulkan.h>
+
 #include <iostream>
 
-namespace kera {
+namespace kera
+{
 
-CommandBuffer::CommandBuffer()
-    : device_(VK_NULL_HANDLE)
-    , command_pool_(VK_NULL_HANDLE)
-    , command_buffer_(VK_NULL_HANDLE) {
-}
+    CommandBuffer::CommandBuffer()
+        : device_(VK_NULL_HANDLE), command_pool_(VK_NULL_HANDLE), command_buffer_(VK_NULL_HANDLE)
+    {
+    }
 
-CommandBuffer::~CommandBuffer() {
-    shutdown();
-}
-
-CommandBuffer::CommandBuffer(CommandBuffer&& other) noexcept
-    : device_(other.device_)
-    , command_pool_(other.command_pool_)
-    , command_buffer_(other.command_buffer_) {
-    other.device_ = VK_NULL_HANDLE;
-    other.command_pool_ = VK_NULL_HANDLE;
-    other.command_buffer_ = VK_NULL_HANDLE;
-}
-
-CommandBuffer& CommandBuffer::operator=(CommandBuffer&& other) noexcept {
-    if (this != &other) {
+    CommandBuffer::~CommandBuffer()
+    {
         shutdown();
-        device_ = other.device_;
-        command_pool_ = other.command_pool_;
-        command_buffer_ = other.command_buffer_;
+    }
+
+    CommandBuffer::CommandBuffer(CommandBuffer&& other) noexcept
+        : device_(other.device_), command_pool_(other.command_pool_), command_buffer_(other.command_buffer_)
+    {
         other.device_ = VK_NULL_HANDLE;
         other.command_pool_ = VK_NULL_HANDLE;
         other.command_buffer_ = VK_NULL_HANDLE;
     }
-    return *this;
-}
 
-bool CommandBuffer::initialize(const Device& device) {
-    if (command_buffer_) {
-        shutdown();
+    CommandBuffer& CommandBuffer::operator=(CommandBuffer&& other) noexcept
+    {
+        if (this != &other)
+        {
+            shutdown();
+            device_ = other.device_;
+            command_pool_ = other.command_pool_;
+            command_buffer_ = other.command_buffer_;
+            other.device_ = VK_NULL_HANDLE;
+            other.command_pool_ = VK_NULL_HANDLE;
+            other.command_buffer_ = VK_NULL_HANDLE;
+        }
+        return *this;
     }
 
-    device_ = device.getVulkanDevice();
-    command_pool_ = device.getCommandPool();
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = command_pool_;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
+    bool CommandBuffer::initialize(const Device& device)
+    {
+        if (command_buffer_)
+        {
+            shutdown();
+        }
 
-    VkResult result = vkAllocateCommandBuffers(device.getVulkanDevice(), &allocInfo, &command_buffer_);
-    if (result != VK_SUCCESS) {
-        std::cerr << "Failed to allocate command buffer: " << result << std::endl;
-        return false;
+        device_ = device.getVulkanDevice();
+        command_pool_ = device.getCommandPool();
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = command_pool_;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+
+        VkResult result = vkAllocateCommandBuffers(device.getVulkanDevice(), &allocInfo, &command_buffer_);
+        if (result != VK_SUCCESS)
+        {
+            std::cerr << "Failed to allocate command buffer: " << result << std::endl;
+            return false;
+        }
+
+        return true;
     }
 
-    return true;
-}
-
-void CommandBuffer::shutdown() {
-    if (command_buffer_) {
-        vkFreeCommandBuffers(device_, command_pool_, 1, &command_buffer_);
-        command_buffer_ = VK_NULL_HANDLE;
-    }
-    command_pool_ = VK_NULL_HANDLE;
-    device_ = VK_NULL_HANDLE;
-}
-
-bool CommandBuffer::begin() {
-    if (!command_buffer_) {
-        return false;
+    void CommandBuffer::shutdown()
+    {
+        if (command_buffer_)
+        {
+            vkFreeCommandBuffers(device_, command_pool_, 1, &command_buffer_);
+            command_buffer_ = VK_NULL_HANDLE;
+        }
+        command_pool_ = VK_NULL_HANDLE;
+        device_ = VK_NULL_HANDLE;
     }
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    bool CommandBuffer::begin()
+    {
+        if (!command_buffer_)
+        {
+            return false;
+        }
 
-    VkResult result = vkBeginCommandBuffer(command_buffer_, &beginInfo);
-    return result == VK_SUCCESS;
-}
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-bool CommandBuffer::end() {
-    if (!command_buffer_) {
-        return false;
+        VkResult result = vkBeginCommandBuffer(command_buffer_, &beginInfo);
+        return result == VK_SUCCESS;
     }
 
-    VkResult result = vkEndCommandBuffer(command_buffer_);
-    return result == VK_SUCCESS;
-}
+    bool CommandBuffer::end()
+    {
+        if (!command_buffer_)
+        {
+            return false;
+        }
 
-void CommandBuffer::reset() {
-    if (command_buffer_) {
-        vkResetCommandBuffer(command_buffer_, 0);
+        VkResult result = vkEndCommandBuffer(command_buffer_);
+        return result == VK_SUCCESS;
     }
-}
 
-} // namespace kera
+    void CommandBuffer::reset()
+    {
+        if (command_buffer_)
+        {
+            vkResetCommandBuffer(command_buffer_, 0);
+        }
+    }
+
+}  // namespace kera

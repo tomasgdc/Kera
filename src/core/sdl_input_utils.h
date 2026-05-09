@@ -4,8 +4,9 @@
 
 #include <SDL3/SDL_keycode.h>
 
-namespace kera {
+namespace kera
+{
 
-Key sdlKeyToKey(SDL_Keycode sdlKey);
+    Key sdlKeyToKey(SDL_Keycode sdlKey);
 
 }  // namespace kera

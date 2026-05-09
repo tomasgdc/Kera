@@ -1,56 +1,77 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <string>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <string>
+#include <vector>
 
-struct QueueFamilyIndices {
-    int graphicsFamily = -1;
-    int presentFamily = -1;
+namespace kera
+{
 
-    bool isComplete() const {
-        return graphicsFamily >= 0 && presentFamily >= 0;
-    }
-};
+    struct QueueFamilyIndices
+    {
+        int graphicsFamily = -1;
+        int presentFamily = -1;
 
-struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
+        bool isComplete() const
+        {
+            return graphicsFamily >= 0 && presentFamily >= 0;
+        }
+    };
 
-class PhysicalDevice {
-public:
-    PhysicalDevice();
-    ~PhysicalDevice() = default;
+    struct SwapChainSupportDetails
+    {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
 
-    bool initialize(VkInstance instance, VkSurfaceKHR surface);
-    void shutdown();
+    class PhysicalDevice
+    {
+    public:
+        PhysicalDevice();
+        ~PhysicalDevice() = default;
 
-    VkPhysicalDevice getVulkanPhysicalDevice() const { return physical_device_; }
-    const VkPhysicalDeviceProperties& getProperties() const { return properties_; }
-    const VkPhysicalDeviceFeatures& getFeatures() const { return features_; }
+        bool initialize(VkInstance instance, VkSurfaceKHR surface);
+        void shutdown();
 
-    const QueueFamilyIndices& getQueueFamilyIndices() const { return queue_families_; }
-    const SwapChainSupportDetails& getSwapChainSupport() const { return swap_chain_support_; }
+        VkPhysicalDevice getVulkanPhysicalDevice() const
+        {
+            return physical_device_;
+        }
+        const VkPhysicalDeviceProperties& getProperties() const
+        {
+            return properties_;
+        }
+        const VkPhysicalDeviceFeatures& getFeatures() const
+        {
+            return features_;
+        }
 
-    bool isSuitable() const;
-    std::string getDeviceName() const;
+        const QueueFamilyIndices& getQueueFamilyIndices() const
+        {
+            return queue_families_;
+        }
+        const SwapChainSupportDetails& getSwapChainSupport() const
+        {
+            return swap_chain_support_;
+        }
 
-private:
-    void pickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface);
-    bool checkDeviceExtensionSupport(VkPhysicalDevice device) const;
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const;
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) const;
+        bool isSuitable() const;
+        std::string getDeviceName() const;
 
-    VkPhysicalDevice physical_device_;
-    VkPhysicalDeviceProperties properties_;
-    VkPhysicalDeviceFeatures features_;
-    QueueFamilyIndices queue_families_;
-    SwapChainSupportDetails swap_chain_support_;
-};
+    private:
+        void pickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface);
+        bool checkDeviceExtensionSupport(VkPhysicalDevice device) const;
+        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const;
+        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) const;
 
-} // namespace kera
+        VkPhysicalDevice physical_device_;
+        VkPhysicalDeviceProperties properties_;
+        VkPhysicalDeviceFeatures features_;
+        QueueFamilyIndices queue_families_;
+        SwapChainSupportDetails swap_chain_support_;
+    };
+
+}  // namespace kera

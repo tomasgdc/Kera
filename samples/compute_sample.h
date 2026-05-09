@@ -2,16 +2,18 @@
 
 #include "samples.h"
 
-namespace kera {
+namespace kera
+{
 
-class ComputeSample : public Sample {
-public:
-    ComputeSample();
+    class ComputeSample : public Sample
+    {
+    public:
+        ComputeSample();
 
-    void initialize() override;
-    void update(float deltaTime) override;
-    void render(RenderContext& context) override;
-    void cleanup() override;
-};
+        void initialize() override;
+        void update(float deltaTime) override;
+        void render(RenderContext& context) override;
+        void cleanup() override;
+    };
 
-} // namespace kera
+}  // namespace kera

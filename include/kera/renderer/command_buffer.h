@@ -1,41 +1,50 @@
 #pragma once
 
-#include <memory>
-#include <vector>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <vector>
 
-class Device;
+namespace kera
+{
 
-class CommandBuffer {
-public:
-    CommandBuffer();
-    ~CommandBuffer();
+    class Device;
 
-    // Delete copy operations
-    CommandBuffer(const CommandBuffer&) = delete;
-    CommandBuffer& operator=(const CommandBuffer&) = delete;
+    class CommandBuffer
+    {
+    public:
+        CommandBuffer();
+        ~CommandBuffer();
 
-    // Move operations
-    CommandBuffer(CommandBuffer&& other) noexcept;
-    CommandBuffer& operator=(CommandBuffer&& other) noexcept;
+        // Delete copy operations
+        CommandBuffer(const CommandBuffer&) = delete;
+        CommandBuffer& operator=(const CommandBuffer&) = delete;
 
-    bool initialize(const Device& device);
-    void shutdown();
+        // Move operations
+        CommandBuffer(CommandBuffer&& other) noexcept;
+        CommandBuffer& operator=(CommandBuffer&& other) noexcept;
 
-    VkCommandBuffer getVulkanCommandBuffer() const { return command_buffer_; }
-    bool isValid() const { return command_buffer_ != VK_NULL_HANDLE; }
+        bool initialize(const Device& device);
+        void shutdown();
 
-    // Command buffer operations
-    bool begin();
-    bool end();
-    void reset();
+        VkCommandBuffer getVulkanCommandBuffer() const
+        {
+            return command_buffer_;
+        }
+        bool isValid() const
+        {
+            return command_buffer_ != VK_NULL_HANDLE;
+        }
 
-private:
-    VkDevice device_;
-    VkCommandPool command_pool_;
-    VkCommandBuffer command_buffer_;
-};
+        // Command buffer operations
+        bool begin();
+        bool end();
+        void reset();
 
-} // namespace kera
+    private:
+        VkDevice device_;
+        VkCommandPool command_pool_;
+        VkCommandBuffer command_buffer_;
+    };
+
+}  // namespace kera

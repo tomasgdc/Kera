@@ -1,48 +1,58 @@
 #pragma once
 
 #include "kera/renderer/descriptors.h"
-#include <span>
-#include <memory>
-#include <vector>
+
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <span>
+#include <vector>
 
-class Device;
-class RenderPass;
-class Shader;
+namespace kera
+{
 
-class Pipeline {
-public:
-    Pipeline();
-    ~Pipeline();
+    class Device;
+    class RenderPass;
+    class Shader;
 
-    // Delete copy operations
-    Pipeline(const Pipeline&) = delete;
-    Pipeline& operator=(const Pipeline&) = delete;
+    class Pipeline
+    {
+    public:
+        Pipeline();
+        ~Pipeline();
 
-    // Move operations
-    Pipeline(Pipeline&& other) noexcept;
-    Pipeline& operator=(Pipeline&& other) noexcept;
+        // Delete copy operations
+        Pipeline(const Pipeline&) = delete;
+        Pipeline& operator=(const Pipeline&) = delete;
 
-    bool initialize(
-        const Device& device,
-        const RenderPass& renderPass,
-        std::span<const Shader* const> shaders,
-        const GraphicsPipelineDesc& desc = {});
-    void shutdown();
+        // Move operations
+        Pipeline(Pipeline&& other) noexcept;
+        Pipeline& operator=(Pipeline&& other) noexcept;
 
-    VkPipeline getVulkanPipeline() const { return pipeline_; }
-    VkPipelineLayout getPipelineLayout() const { return pipeline_layout_; }
-    VkDescriptorSetLayout getDescriptorSetLayout(uint32_t set) const;
+        bool initialize(const Device& device, const RenderPass& renderPass, std::span<const Shader* const> shaders,
+                        const GraphicsPipelineDesc& desc = {});
+        void shutdown();
 
-    bool isValid() const { return pipeline_ != VK_NULL_HANDLE; }
+        VkPipeline getVulkanPipeline() const
+        {
+            return pipeline_;
+        }
+        VkPipelineLayout getPipelineLayout() const
+        {
+            return pipeline_layout_;
+        }
+        VkDescriptorSetLayout getDescriptorSetLayout(uint32_t set) const;
 
-private:
-    VkDevice device_;
-    VkPipeline pipeline_;
-    VkPipelineLayout pipeline_layout_;
-    std::vector<VkDescriptorSetLayout> descriptor_set_layouts_;
-};
+        bool isValid() const
+        {
+            return pipeline_ != VK_NULL_HANDLE;
+        }
 
-} // namespace kera
+    private:
+        VkDevice device_;
+        VkPipeline pipeline_;
+        VkPipelineLayout pipeline_layout_;
+        std::vector<VkDescriptorSetLayout> descriptor_set_layouts_;
+    };
+
+}  // namespace kera

@@ -1,36 +1,45 @@
 #pragma once
 
-#include <memory>
 #include <vulkan/vulkan.h>
+
+#include <memory>
 
 struct SDL_Window;
 
-namespace kera {
+namespace kera
+{
 
-class Window;
+    class Window;
 
-class Surface {
-public:
-    Surface();
-    ~Surface();
+    class Surface
+    {
+    public:
+        Surface();
+        ~Surface();
 
-    // Delete copy operations
-    Surface(const Surface&) = delete;
-    Surface& operator=(const Surface&) = delete;
+        // Delete copy operations
+        Surface(const Surface&) = delete;
+        Surface& operator=(const Surface&) = delete;
 
-    // Move operations
-    Surface(Surface&& other) noexcept;
-    Surface& operator=(Surface&& other) noexcept;
+        // Move operations
+        Surface(Surface&& other) noexcept;
+        Surface& operator=(Surface&& other) noexcept;
 
-    bool create(VkInstance instance, const Window& window);
-    void destroy();
+        bool create(VkInstance instance, const Window& window);
+        void destroy();
 
-    VkSurfaceKHR getVulkanSurface() const { return surface_; }
-    bool isValid() const { return surface_ != VK_NULL_HANDLE; }
+        VkSurfaceKHR getVulkanSurface() const
+        {
+            return surface_;
+        }
+        bool isValid() const
+        {
+            return surface_ != VK_NULL_HANDLE;
+        }
 
-private:
-    VkInstance instance_;
-    VkSurfaceKHR surface_;
-};
+    private:
+        VkInstance instance_;
+        VkSurfaceKHR surface_;
+    };
 
-} // namespace kera
+}  // namespace kera

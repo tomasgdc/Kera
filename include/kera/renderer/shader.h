@@ -1,58 +1,67 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <string>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <string>
+#include <vector>
 
-enum class ShaderType {
-    Vertex,
-    Fragment,
-    Compute,
-    Geometry,
-    TessellationControl,
-    TessellationEvaluation
-};
+namespace kera
+{
 
-class Device;
+    enum class ShaderType
+    {
+        Vertex,
+        Fragment,
+        Compute,
+        Geometry,
+        TessellationControl,
+        TessellationEvaluation
+    };
 
-class Shader {
-public:
-    Shader();
-    ~Shader();
+    class Device;
 
-    // Delete copy operations
-    Shader(const Shader&) = delete;
-    Shader& operator=(const Shader&) = delete;
+    class Shader
+    {
+    public:
+        Shader();
+        ~Shader();
 
-    // Move operations
-    Shader(Shader&& other) noexcept;
-    Shader& operator=(Shader&& other) noexcept;
+        // Delete copy operations
+        Shader(const Shader&) = delete;
+        Shader& operator=(const Shader&) = delete;
 
-    bool initialize(const Device& device, ShaderType type, const std::vector<uint32_t>& spirvCode);
-    bool initializeFromFile(const Device& device, ShaderType type, const std::string& filepath);
-    bool initializeFromSlangFile(
-        const Device& device,
-        ShaderType type,
-        const std::string& shaderPath,
-        const std::string& entryPoint,
-        const std::vector<std::string>& searchPaths = {});
-    void shutdown();
+        // Move operations
+        Shader(Shader&& other) noexcept;
+        Shader& operator=(Shader&& other) noexcept;
 
-    VkShaderModule getVulkanShaderModule() const { return shader_module_; }
-    ShaderType getType() const { return type_; }
+        bool initialize(const Device& device, ShaderType type, const std::vector<uint32_t>& spirvCode);
+        bool initializeFromFile(const Device& device, ShaderType type, const std::string& filepath);
+        bool initializeFromSlangFile(const Device& device, ShaderType type, const std::string& shaderPath,
+                                     const std::string& entryPoint, const std::vector<std::string>& searchPaths = {});
+        void shutdown();
 
-    bool isValid() const { return shader_module_ != VK_NULL_HANDLE; }
+        VkShaderModule getVulkanShaderModule() const
+        {
+            return shader_module_;
+        }
+        ShaderType getType() const
+        {
+            return type_;
+        }
 
-    // Shader stage info for pipeline creation
-    VkPipelineShaderStageCreateInfo getPipelineStageInfo() const;
+        bool isValid() const
+        {
+            return shader_module_ != VK_NULL_HANDLE;
+        }
 
-private:
-    VkDevice device_;
-    VkShaderModule shader_module_;
-    ShaderType type_;
-};
+        // Shader stage info for pipeline creation
+        VkPipelineShaderStageCreateInfo getPipelineStageInfo() const;
 
-} // namespace kera
+    private:
+        VkDevice device_;
+        VkShaderModule shader_module_;
+        ShaderType type_;
+    };
+
+}  // namespace kera

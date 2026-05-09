@@ -1,55 +1,71 @@
 #pragma once
 
-#include <memory>
-#include <vector>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
+#include <vector>
 
-enum class BufferUsage {
-    Vertex,
-    Index,
-    Uniform,
-    Storage,
-    TransferSrc,
-    TransferDst
-};
+namespace kera
+{
 
-class Device;
+    enum class BufferUsage
+    {
+        Vertex,
+        Index,
+        Uniform,
+        Storage,
+        TransferSrc,
+        TransferDst
+    };
 
-class Buffer {
-public:
-    Buffer();
-    ~Buffer();
+    class Device;
 
-    // Delete copy operations
-    Buffer(const Buffer&) = delete;
-    Buffer& operator=(const Buffer&) = delete;
+    class Buffer
+    {
+    public:
+        Buffer();
+        ~Buffer();
 
-    // Move operations
-    Buffer(Buffer&& other) noexcept;
-    Buffer& operator=(Buffer&& other) noexcept;
+        // Delete copy operations
+        Buffer(const Buffer&) = delete;
+        Buffer& operator=(const Buffer&) = delete;
 
-    bool initialize(const Device& device, VkDeviceSize size, BufferUsage usage, VkMemoryPropertyFlags properties);
-    void shutdown();
+        // Move operations
+        Buffer(Buffer&& other) noexcept;
+        Buffer& operator=(Buffer&& other) noexcept;
 
-    VkBuffer getVulkanBuffer() const { return buffer_; }
-    VkDeviceMemory getDeviceMemory() const { return memory_; }
-    VkDeviceSize getSize() const { return size_; }
+        bool initialize(const Device& device, VkDeviceSize size, BufferUsage usage, VkMemoryPropertyFlags properties);
+        void shutdown();
 
-    bool isValid() const { return buffer_ != VK_NULL_HANDLE; }
+        VkBuffer getVulkanBuffer() const
+        {
+            return buffer_;
+        }
+        VkDeviceMemory getDeviceMemory() const
+        {
+            return memory_;
+        }
+        VkDeviceSize getSize() const
+        {
+            return size_;
+        }
 
-    // Data operations
-    bool map(void** data);
-    void unmap();
-    bool copyFrom(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+        bool isValid() const
+        {
+            return buffer_ != VK_NULL_HANDLE;
+        }
 
-private:
-    VkDevice device_;
-    VkBuffer buffer_;
-    VkDeviceMemory memory_;
-    VkDeviceSize size_;
-    void* mapped_data_;
-};
+        // Data operations
+        bool map(void** data);
+        void unmap();
+        bool copyFrom(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
 
-} // namespace kera
+    private:
+        VkDevice device_;
+        VkBuffer buffer_;
+        VkDeviceMemory memory_;
+        VkDeviceSize size_;
+        void* mapped_data_;
+    };
+
+}  // namespace kera

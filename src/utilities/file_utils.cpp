@@ -1,9 +1,10 @@
 #include "kera/utilities/file_utils.h"
-#include <fstream>
-#include <sstream>
-#include <iostream>
 
-namespace kera 
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
+namespace kera
 {
     bool FileUtils::fileExists(const std::string& path)
     {
@@ -160,4 +161,4 @@ namespace kera
         }
         return directories;
     }
-} // namespace kera
+}  // namespace kera

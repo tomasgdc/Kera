@@ -1,58 +1,81 @@
 #pragma once
 
-#include <memory>
 #include <vulkan/vulkan.h>
 
-namespace kera {
+#include <memory>
 
-enum class ImageUsage {
-    Texture,
-    DepthStencil,
-    RenderTarget,
-    Storage
-};
+namespace kera
+{
 
-enum class ImageFormat {
-    RGBA8,
-    RGB8,
-    Depth24Stencil8,
-    Depth32
-};
+    enum class ImageUsage
+    {
+        Texture,
+        DepthStencil,
+        RenderTarget,
+        Storage
+    };
 
-class Device;
+    enum class ImageFormat
+    {
+        RGBA8,
+        RGB8,
+        Depth24Stencil8,
+        Depth32
+    };
 
-class Image {
-public:
-    Image();
-    ~Image();
+    class Device;
 
-    // Delete copy operations
-    Image(const Image&) = delete;
-    Image& operator=(const Image&) = delete;
+    class Image
+    {
+    public:
+        Image();
+        ~Image();
 
-    // Move operations
-    Image(Image&& other) noexcept;
-    Image& operator=(Image&& other) noexcept;
+        // Delete copy operations
+        Image(const Image&) = delete;
+        Image& operator=(const Image&) = delete;
 
-    bool initialize(const Device& device, uint32_t width, uint32_t height, ImageFormat format, ImageUsage usage);
-    void shutdown();
+        // Move operations
+        Image(Image&& other) noexcept;
+        Image& operator=(Image&& other) noexcept;
 
-    VkImage getVulkanImage() const { return image_; }
-    VkImageView getImageView() const { return image_view_; }
-    VkSampler getSampler() const { return sampler_; }
-    uint32_t getWidth() const { return width_; }
-    uint32_t getHeight() const { return height_; }
+        bool initialize(const Device& device, uint32_t width, uint32_t height, ImageFormat format, ImageUsage usage);
+        void shutdown();
 
-    bool isValid() const { return image_ != VK_NULL_HANDLE; }
+        VkImage getVulkanImage() const
+        {
+            return image_;
+        }
+        VkImageView getImageView() const
+        {
+            return image_view_;
+        }
+        VkSampler getSampler() const
+        {
+            return sampler_;
+        }
+        uint32_t getWidth() const
+        {
+            return width_;
+        }
+        uint32_t getHeight() const
+        {
+            return height_;
+        }
 
-private:
-    VkImage image_;
-    VkDeviceMemory memory_;
-    VkImageView image_view_;
-    VkSampler sampler_;
-    uint32_t width_;
-    uint32_t height_;
-    ImageFormat format_;
-};
+        bool isValid() const
+        {
+            return image_ != VK_NULL_HANDLE;
+        }
 
-} // namespace kera
+    private:
+        VkImage image_;
+        VkDeviceMemory memory_;
+        VkImageView image_view_;
+        VkSampler sampler_;
+        uint32_t width_;
+        uint32_t height_;
+        ImageFormat format_;
+    };
+
+}  // namespace kera

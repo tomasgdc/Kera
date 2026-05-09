@@ -12,28 +12,39 @@
 #include <slang.h>
 #endif
 
-namespace kera {
+namespace kera
+{
 
-    namespace {
+    namespace
+    {
 
 #if defined(KERA_HAS_SLANG)
 
-        SlangStage shaderTypeToSlangStage(ShaderType type) {
-            switch (type) {
-            case ShaderType::Vertex: return SLANG_STAGE_VERTEX;
-            case ShaderType::Fragment: return SLANG_STAGE_FRAGMENT;
-            case ShaderType::Compute: return SLANG_STAGE_COMPUTE;
-            case ShaderType::Geometry: return SLANG_STAGE_GEOMETRY;
-            case ShaderType::TessellationControl: return SLANG_STAGE_HULL;
-            case ShaderType::TessellationEvaluation: return SLANG_STAGE_DOMAIN;
-            default: return SLANG_STAGE_NONE;
+        SlangStage shaderTypeToSlangStage(ShaderType type)
+        {
+            switch (type)
+            {
+                case ShaderType::Vertex:
+                    return SLANG_STAGE_VERTEX;
+                case ShaderType::Fragment:
+                    return SLANG_STAGE_FRAGMENT;
+                case ShaderType::Compute:
+                    return SLANG_STAGE_COMPUTE;
+                case ShaderType::Geometry:
+                    return SLANG_STAGE_GEOMETRY;
+                case ShaderType::TessellationControl:
+                    return SLANG_STAGE_HULL;
+                case ShaderType::TessellationEvaluation:
+                    return SLANG_STAGE_DOMAIN;
+                default:
+                    return SLANG_STAGE_NONE;
             }
         }
 
-        void appendDiagnostics(
-            std::string* outDiagnostics,
-            slang::IBlob* diagnosticsBlob) {
-            if (!outDiagnostics || !diagnosticsBlob || diagnosticsBlob->getBufferSize() == 0) {
+        void appendDiagnostics(std::string* outDiagnostics, slang::IBlob* diagnosticsBlob)
+        {
+            if (!outDiagnostics || !diagnosticsBlob || diagnosticsBlob->getBufferSize() == 0)
+            {
                 return;
             }
 
@@ -41,28 +52,27 @@ namespace kera {
             outDiagnostics->append(text, diagnosticsBlob->getBufferSize());
         }
 
-        std::vector<const char*> buildSearchPathPointers(
-            const SlangCompileRequest& request,
-            std::vector<std::string>& ownedSearchPaths) {
+        std::vector<const char*> buildSearchPathPointers(const SlangCompileRequest& request,
+                                                         std::vector<std::string>& ownedSearchPaths)
+        {
             ownedSearchPaths = request.searchPaths;
 
             const std::filesystem::path shaderPath(request.shaderPath);
-            const std::string shaderDirectory = shaderPath.has_parent_path()
-                ? shaderPath.parent_path().string()
-                : std::filesystem::current_path().string();
+            const std::string shaderDirectory = shaderPath.has_parent_path() ? shaderPath.parent_path().string()
+                                                                             : std::filesystem::current_path().string();
 
-            const bool hasShaderDirectory = std::find(
-                ownedSearchPaths.begin(),
-                ownedSearchPaths.end(),
-                shaderDirectory) != ownedSearchPaths.end();
+            const bool hasShaderDirectory =
+                std::find(ownedSearchPaths.begin(), ownedSearchPaths.end(), shaderDirectory) != ownedSearchPaths.end();
 
-            if (!hasShaderDirectory) {
+            if (!hasShaderDirectory)
+            {
                 ownedSearchPaths.push_back(shaderDirectory);
             }
 
             std::vector<const char*> searchPathPointers;
             searchPathPointers.reserve(ownedSearchPaths.size());
-            for (const std::string& path : ownedSearchPaths) {
+            for (const std::string& path : ownedSearchPaths)
+            {
                 searchPathPointers.push_back(path.c_str());
             }
 
@@ -71,36 +81,42 @@ namespace kera {
 
 #endif
 
-    } // namespace
+    }  // namespace
 
-    bool SlangCompiler::compileToSpirv(
-        const SlangCompileRequest& request,
-        std::vector<uint32_t>& outSpirv,
-        std::string* outDiagnostics) {
+    bool SlangCompiler::compileToSpirv(const SlangCompileRequest& request, std::vector<uint32_t>& outSpirv,
+                                       std::string* outDiagnostics)
+    {
         outSpirv.clear();
 
-        if (outDiagnostics) {
+        if (outDiagnostics)
+        {
             outDiagnostics->clear();
         }
 
-        if (request.shaderPath.empty()) {
-            if (outDiagnostics) {
+        if (request.shaderPath.empty())
+        {
+            if (outDiagnostics)
+            {
                 *outDiagnostics = "Slang shader path is empty.";
             }
             Logger::getInstance().error("Slang compile failed: shader path is empty.");
             return false;
         }
 
-        if (request.entryPoint.empty()) {
-            if (outDiagnostics) {
+        if (request.entryPoint.empty())
+        {
+            if (outDiagnostics)
+            {
                 *outDiagnostics = "Slang entry point is empty.";
             }
             Logger::getInstance().error("Slang compile failed: entry point is empty.");
             return false;
         }
 
-        if (!FileUtils::fileExists(request.shaderPath)) {
-            if (outDiagnostics) {
+        if (!FileUtils::fileExists(request.shaderPath))
+        {
+            if (outDiagnostics)
+            {
                 *outDiagnostics = "Slang shader file not found: " + request.shaderPath;
             }
             Logger::getInstance().error("Slang shader file not found: " + request.shaderPath);
@@ -108,7 +124,8 @@ namespace kera {
         }
 
 #if !defined(KERA_HAS_SLANG)
-        if (outDiagnostics) {
+        if (outDiagnostics)
+        {
             *outDiagnostics = "Kera was built without Slang support.";
         }
         Logger::getInstance().error("Slang compile requested but KERA_HAS_SLANG is not enabled.");
@@ -116,8 +133,10 @@ namespace kera {
 #else
         Slang::ComPtr<slang::IGlobalSession> globalSession;
         SlangResult result = slang::createGlobalSession(globalSession.writeRef());
-        if (SLANG_FAILED(result)) {
-            if (outDiagnostics) {
+        if (SLANG_FAILED(result))
+        {
+            if (outDiagnostics)
+            {
                 *outDiagnostics = "Failed to create Slang global session.";
             }
             Logger::getInstance().error("Failed to create Slang global session.");
@@ -141,8 +160,10 @@ namespace kera {
 
         Slang::ComPtr<slang::ISession> session;
         result = globalSession->createSession(sessionDesc, session.writeRef());
-        if (SLANG_FAILED(result)) {
-            if (outDiagnostics) {
+        if (SLANG_FAILED(result))
+        {
+            if (outDiagnostics)
+            {
                 *outDiagnostics = "Failed to create Slang session.";
             }
             Logger::getInstance().error("Failed to create Slang session.");
@@ -155,7 +176,8 @@ namespace kera {
         slang::IModule* rawModule = session->loadModule(moduleName.c_str(), diagnosticsBlob.writeRef());
         appendDiagnostics(outDiagnostics, diagnosticsBlob);
 
-        if (!rawModule) {
+        if (!rawModule)
+        {
             Logger::getInstance().error("Failed to load Slang module: " + request.shaderPath);
             return false;
         }
@@ -163,30 +185,26 @@ namespace kera {
         Slang::ComPtr<slang::IModule> module(rawModule);
         Slang::ComPtr<slang::IEntryPoint> entryPoint;
         diagnosticsBlob = nullptr;
-        result = module->findAndCheckEntryPoint(
-            request.entryPoint.c_str(),
-            shaderTypeToSlangStage(request.shaderType),
-            entryPoint.writeRef(),
-            diagnosticsBlob.writeRef());
+        result = module->findAndCheckEntryPoint(request.entryPoint.c_str(), shaderTypeToSlangStage(request.shaderType),
+                                                entryPoint.writeRef(), diagnosticsBlob.writeRef());
         appendDiagnostics(outDiagnostics, diagnosticsBlob);
 
-        if (SLANG_FAILED(result)) {
-            Logger::getInstance().error(
-                "Failed to find Slang entry point '" + request.entryPoint + "' in " + request.shaderPath);
+        if (SLANG_FAILED(result))
+        {
+            Logger::getInstance().error("Failed to find Slang entry point '" + request.entryPoint + "' in " +
+                                        request.shaderPath);
             return false;
         }
 
-        slang::IComponentType* components[] = { module.get(), entryPoint.get() };
+        slang::IComponentType* components[] = {module.get(), entryPoint.get()};
         Slang::ComPtr<slang::IComponentType> compositeProgram;
         diagnosticsBlob = nullptr;
-        result = session->createCompositeComponentType(
-            components,
-            2,
-            compositeProgram.writeRef(),
-            diagnosticsBlob.writeRef());
+        result = session->createCompositeComponentType(components, 2, compositeProgram.writeRef(),
+                                                       diagnosticsBlob.writeRef());
         appendDiagnostics(outDiagnostics, diagnosticsBlob);
 
-        if (SLANG_FAILED(result)) {
+        if (SLANG_FAILED(result))
+        {
             Logger::getInstance().error("Failed to create Slang composite component type.");
             return false;
         }
@@ -196,7 +214,8 @@ namespace kera {
         result = compositeProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
         appendDiagnostics(outDiagnostics, diagnosticsBlob);
 
-        if (SLANG_FAILED(result)) {
+        if (SLANG_FAILED(result))
+        {
             Logger::getInstance().error("Failed to link Slang program.");
             return false;
         }
@@ -206,14 +225,17 @@ namespace kera {
         result = linkedProgram->getEntryPointCode(0, 0, spirvBlob.writeRef(), diagnosticsBlob.writeRef());
         appendDiagnostics(outDiagnostics, diagnosticsBlob);
 
-        if (SLANG_FAILED(result) || !spirvBlob) {
+        if (SLANG_FAILED(result) || !spirvBlob)
+        {
             Logger::getInstance().error("Failed to generate SPIR-V from Slang.");
             return false;
         }
 
         const size_t byteCount = spirvBlob->getBufferSize();
-        if (byteCount % sizeof(uint32_t) != 0) {
-            if (outDiagnostics) {
+        if (byteCount % sizeof(uint32_t) != 0)
+        {
+            if (outDiagnostics)
+            {
                 outDiagnostics->append("Generated SPIR-V size is not aligned to 32-bit words.");
             }
             Logger::getInstance().error("Generated Slang SPIR-V blob has invalid size.");
@@ -223,9 +245,9 @@ namespace kera {
         outSpirv.resize(byteCount / sizeof(uint32_t));
         std::memcpy(outSpirv.data(), spirvBlob->getBufferPointer(), byteCount);
 
-        Logger::getInstance().info(
-            "Compiled Slang shader at startup: " + request.shaderPath + " [" + request.entryPoint + "]");
+        Logger::getInstance().info("Compiled Slang shader at startup: " + request.shaderPath + " [" +
+                                   request.entryPoint + "]");
         return true;
 #endif
     }
-} // namespace kera
+}  // namespace kera

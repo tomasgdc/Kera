@@ -2,20 +2,28 @@
 
 #include <string>
 
-namespace kera {
+namespace kera
+{
 
-class IRenderer;
+    class IRenderer;
 
-class StatsOverlay {
- public:
-  void toggleVisible() { m_visible = !m_visible; }
-  bool isVisible() const { return m_visible; }
+    class StatsOverlay
+    {
+    public:
+        void toggleVisible()
+        {
+            m_visible = !m_visible;
+        }
+        bool isVisible() const
+        {
+            return m_visible;
+        }
 
-  void draw(const IRenderer& renderer, int activeSampleIndex,
-            const std::string& activeSampleName, float frameTimeMs);
+        void draw(const IRenderer& renderer, int activeSampleIndex, const std::string& activeSampleName,
+                  float frameTimeMs);
 
- private:
-  bool m_visible = true;
-};
+    private:
+        bool m_visible = true;
+    };
 
 }  // namespace kera
