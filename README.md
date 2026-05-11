@@ -4,7 +4,7 @@ Kera is a cross-platform rendering library built on Vulkan and SDL3, designed fo
 
 ## Features
 
-- **Vulkan-based rendering**: Modern, cross-platform graphics API
+- **Vulkan-based rendering**: Modern, cross-platform graphics API.
 - **SDL3 integration**: Window management, input handling, and platform abstraction
 - **Slang shader language**: Cross-platform shading with HLSL-like syntax
 - **Modular architecture**: Clean separation between core systems and rendering
