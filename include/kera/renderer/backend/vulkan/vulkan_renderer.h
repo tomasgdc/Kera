@@ -256,6 +256,7 @@ namespace kera
     private:
         bool recreateSwapchainResources(uint32_t width, uint32_t height);
         bool recreateLiveGraphicsPipelines();
+        bool recreateSwapchainFromWindow();
         RenderPass* resolveRenderPass(RenderTargetHandle renderTarget);
         void waitForDeviceIdle();
         void destroySyncObjects();

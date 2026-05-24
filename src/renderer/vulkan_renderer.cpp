@@ -500,6 +500,7 @@ namespace kera
 
         if (newExtent.width == 0 || newExtent.height == 0)
         {
+            m_swapchainRecreateRequested = true;
             return true;
         }
 
@@ -528,6 +529,7 @@ namespace kera
             Logger::getInstance().warning("Failed to restore ImGui after resize.");
         }
 
+        m_swapchainRecreateRequested = false;
         return true;
     }
 
@@ -1378,9 +1380,10 @@ namespace kera
         }
 
         const uint32_t imageIndex = frame->m_imageIndex;
-        if (imageIndex >= m_renderFinishedSemaphores.size())
+        if (imageIndex >= m_swapchain->getImageCount())
         {
-            Logger::getInstance().error("Swapchain image index exceeded available render-finished semaphores.");
+            Logger::getInstance().error("Swapchain image index exceeded available swapchain images.");
+            m_frames.remove(frameHandle);
             return false;
         }
 
@@ -1408,13 +1411,28 @@ namespace kera
         const VkResult presentResult =
             m_swapchain->present(imageIndex, renderFinishedSemaphore, m_device->getPresentQueue());
 
-        if (presentResult != VK_SUCCESS && presentResult != VK_SUBOPTIMAL_KHR)
+        const bool shouldRecreateSwapchain = m_swapchainRecreateRequested ||
+                                             presentResult == VK_ERROR_OUT_OF_DATE_KHR ||
+                                             presentResult == VK_SUBOPTIMAL_KHR;
+
+        if (presentResult != VK_SUCCESS && presentResult != VK_SUBOPTIMAL_KHR &&
+            presentResult != VK_ERROR_OUT_OF_DATE_KHR)
         {
             Logger::getInstance().error("Failed to present Vulkan swapchain image.");
+            m_frames.remove(frameHandle);
             return false;
         }
 
         m_frames.remove(frameHandle);
+        if (shouldRecreateSwapchain)
+        {
+            Logger::getInstance().info("Vulkan swapchain needs recreation after present.");
+            if (!recreateSwapchainFromWindow())
+            {
+                Logger::getInstance().error("Failed to recreate Vulkan swapchain after present.");
+                return false;
+            }
+        }
         return true;
     }
 
@@ -1532,6 +1550,28 @@ namespace kera
 
                 return true;
             });
+    }
+
+    bool VulkanRenderer::recreateSwapchainFromWindow()
+    {
+        if (!m_window)
+        {
+            Logger::getInstance().error("Cannot recreate Vulkan swapchain without a window.");
+            return false;
+        }
+
+        const int width = m_window->getWidth();
+        const int height = m_window->getHeight();
+        if (width <= 0 || height <= 0)
+        {
+            m_swapchainRecreateRequested = true;
+            return true;
+        }
+
+        return resize({
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height),
+        });
     }
 
     RenderPass* VulkanRenderer::resolveRenderPass(RenderTargetHandle renderTarget)
