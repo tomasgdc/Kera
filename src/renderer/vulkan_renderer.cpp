@@ -222,6 +222,9 @@ namespace kera
             Logger::getInstance().error("Failed to create Vulkan instance");
             return false;
         }
+        Logger::getInstance().info(m_instance->isDebugMessengerActive()
+                                       ? "Vulkan debug messenger is active."
+                                       : "Vulkan debug messenger is not active.");
 
         m_surface = std::make_shared<Surface>();
         if (!m_surface->create(m_instance->getVulkanInstance(), window))
@@ -1153,6 +1156,7 @@ namespace kera
             Logger::getInstance().error("Failed to wait for Vulkan frame fence.");
             return {};
         }
+        commandBuffer.markCompleted();
 
         const uint32_t swapchainImageCount = m_swapchain->getImageCount();
         if (m_imagesInFlight.size() != swapchainImageCount || m_framebuffer->getFramebufferCount() < swapchainImageCount)
@@ -1161,8 +1165,7 @@ namespace kera
             return {};
         }
 
-        commandBuffer.reset();
-        if (!commandBuffer.begin())
+        if (!commandBuffer.reset() || !commandBuffer.begin())
         {
             Logger::getInstance().error("Failed to begin Vulkan command buffer.");
             return {};
@@ -1494,6 +1497,7 @@ namespace kera
             releaseFrame(frameHandle, syncIndex);
             return false;
         }
+        commandBuffer.markSubmitted();
         m_imagesInFlight[imageIndex] = frameSync.m_inFlightFence;
 
         const VkResult presentResult =

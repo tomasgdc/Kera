@@ -35,16 +35,36 @@ namespace kera
         {
             return command_buffer_ != VK_NULL_HANDLE;
         }
+        bool isRecording() const
+        {
+            return state_ == State::Recording;
+        }
+        bool isPending() const
+        {
+            return state_ == State::Pending;
+        }
 
         // Command buffer operations
         bool begin();
         bool end();
-        void reset();
+        bool reset();
+        bool markSubmitted();
+        void markCompleted();
 
     private:
+        enum class State
+        {
+            Uninitialized,
+            Ready,
+            Recording,
+            Executable,
+            Pending
+        };
+
         VkDevice device_;
         VkCommandPool command_pool_;
         VkCommandBuffer command_buffer_;
+        State state_;
     };
 
 }  // namespace kera

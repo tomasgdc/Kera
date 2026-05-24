@@ -1,13 +1,17 @@
 #include "kera/renderer/instance.h"
 
+#include "kera/utilities/logger.h"
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <set>
+#include <string>
 
 namespace kera
 {
@@ -26,12 +30,43 @@ namespace kera
                                                      const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                                                      void* pUserData)
         {
-            (void)messageSeverity;
             (void)messageType;
             (void)pUserData;
 
-            std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+            const std::string message = std::string("Vulkan validation: ") +
+                                        (pCallbackData && pCallbackData->pMessage ? pCallbackData->pMessage : "");
+
+            if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0)
+            {
+                Logger::getInstance().error(message);
+            }
+            else if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0)
+            {
+                Logger::getInstance().warning(message);
+            }
+            else if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0)
+            {
+                Logger::getInstance().info(message);
+            }
+            else
+            {
+                Logger::getInstance().debug(message);
+            }
             return VK_FALSE;
+        }
+
+        void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+        {
+            createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+            createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                         VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                                         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                         VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+            createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                     VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                     VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+            createInfo.pfnUserCallback = debugCallback;
         }
 
         VkResult createDebugUtilsMessengerEXT(VkInstance instance,
@@ -140,7 +175,7 @@ namespace kera
 
         if (enableValidation && !validation_enabled_)
         {
-            std::cout << "Validation layers requested but not available" << std::endl;
+            Logger::getInstance().warning("Vulkan validation layers requested but not available.");
         }
 
         if (!createInstance(appName, appVersion))
@@ -150,15 +185,15 @@ namespace kera
 
         if (validation_enabled_ && !setupDebugMessenger())
         {
-            std::cerr << "Failed to set up debug messenger" << std::endl;
+            Logger::getInstance().error("Failed to set up Vulkan debug messenger.");
             shutdown();
             return false;
         }
 
-        std::cout << "Vulkan instance created successfully" << std::endl;
+        Logger::getInstance().info("Vulkan instance created successfully.");
         if (validation_enabled_)
         {
-            std::cout << "Validation layers enabled" << std::endl;
+            Logger::getInstance().info("Vulkan validation layers enabled.");
         }
 
         return true;
@@ -175,8 +210,9 @@ namespace kera
         {
             vkDestroyInstance(instance_, nullptr);
             instance_ = VK_NULL_HANDLE;
-            std::cout << "Vulkan instance destroyed" << std::endl;
+            Logger::getInstance().info("Vulkan instance destroyed.");
         }
+        validation_enabled_ = false;
     }
 
     std::vector<const char*> Instance::getRequiredExtensions() const
@@ -187,7 +223,7 @@ namespace kera
         const char* const* sdlExtensions = SDL_Vulkan_GetInstanceExtensions(&count);
         if (!sdlExtensions)
         {
-            std::cerr << "Failed to get SDL Vulkan extensions" << std::endl;
+            Logger::getInstance().error("Failed to get SDL Vulkan extensions.");
             return {};
         }
 
@@ -235,22 +271,14 @@ namespace kera
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         if (validation_enabled_)
         {
-            debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                              VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                              VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                          VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                          VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-            debugCreateInfo.pfnUserCallback = debugCallback;
-
+            populateDebugMessengerCreateInfo(debugCreateInfo);
             createInfo.pNext = &debugCreateInfo;
         }
 
         VkResult result = vkCreateInstance(&createInfo, nullptr, &instance_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create Vulkan instance: " << result << std::endl;
+            Logger::getInstance().error("Failed to create Vulkan instance: " + std::to_string(result));
             return false;
         }
 
@@ -260,14 +288,7 @@ namespace kera
     bool Instance::setupDebugMessenger()
     {
         VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                     VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        createInfo.pfnUserCallback = debugCallback;
+        populateDebugMessengerCreateInfo(createInfo);
 
         return createDebugUtilsMessengerEXT(instance_, &createInfo, nullptr, &debug_messenger_) == VK_SUCCESS;
     }
