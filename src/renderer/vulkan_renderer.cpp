@@ -1123,6 +1123,22 @@ namespace kera
         const uint32_t syncIndex = m_currentFrameSyncIndex;
         VulkanFrameSyncResource& frameSync = m_frameSyncResources[syncIndex];
         CommandBuffer& commandBuffer = *m_commandBuffers[syncIndex];
+        if (syncIndex >= m_activeFrameHandles.size())
+        {
+            Logger::getInstance().error("Frame sync slot is missing active-frame tracking.");
+            return {};
+        }
+
+        FrameHandle& activeFrameHandle = m_activeFrameHandles[syncIndex];
+        if (activeFrameHandle.isValid())
+        {
+            if (m_frames.get(activeFrameHandle))
+            {
+                Logger::getInstance().error("Cannot begin a new Vulkan frame while the current sync slot is active.");
+                return {};
+            }
+            activeFrameHandle = {};
+        }
 
         const VkResult waitResult = vkWaitForFences(vkDevice, 1, &frameSync.m_inFlightFence, VK_TRUE, UINT64_MAX);
         if (waitResult != VK_SUCCESS)
@@ -1196,7 +1212,9 @@ namespace kera
         frame.m_syncIndex = syncIndex;
         m_stats.drawCallsThisFrame = 0;
         ++m_stats.frameIndex;
-        return m_frames.emplace(frame);
+        FrameHandle frameHandle = m_frames.emplace(frame);
+        activeFrameHandle = frameHandle;
+        return frameHandle;
     }
 
     void VulkanRenderer::beginRenderPass(FrameHandle frameHandle, const RenderPassDesc& desc)
@@ -1403,13 +1421,31 @@ namespace kera
             return false;
         }
 
+        const uint32_t syncIndex = frame->m_syncIndex;
+        auto removeActiveFrame =
+            [this, frameHandle, syncIndex]()
+            {
+                if (syncIndex < m_activeFrameHandles.size() && m_activeFrameHandles[syncIndex] == frameHandle)
+                {
+                    m_activeFrameHandles[syncIndex] = {};
+                }
+                m_frames.remove(frameHandle);
+            };
+
+        if (syncIndex >= m_activeFrameHandles.size() || m_activeFrameHandles[syncIndex] != frameHandle)
+        {
+            Logger::getInstance().error("Frame handle does not match the active Vulkan frame slot.");
+            removeActiveFrame();
+            return false;
+        }
+
         VulkanFrameSyncResource& frameSync = m_frameSyncResources[frame->m_syncIndex];
         CommandBuffer& commandBuffer = *m_commandBuffers[frame->m_syncIndex];
 
         if (!commandBuffer.end())
         {
             Logger::getInstance().error("Failed to end Vulkan command buffer.");
-            m_frames.remove(frameHandle);
+            removeActiveFrame();
             return false;
         }
 
@@ -1417,7 +1453,7 @@ namespace kera
         if (imageIndex >= m_swapchain->getImageCount() || imageIndex >= m_imagesInFlight.size())
         {
             Logger::getInstance().error("Swapchain image index exceeded available swapchain images.");
-            m_frames.remove(frameHandle);
+            removeActiveFrame();
             return false;
         }
 
@@ -1438,14 +1474,14 @@ namespace kera
         if (vkResetFences(m_device->getVulkanDevice(), 1, &frameSync.m_inFlightFence) != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to reset Vulkan frame fence.");
-            m_frames.remove(frameHandle);
+            removeActiveFrame();
             return false;
         }
 
         if (vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submitInfo, frameSync.m_inFlightFence) != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to submit Vulkan draw command buffer.");
-            m_frames.remove(frameHandle);
+            removeActiveFrame();
             return false;
         }
         m_imagesInFlight[imageIndex] = frameSync.m_inFlightFence;
@@ -1461,11 +1497,11 @@ namespace kera
             presentResult != VK_ERROR_OUT_OF_DATE_KHR)
         {
             Logger::getInstance().error("Failed to present Vulkan swapchain image.");
-            m_frames.remove(frameHandle);
+            removeActiveFrame();
             return false;
         }
 
-        m_frames.remove(frameHandle);
+        removeActiveFrame();
         m_currentFrameSyncIndex = (m_currentFrameSyncIndex + 1) % static_cast<uint32_t>(m_frameSyncResources.size());
         if (shouldRecreateSwapchain)
         {
@@ -1492,6 +1528,8 @@ namespace kera
                 resource.m_pipeline.shutdown();
                 return true;
             });
+        m_frames.clear();
+        m_activeFrameHandles.clear();
 
         for (std::unique_ptr<CommandBuffer>& commandBuffer : m_commandBuffers)
         {
@@ -1684,6 +1722,7 @@ namespace kera
         }
         m_frameSyncResources.clear();
         m_imagesInFlight.clear();
+        m_activeFrameHandles.clear();
         m_currentFrameSyncIndex = 0;
     }
 
@@ -1750,6 +1789,7 @@ namespace kera
         VkDevice vkDevice = m_device->getVulkanDevice();
         m_frameSyncResources.resize(frameSyncCount);
         m_imagesInFlight.assign(m_swapchain->getImageCount(), VK_NULL_HANDLE);
+        m_activeFrameHandles.assign(frameSyncCount, {});
 
         for (VulkanFrameSyncResource& frameSync : m_frameSyncResources)
         {

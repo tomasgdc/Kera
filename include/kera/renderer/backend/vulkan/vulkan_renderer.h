@@ -284,6 +284,7 @@ namespace kera
 
         std::vector<VulkanFrameSyncResource> m_frameSyncResources;
         std::vector<VkFence> m_imagesInFlight;
+        std::vector<FrameHandle> m_activeFrameHandles;
         uint32_t m_currentFrameSyncIndex = 0;
         VkDescriptorPool m_descriptorPool;
 
