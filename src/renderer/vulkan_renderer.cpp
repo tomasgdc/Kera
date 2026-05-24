@@ -1117,12 +1117,33 @@ namespace kera
         VkDevice vkDevice = m_device->getVulkanDevice();
         vkWaitForFences(vkDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
         vkResetFences(vkDevice, 1, &m_inFlightFence);
+        const VkResult waitResult = vkWaitForFences(vkDevice, 1, &frameSync.m_inFlightFence, VK_TRUE, UINT64_MAX);
+        if (waitResult != VK_SUCCESS)
+        {
+            Logger::getInstance().error("Failed to wait for Vulkan frame fence.");
+            return {};
+        }
 
         uint32_t imageIndex = 0;
         const VkResult acquireResult =
             m_swapchain->acquireNextImage(m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
-        if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR)
+        if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            Logger::getInstance().info("Vulkan swapchain is out of date during image acquire; recreating.");
+            m_swapchainRecreateRequested = true;
+            if (!recreateSwapchainFromWindow())
+            {
+                Logger::getInstance().error("Failed to recreate Vulkan swapchain after image acquire.");
+            }
+            return {};
+        }
+
+        if (acquireResult == VK_SUBOPTIMAL_KHR)
+        {
+            m_swapchainRecreateRequested = true;
+        }
+        else if (acquireResult != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to acquire Vulkan swapchain image.");
             return {};

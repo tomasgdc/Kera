@@ -289,6 +289,7 @@ namespace kera
         ResourceRegistry<VulkanFrameResource, FrameHandle> m_frames;
         RendererStats m_stats;
         bool m_uiInitialized = false;
+        bool m_swapchainRecreateRequested = false;
     };
 
 }  // namespace kera
