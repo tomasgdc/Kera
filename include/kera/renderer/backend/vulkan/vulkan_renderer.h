@@ -179,6 +179,14 @@ namespace kera
         VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
         VkExtent2D m_extent{};
         uint32_t m_imageIndex = 0;
+        uint32_t m_syncIndex = 0;
+    };
+
+    struct VulkanFrameSyncResource
+    {
+        VkSemaphore m_imageAvailableSemaphore = VK_NULL_HANDLE;
+        VkSemaphore m_renderFinishedSemaphore = VK_NULL_HANDLE;
+        VkFence m_inFlightFence = VK_NULL_HANDLE;
     };
 
     class VulkanRenderer : public IRenderer
@@ -272,11 +280,10 @@ namespace kera
         std::shared_ptr<SwapChain> m_swapchain;
         std::unique_ptr<RenderPass> m_renderPass;
         std::unique_ptr<Framebuffer> m_framebuffer;
-        std::unique_ptr<CommandBuffer> m_commandBuffer;
+        std::vector<std::unique_ptr<CommandBuffer>> m_commandBuffers;
 
-        VkSemaphore m_imageAvailableSemaphore;
-        std::vector<VkSemaphore> m_renderFinishedSemaphores;
-        VkFence m_inFlightFence;
+        std::vector<VulkanFrameSyncResource> m_frameSyncResources;
+        uint32_t m_currentFrameSyncIndex = 0;
         VkDescriptorPool m_descriptorPool;
 
         ResourceRegistry<VulkanShaderModuleResource, ShaderModuleHandle> m_shaderModules;

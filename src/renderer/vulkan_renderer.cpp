@@ -27,6 +27,7 @@ namespace kera
 
     namespace
     {
+        constexpr uint32_t kMaxFramesInFlight = 2;
 
         ShaderType toShaderType(ShaderStage stage)
         {
@@ -199,14 +200,7 @@ namespace kera
 
     }  // namespace
 
-    VulkanRenderer::VulkanRenderer()
-        : m_window(nullptr)
-        , m_imageAvailableSemaphore(VK_NULL_HANDLE)
-        , m_inFlightFence(VK_NULL_HANDLE)
-        , m_descriptorPool(VK_NULL_HANDLE)
-        , m_uiInitialized(false)
-    {
-    }
+    VulkanRenderer::VulkanRenderer() : m_window(nullptr), m_descriptorPool(VK_NULL_HANDLE), m_uiInitialized(false) {}
 
     VulkanRenderer::~VulkanRenderer()
     {
@@ -285,11 +279,14 @@ namespace kera
         destroySyncObjects();
         destroyDescriptorPool();
 
-        if (m_commandBuffer)
+        for (std::unique_ptr<CommandBuffer>& commandBuffer : m_commandBuffers)
         {
-            m_commandBuffer->shutdown();
-            m_commandBuffer.reset();
+            if (commandBuffer)
+            {
+                commandBuffer->shutdown();
+            }
         }
+        m_commandBuffers.clear();
 
         if (m_framebuffer)
         {
@@ -1110,15 +1107,18 @@ namespace kera
 
     FrameHandle VulkanRenderer::beginFrame()
     {
-        if (!m_device || !m_swapchain || !m_commandBuffer || !m_framebuffer || !m_renderPass)
+        if (!m_device || !m_swapchain || m_commandBuffers.empty() || m_frameSyncResources.empty() || !m_framebuffer ||
+            !m_renderPass)
         {
             Logger::getInstance().error("Renderer frame resources are not initialized.");
             return {};
         }
 
         VkDevice vkDevice = m_device->getVulkanDevice();
-        vkWaitForFences(vkDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
-        vkResetFences(vkDevice, 1, &m_inFlightFence);
+        const uint32_t syncIndex = m_currentFrameSyncIndex;
+        VulkanFrameSyncResource& frameSync = m_frameSyncResources[syncIndex];
+        CommandBuffer& commandBuffer = *m_commandBuffers[syncIndex];
+
         const VkResult waitResult = vkWaitForFences(vkDevice, 1, &frameSync.m_inFlightFence, VK_TRUE, UINT64_MAX);
         if (waitResult != VK_SUCCESS)
         {
@@ -1128,7 +1128,7 @@ namespace kera
 
         uint32_t imageIndex = 0;
         const VkResult acquireResult =
-            m_swapchain->acquireNextImage(m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+            m_swapchain->acquireNextImage(frameSync.m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
         if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
         {
@@ -1151,8 +1151,8 @@ namespace kera
             return {};
         }
 
-        m_commandBuffer->reset();
-        if (!m_commandBuffer->begin())
+        commandBuffer.reset();
+        if (!commandBuffer.begin())
         {
             Logger::getInstance().error("Failed to begin Vulkan command buffer.");
             return {};
@@ -1166,11 +1166,12 @@ namespace kera
         }
 
         VulkanFrameResource frame{};
-        frame.m_commandBuffer = m_commandBuffer->getVulkanCommandBuffer();
+        frame.m_commandBuffer = commandBuffer.getVulkanCommandBuffer();
         frame.m_renderPass = m_renderPass->getVulkanRenderPass();
         frame.m_framebuffer = framebuffer;
         frame.m_extent = m_swapchain->getExtent();
         frame.m_imageIndex = imageIndex;
+        frame.m_syncIndex = syncIndex;
         m_stats.drawCallsThisFrame = 0;
         ++m_stats.frameIndex;
         return m_frames.emplace(frame);
@@ -1360,7 +1361,7 @@ namespace kera
 
     bool VulkanRenderer::endFrame(FrameHandle frameHandle)
     {
-        if (!m_device || !m_commandBuffer || !m_swapchain)
+        if (!m_device || m_commandBuffers.empty() || m_frameSyncResources.empty() || !m_swapchain)
         {
             Logger::getInstance().error("Renderer frame resources are not initialized.");
             return false;
@@ -1373,9 +1374,20 @@ namespace kera
             return false;
         }
 
-        if (!m_commandBuffer->end())
+        if (frame->m_syncIndex >= m_frameSyncResources.size() || frame->m_syncIndex >= m_commandBuffers.size())
+        {
+            Logger::getInstance().error("Frame references an invalid sync resource.");
+            m_frames.remove(frameHandle);
+            return false;
+        }
+
+        VulkanFrameSyncResource& frameSync = m_frameSyncResources[frame->m_syncIndex];
+        CommandBuffer& commandBuffer = *m_commandBuffers[frame->m_syncIndex];
+
+        if (!commandBuffer.end())
         {
             Logger::getInstance().error("Failed to end Vulkan command buffer.");
+            m_frames.remove(frameHandle);
             return false;
         }
 
@@ -1387,29 +1399,36 @@ namespace kera
             return false;
         }
 
-        VkSemaphore renderFinishedSemaphore = m_renderFinishedSemaphores[imageIndex];
         VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
-        VkCommandBuffer commandBuffers[] = {m_commandBuffer->getVulkanCommandBuffer()};
+        VkCommandBuffer commandBuffers[] = {frame->m_commandBuffer};
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = &m_imageAvailableSemaphore;
+        submitInfo.pWaitSemaphores = &frameSync.m_imageAvailableSemaphore;
         submitInfo.pWaitDstStageMask = waitStages;
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = commandBuffers;
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+        submitInfo.pSignalSemaphores = &frameSync.m_renderFinishedSemaphore;
 
-        if (vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submitInfo, m_inFlightFence) != VK_SUCCESS)
+        if (vkResetFences(m_device->getVulkanDevice(), 1, &frameSync.m_inFlightFence) != VK_SUCCESS)
+        {
+            Logger::getInstance().error("Failed to reset Vulkan frame fence.");
+            m_frames.remove(frameHandle);
+            return false;
+        }
+
+        if (vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submitInfo, frameSync.m_inFlightFence) != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to submit Vulkan draw command buffer.");
+            m_frames.remove(frameHandle);
             return false;
         }
 
         const VkResult presentResult =
-            m_swapchain->present(imageIndex, renderFinishedSemaphore, m_device->getPresentQueue());
+            m_swapchain->present(imageIndex, frameSync.m_renderFinishedSemaphore, m_device->getPresentQueue());
 
         const bool shouldRecreateSwapchain = m_swapchainRecreateRequested ||
                                              presentResult == VK_ERROR_OUT_OF_DATE_KHR ||
@@ -1424,6 +1443,7 @@ namespace kera
         }
 
         m_frames.remove(frameHandle);
+        m_currentFrameSyncIndex = (m_currentFrameSyncIndex + 1) % static_cast<uint32_t>(m_frameSyncResources.size());
         if (shouldRecreateSwapchain)
         {
             Logger::getInstance().info("Vulkan swapchain needs recreation after present.");
@@ -1450,11 +1470,14 @@ namespace kera
                 return true;
             });
 
-        if (m_commandBuffer)
+        for (std::unique_ptr<CommandBuffer>& commandBuffer : m_commandBuffers)
         {
-            m_commandBuffer->shutdown();
-            m_commandBuffer.reset();
+            if (commandBuffer)
+            {
+                commandBuffer->shutdown();
+            }
         }
+        m_commandBuffers.clear();
 
         if (m_framebuffer)
         {
@@ -1499,10 +1522,22 @@ namespace kera
             return false;
         }
 
-        m_commandBuffer = std::make_unique<CommandBuffer>();
-        if (!m_commandBuffer->initialize(*m_device))
+        const uint32_t frameResourceCount =
+            m_swapchain->getImageCount() < kMaxFramesInFlight ? m_swapchain->getImageCount() : kMaxFramesInFlight;
+        if (frameResourceCount == 0)
         {
             return false;
+        }
+
+        m_commandBuffers.reserve(frameResourceCount);
+        for (uint32_t index = 0; index < frameResourceCount; ++index)
+        {
+            auto commandBuffer = std::make_unique<CommandBuffer>();
+            if (!commandBuffer->initialize(*m_device))
+            {
+                return false;
+            }
+            m_commandBuffers.push_back(std::move(commandBuffer));
         }
 
         return recreateLiveGraphicsPipelines();
@@ -1606,25 +1641,26 @@ namespace kera
         }
 
         VkDevice vkDevice = m_device->getVulkanDevice();
-        if (m_inFlightFence != VK_NULL_HANDLE)
+        for (VulkanFrameSyncResource& frameSync : m_frameSyncResources)
         {
-            vkDestroyFence(vkDevice, m_inFlightFence, nullptr);
-            m_inFlightFence = VK_NULL_HANDLE;
-        }
-
-        for (VkSemaphore semaphore : m_renderFinishedSemaphores)
-        {
-            if (semaphore != VK_NULL_HANDLE)
+            if (frameSync.m_inFlightFence != VK_NULL_HANDLE)
             {
-                vkDestroySemaphore(vkDevice, semaphore, nullptr);
+                vkDestroyFence(vkDevice, frameSync.m_inFlightFence, nullptr);
+                frameSync.m_inFlightFence = VK_NULL_HANDLE;
+            }
+            if (frameSync.m_renderFinishedSemaphore != VK_NULL_HANDLE)
+            {
+                vkDestroySemaphore(vkDevice, frameSync.m_renderFinishedSemaphore, nullptr);
+                frameSync.m_renderFinishedSemaphore = VK_NULL_HANDLE;
+            }
+            if (frameSync.m_imageAvailableSemaphore != VK_NULL_HANDLE)
+            {
+                vkDestroySemaphore(vkDevice, frameSync.m_imageAvailableSemaphore, nullptr);
+                frameSync.m_imageAvailableSemaphore = VK_NULL_HANDLE;
             }
         }
-        m_renderFinishedSemaphores.clear();
-        if (m_imageAvailableSemaphore != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore(vkDevice, m_imageAvailableSemaphore, nullptr);
-            m_imageAvailableSemaphore = VK_NULL_HANDLE;
-        }
+        m_frameSyncResources.clear();
+        m_currentFrameSyncIndex = 0;
     }
 
     bool VulkanRenderer::createDescriptorPool()
@@ -1672,6 +1708,14 @@ namespace kera
             return false;
         }
 
+        const uint32_t frameSyncCount = m_commandBuffers.size() < kMaxFramesInFlight
+                                            ? static_cast<uint32_t>(m_commandBuffers.size())
+                                            : kMaxFramesInFlight;
+        if (frameSyncCount == 0)
+        {
+            return false;
+        }
+
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -1680,28 +1724,32 @@ namespace kera
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
         VkDevice vkDevice = m_device->getVulkanDevice();
-        if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &m_imageAvailableSemaphore) != VK_SUCCESS)
-        {
-            return false;
-        }
+        m_frameSyncResources.resize(frameSyncCount);
 
-        m_renderFinishedSemaphores.resize(m_swapchain->getImageCount(), VK_NULL_HANDLE);
-
-        for (VkSemaphore& semaphore : m_renderFinishedSemaphores)
+        for (VulkanFrameSyncResource& frameSync : m_frameSyncResources)
         {
-            if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &semaphore) != VK_SUCCESS)
+            if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &frameSync.m_imageAvailableSemaphore) !=
+                VK_SUCCESS)
+            {
+                destroySyncObjects();
+                return false;
+            }
+
+            if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &frameSync.m_renderFinishedSemaphore) !=
+                VK_SUCCESS)
+            {
+                destroySyncObjects();
+                return false;
+            }
+
+            if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &frameSync.m_inFlightFence) != VK_SUCCESS)
             {
                 destroySyncObjects();
                 return false;
             }
         }
 
-        if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &m_inFlightFence) != VK_SUCCESS)
-        {
-            destroySyncObjects();
-            return false;
-        }
-
+        m_currentFrameSyncIndex = 0;
         return true;
     }
 }  // namespace kera
