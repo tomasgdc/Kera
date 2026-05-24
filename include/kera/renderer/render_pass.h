@@ -25,7 +25,8 @@ namespace kera
         RenderPass& operator=(RenderPass&& other) noexcept;
 
         bool initialize(const Device& device, const SwapChain& swapChain);
-        bool initializeColorTarget(const Device& device, VkFormat colorFormat);
+        bool initializeColorTarget(const Device& device, VkFormat colorFormat,
+                                   VkFormat depthFormat = VK_FORMAT_UNDEFINED);
         void shutdown();
 
         VkRenderPass getVulkanRenderPass() const

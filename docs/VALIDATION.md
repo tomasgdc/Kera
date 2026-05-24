@@ -53,6 +53,33 @@ When `KERA_RUN_GPU_SMOKE=1` is set, sample smoke logs are written beside the sam
 
 - `build/windows-debug/samples/Debug/kera_validation_smoke.log`
 - `build/windows-debug/samples/Debug/kera_resize_smoke.log`
+- `build/windows-debug/samples/Debug/kera_many_lights_smoke.log`
+
+## Frame Capture Lane
+
+Use this lane when validation passes but rendered output, image layouts, descriptors, or pass ordering need visible
+proof.
+
+RenderDoc capture:
+
+```powershell
+$env:KERA_RUN_GPU_SMOKE = '1'
+renderdoccmd capture --wait-for-exit --output build/windows-debug/samples/Debug/kera_many_lights `
+    build/windows-debug/samples/Debug/kera_samples.exe --smoke-test --smoke-frames 2 --sample-index 2
+```
+
+Nsight Graphics can launch the same executable and arguments:
+
+```powershell
+build/windows-debug/samples/Debug/kera_samples.exe --smoke-test --smoke-frames 2 --sample-index 2
+```
+
+Expected first capture target:
+
+- sample index `2` (`InstancedTriangleManyLightsSample`)
+- geometry pass writes an offscreen render target
+- lighting pass samples that texture through sampled-image and sampler descriptors
+- validation output should contain no `[ERROR] Vulkan validation:` lines
 
 ## Shader Contract Lane
 

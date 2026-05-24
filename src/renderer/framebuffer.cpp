@@ -74,7 +74,8 @@ namespace kera
     }
 
     bool Framebuffer::initializeSingleColorTarget(const Device& device, const RenderPass& renderPass,
-                                                  VkImageView colorImageView, VkExtent2D extent)
+                                                  VkImageView colorImageView, VkExtent2D extent,
+                                                  VkImageView depthImageView)
     {
         shutdown();
 
@@ -86,12 +87,13 @@ namespace kera
         VkDevice vkDevice = device.getVulkanDevice();
         device_ = vkDevice;
 
-        VkImageView attachments[] = {colorImageView};
+        VkImageView attachments[] = {colorImageView, depthImageView};
+        const uint32_t attachmentCount = depthImageView == VK_NULL_HANDLE ? 1u : 2u;
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = renderPass.getVulkanRenderPass();
-        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.attachmentCount = attachmentCount;
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = extent.width;
         framebufferInfo.height = extent.height;

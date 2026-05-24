@@ -28,7 +28,7 @@ namespace kera
 
         bool initialize(const Device& device, const RenderPass& renderPass, const SwapChain& swapChain);
         bool initializeSingleColorTarget(const Device& device, const RenderPass& renderPass, VkImageView colorImageView,
-                                         VkExtent2D extent);
+                                         VkExtent2D extent, VkImageView depthImageView = VK_NULL_HANDLE);
         void shutdown();
 
         const std::vector<VkFramebuffer>& getVulkanFramebuffers() const

@@ -89,7 +89,8 @@ namespace kera
 
     enum class TextureFormat
     {
-        RGBA8
+        RGBA8,
+        Depth32
     };
 
     enum class SamplerFilter
@@ -159,6 +160,7 @@ namespace kera
         TextureFormat format = TextureFormat::RGBA8;
         bool renderTarget = false;
         bool sampled = true;
+        bool depthStencil = false;
     };
 
     struct SamplerDesc
@@ -172,6 +174,7 @@ namespace kera
     struct RenderTargetDesc
     {
         TextureHandle colorTexture;
+        TextureHandle depthTexture;
     };
 
     struct InstanceBufferDesc
@@ -224,6 +227,8 @@ namespace kera
         RenderTargetHandle renderTarget;
         VertexLayoutDesc vertexLayout;
         std::vector<DescriptorSetLayoutDesc> descriptorSets;
+        bool depthTest = false;
+        bool depthWrite = false;
     };
 
     struct ClearColorValue
@@ -237,6 +242,7 @@ namespace kera
     struct RenderPassDesc
     {
         ClearColorValue clearColor;
+        float clearDepth = 1.0f;
     };
 
 }  // namespace kera

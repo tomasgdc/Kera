@@ -80,6 +80,8 @@ namespace kera
         {
             switch (format)
             {
+                case TextureFormat::Depth32:
+                    return VK_FORMAT_D32_SFLOAT;
                 case TextureFormat::RGBA8:
                 default:
                     return VK_FORMAT_R8G8B8A8_UNORM;
@@ -133,6 +135,10 @@ namespace kera
             {
                 case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
                     return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+                    return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                    return VK_ACCESS_TRANSFER_WRITE_BIT;
                 case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
                     return VK_ACCESS_SHADER_READ_BIT;
                 case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
@@ -148,6 +154,10 @@ namespace kera
             {
                 case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
                     return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+                    return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                    return VK_PIPELINE_STAGE_TRANSFER_BIT;
                 case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
                     return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
                 case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
@@ -155,6 +165,45 @@ namespace kera
                 case VK_IMAGE_LAYOUT_UNDEFINED:
                 default:
                     return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            }
+        }
+
+        VkAccessFlags2 accessMask2ForLayout(VkImageLayout layout)
+        {
+            switch (layout)
+            {
+                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    return VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+                    return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                    return VK_ACCESS_2_TRANSFER_WRITE_BIT;
+                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                    return VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                case VK_IMAGE_LAYOUT_UNDEFINED:
+                default:
+                    return 0;
+            }
+        }
+
+        VkPipelineStageFlags2 stageMask2ForLayout(VkImageLayout layout)
+        {
+            switch (layout)
+            {
+                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+                    return VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                    return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                    return VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                    return VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+                case VK_IMAGE_LAYOUT_UNDEFINED:
+                default:
+                    return VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
             }
         }
 
@@ -685,6 +734,11 @@ namespace kera
 
     bool VulkanRenderer::destroyBuffer(BufferHandle buffer)
     {
+        if (frameResourceUses(buffer))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan buffer that is still referenced by an in-flight frame.");
+            return false;
+        }
         if (descriptorSetsReference(buffer))
         {
             Logger::getInstance().error("Cannot destroy a Vulkan buffer that is still referenced by a descriptor set.");
@@ -745,6 +799,68 @@ namespace kera
         return true;
     }
 
+    BufferHandle VulkanRenderer::createUniformRingBuffer(std::size_t elementSize, uint32_t slotCount)
+    {
+        if (elementSize == 0)
+        {
+            Logger::getInstance().error("Uniform ring buffer element size must be non-zero.");
+            return {};
+        }
+
+        const uint32_t resolvedSlotCount =
+            slotCount == 0 ? static_cast<uint32_t>(m_frameSyncResources.empty() ? kMaxFramesInFlight
+                                                                                : m_frameSyncResources.size())
+                           : slotCount;
+        VulkanBufferResource resource{};
+        resource.m_ringSlotSize = elementSize;
+        resource.m_ringSlotCount = resolvedSlotCount;
+        if (!resource.m_buffer.initialize(*m_device, static_cast<VkDeviceSize>(elementSize * resolvedSlotCount),
+                                          BufferUsage::Uniform, toMemoryFlags(MemoryAccess::CpuWrite)))
+        {
+            Logger::getInstance().error("Failed to create Vulkan uniform ring buffer.");
+            return {};
+        }
+
+        return m_buffers.emplace(std::move(resource));
+    }
+
+    bool VulkanRenderer::uploadUniformRingBuffer(BufferHandle bufferHandle, FrameHandle frameHandle, const void* data,
+                                                 std::size_t size)
+    {
+        VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
+        VulkanFrameResource* frame = m_frames.get(frameHandle);
+        if (!buffer || !frame)
+        {
+            Logger::getInstance().error("Invalid handle passed to uploadUniformRingBuffer.");
+            return false;
+        }
+        if (buffer->m_ringSlotSize == 0 || buffer->m_ringSlotCount == 0)
+        {
+            Logger::getInstance().error("Buffer is not a Vulkan uniform ring buffer.");
+            return false;
+        }
+        if (size > buffer->m_ringSlotSize)
+        {
+            Logger::getInstance().error("Uniform ring buffer upload exceeds slot size.");
+            return false;
+        }
+
+        const std::size_t offset = getUniformRingBufferOffset(bufferHandle, frameHandle);
+        return uploadBuffer(bufferHandle, data, size, offset);
+    }
+
+    std::size_t VulkanRenderer::getUniformRingBufferOffset(BufferHandle bufferHandle, FrameHandle frameHandle) const
+    {
+        const VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
+        const VulkanFrameResource* frame = m_frames.get(frameHandle);
+        if (!buffer || !frame || buffer->m_ringSlotSize == 0 || buffer->m_ringSlotCount == 0)
+        {
+            return 0;
+        }
+
+        return buffer->m_ringSlotSize * (frame->m_syncIndex % buffer->m_ringSlotCount);
+    }
+
     TextureHandle VulkanRenderer::createTexture(const TextureDesc& desc)
     {
         if (!m_device)
@@ -762,11 +878,11 @@ namespace kera
         VkImageUsageFlags usage = 0;
         if (desc.renderTarget)
         {
-            usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            usage |= desc.depthStencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         }
         if (desc.sampled)
         {
-            usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+            usage |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         }
         if (usage == 0)
         {
@@ -778,12 +894,16 @@ namespace kera
         resource.m_device = m_device->getVulkanDevice();
         resource.m_format = toVkTextureFormat(desc.format);
         resource.m_extent = {desc.width, desc.height};
+        resource.m_aspectMask = desc.depthStencil ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
         resource.m_sampled = desc.sampled;
         resource.m_renderTarget = desc.renderTarget;
+        resource.m_depthStencil = desc.depthStencil;
         resource.m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         resource.m_descriptorLayout = desc.sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-        resource.m_renderTargetFinalLayout =
-            desc.renderTarget ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+        resource.m_renderTargetFinalLayout = desc.renderTarget
+                                                 ? (desc.depthStencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                                                      : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                                                 : VK_IMAGE_LAYOUT_UNDEFINED;
 
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -838,7 +958,7 @@ namespace kera
         viewInfo.image = resource.m_image;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewInfo.format = resource.m_format;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.aspectMask = resource.m_aspectMask;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -854,8 +974,73 @@ namespace kera
         return m_textures.emplace(std::move(resource));
     }
 
+    bool VulkanRenderer::uploadTexture(TextureHandle textureHandle, const void* data, std::size_t size)
+    {
+        if (!m_device)
+        {
+            Logger::getInstance().error("Renderer is not initialized.");
+            return false;
+        }
+        if (!data || size == 0)
+        {
+            Logger::getInstance().error("Texture upload data must be non-empty.");
+            return false;
+        }
+
+        VulkanTextureResource* texture = m_textures.get(textureHandle);
+        if (!texture)
+        {
+            Logger::getInstance().error("Invalid texture handle passed to uploadTexture.");
+            return false;
+        }
+        if (!texture->m_sampled || texture->m_descriptorLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+        {
+            Logger::getInstance().error("Texture upload requires a sampled Vulkan texture.");
+            return false;
+        }
+        if (texture->m_depthStencil)
+        {
+            Logger::getInstance().error("Depth texture upload is not supported by uploadTexture.");
+            return false;
+        }
+
+        const std::size_t expectedSize =
+            static_cast<std::size_t>(texture->m_extent.width) * static_cast<std::size_t>(texture->m_extent.height) * 4u;
+        if (size < expectedSize)
+        {
+            Logger::getInstance().error("Texture upload data is smaller than the texture extent requires.");
+            return false;
+        }
+
+        Buffer stagingBuffer;
+        if (!stagingBuffer.initialize(*m_device, static_cast<VkDeviceSize>(expectedSize), BufferUsage::TransferSrc,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+        {
+            Logger::getInstance().error("Failed to create Vulkan texture staging buffer.");
+            return false;
+        }
+        if (!stagingBuffer.copyFrom(data, static_cast<VkDeviceSize>(expectedSize)))
+        {
+            Logger::getInstance().error("Failed to upload data to Vulkan texture staging buffer.");
+            return false;
+        }
+
+        if (!copyBufferToTexture(stagingBuffer, *texture))
+        {
+            Logger::getInstance().error("Failed to copy Vulkan staging buffer to texture.");
+            return false;
+        }
+
+        return true;
+    }
+
     bool VulkanRenderer::destroyTexture(TextureHandle texture)
     {
+        if (frameResourceUses(texture))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by an in-flight frame.");
+            return false;
+        }
         if (descriptorSetsReference(texture))
         {
             Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by a descriptor set.");
@@ -910,6 +1095,11 @@ namespace kera
 
     bool VulkanRenderer::destroySampler(SamplerHandle sampler)
     {
+        if (frameResourceUses(sampler))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan sampler that is still referenced by an in-flight frame.");
+            return false;
+        }
         if (descriptorSetsReference(sampler))
         {
             Logger::getInstance().error("Cannot destroy a Vulkan sampler that is still referenced by a descriptor set.");
@@ -939,12 +1129,41 @@ namespace kera
             Logger::getInstance().error("Texture passed to createRenderTarget was not created for render-target usage.");
             return {};
         }
+        if (texture->m_depthStencil)
+        {
+            Logger::getInstance().error("Color texture passed to createRenderTarget must not be a depth texture.");
+            return {};
+        }
+
+        VulkanTextureResource* depthTexture = nullptr;
+        if (desc.depthTexture.isValid())
+        {
+            depthTexture = m_textures.get(desc.depthTexture);
+            if (!depthTexture)
+            {
+                Logger::getInstance().error("Invalid depth texture passed to createRenderTarget.");
+                return {};
+            }
+            if (!depthTexture->m_renderTarget || !depthTexture->m_depthStencil)
+            {
+                Logger::getInstance().error("Depth texture passed to createRenderTarget is not depth render-target usage.");
+                return {};
+            }
+            if (depthTexture->m_extent.width != texture->m_extent.width ||
+                depthTexture->m_extent.height != texture->m_extent.height)
+            {
+                Logger::getInstance().error("Render target color and depth textures must have matching extents.");
+                return {};
+            }
+        }
 
         VulkanRenderTargetResource resource{};
         resource.m_colorTexture = desc.colorTexture;
+        resource.m_depthTexture = desc.depthTexture;
         resource.m_extent = texture->m_extent;
         resource.m_renderPass = std::make_unique<RenderPass>();
-        if (!resource.m_renderPass->initializeColorTarget(*m_device, texture->m_format))
+        if (!resource.m_renderPass->initializeColorTarget(
+                *m_device, texture->m_format, depthTexture ? depthTexture->m_format : VK_FORMAT_UNDEFINED))
         {
             Logger::getInstance().error("Failed to create render target render pass.");
             return {};
@@ -952,7 +1171,9 @@ namespace kera
 
         resource.m_framebuffer = std::make_unique<Framebuffer>();
         if (!resource.m_framebuffer->initializeSingleColorTarget(*m_device, *resource.m_renderPass,
-                                                                 texture->m_imageView, texture->m_extent))
+                                                                 texture->m_imageView, texture->m_extent,
+                                                                 depthTexture ? depthTexture->m_imageView
+                                                                              : VK_NULL_HANDLE))
         {
             Logger::getInstance().error("Failed to create render target framebuffer.");
             return {};
@@ -1247,6 +1468,12 @@ namespace kera
 
     bool VulkanRenderer::destroyDescriptorSet(DescriptorSetHandle setHandle)
     {
+        if (frameResourceUses(setHandle))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan descriptor set that is still referenced by an in-flight frame.");
+            return false;
+        }
+
         VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(setHandle);
         if (!descriptorSet)
         {
@@ -1300,6 +1527,7 @@ namespace kera
             return {};
         }
         commandBuffer.markCompleted();
+        clearCompletedFrameResourceUse(syncIndex);
 
         const uint32_t swapchainImageCount = m_swapchain->getImageCount();
         if (m_imagesInFlight.size() != swapchainImageCount || m_framebuffer->getFramebufferCount() < swapchainImageCount)
@@ -1412,6 +1640,7 @@ namespace kera
         vkCmdBeginRenderPass(frame->m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = {};
+        frame->m_activeDepthTexture = {};
         frame->m_renderPassFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
         VkViewport viewport{};
@@ -1459,6 +1688,17 @@ namespace kera
         }
 
         transitionTextureLayout(frame->m_commandBuffer, *texture, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        VulkanTextureResource* depthTexture =
+            renderTarget->m_depthTexture.isValid() ? m_textures.get(renderTarget->m_depthTexture) : nullptr;
+        if (renderTarget->m_depthTexture.isValid() && !depthTexture)
+        {
+            Logger::getInstance().error("Render target depth texture is invalid.");
+            return;
+        }
+        if (depthTexture)
+        {
+            transitionTextureLayout(frame->m_commandBuffer, *depthTexture, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        }
 
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1467,15 +1707,17 @@ namespace kera
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = renderTarget->m_extent;
 
-        VkClearValue clearColor{};
-        clearColor.color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b, desc.clearColor.a}};
+        VkClearValue clearValues[2]{};
+        clearValues[0].color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b, desc.clearColor.a}};
+        clearValues[1].depthStencil = {desc.clearDepth, 0};
 
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
+        renderPassInfo.clearValueCount = depthTexture ? 2u : 1u;
+        renderPassInfo.pClearValues = clearValues;
 
         vkCmdBeginRenderPass(frame->m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = renderTarget->m_colorTexture;
+        frame->m_activeDepthTexture = renderTarget->m_depthTexture;
         frame->m_renderPassFinalLayout = texture->m_renderTargetFinalLayout;
 
         VkViewport viewport{};
@@ -1517,6 +1759,15 @@ namespace kera
                 texture->m_currentLayout = frame->m_renderPassFinalLayout;
             }
             frame->m_activeRenderTargetTexture = {};
+        }
+        if (frame->m_activeDepthTexture.isValid())
+        {
+            VulkanTextureResource* texture = m_textures.get(frame->m_activeDepthTexture);
+            if (texture)
+            {
+                texture->m_currentLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            }
+            frame->m_activeDepthTexture = {};
         }
         frame->m_renderPassFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
@@ -1616,6 +1867,7 @@ namespace kera
         vkCmdBindDescriptorSets(frame->m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 pipeline->m_pipeline.getPipelineLayout(), set, 1, &descriptorSet->m_descriptorSet, 0,
                                 nullptr);
+        recordDescriptorSetUse(frame->m_syncIndex, descriptorSetHandle, *descriptorSet);
     }
 
     void VulkanRenderer::drawIndexed(FrameHandle frameHandle, uint32_t indexCount, uint32_t instanceCount)
@@ -1987,25 +2239,238 @@ namespace kera
             return;
         }
 
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.srcAccessMask = accessMaskForLayout(texture.m_currentLayout);
-        barrier.dstAccessMask = accessMaskForLayout(newLayout);
-        barrier.oldLayout = texture.m_currentLayout;
-        barrier.newLayout = newLayout;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = texture.m_image;
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
+        if (m_device && m_device->isSynchronization2Enabled())
+        {
+            VkImageMemoryBarrier2 barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            barrier.srcStageMask = stageMask2ForLayout(texture.m_currentLayout);
+            barrier.srcAccessMask = accessMask2ForLayout(texture.m_currentLayout);
+            barrier.dstStageMask = stageMask2ForLayout(newLayout);
+            barrier.dstAccessMask = accessMask2ForLayout(newLayout);
+            barrier.oldLayout = texture.m_currentLayout;
+            barrier.newLayout = newLayout;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = texture.m_image;
+            barrier.subresourceRange.aspectMask = texture.m_aspectMask;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
 
-        vkCmdPipelineBarrier(commandBuffer, stageMaskForLayout(texture.m_currentLayout), stageMaskForLayout(newLayout),
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+            VkDependencyInfo dependencyInfo{};
+            dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependencyInfo.imageMemoryBarrierCount = 1;
+            dependencyInfo.pImageMemoryBarriers = &barrier;
+            vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+        }
+        else
+        {
+            VkImageMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.srcAccessMask = accessMaskForLayout(texture.m_currentLayout);
+            barrier.dstAccessMask = accessMaskForLayout(newLayout);
+            barrier.oldLayout = texture.m_currentLayout;
+            barrier.newLayout = newLayout;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = texture.m_image;
+            barrier.subresourceRange.aspectMask = texture.m_aspectMask;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            vkCmdPipelineBarrier(commandBuffer, stageMaskForLayout(texture.m_currentLayout),
+                                 stageMaskForLayout(newLayout), 0, 0, nullptr, 0, nullptr, 1, &barrier);
+        }
 
         texture.m_currentLayout = newLayout;
+    }
+
+    bool VulkanRenderer::copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture)
+    {
+        VkCommandBufferAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocateInfo.commandPool = m_device->getCommandPool();
+        allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocateInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        if (vkAllocateCommandBuffers(m_device->getVulkanDevice(), &allocateInfo, &commandBuffer) != VK_SUCCESS)
+        {
+            Logger::getInstance().error("Failed to allocate Vulkan texture upload command buffer.");
+            return false;
+        }
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+        {
+            vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            Logger::getInstance().error("Failed to begin Vulkan texture upload command buffer.");
+            return false;
+        }
+
+        transitionTextureLayout(commandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkBufferImageCopy copyRegion{};
+        copyRegion.imageSubresource.aspectMask = texture.m_aspectMask;
+        copyRegion.imageSubresource.mipLevel = 0;
+        copyRegion.imageSubresource.baseArrayLayer = 0;
+        copyRegion.imageSubresource.layerCount = 1;
+        copyRegion.imageExtent = {texture.m_extent.width, texture.m_extent.height, 1};
+        vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.getVulkanBuffer(), texture.m_image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+        transitionTextureLayout(commandBuffer, texture, texture.m_descriptorLayout);
+
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+        {
+            vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            Logger::getInstance().error("Failed to end Vulkan texture upload command buffer.");
+            return false;
+        }
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        const VkResult submitResult = vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+        if (submitResult == VK_SUCCESS)
+        {
+            vkQueueWaitIdle(m_device->getGraphicsQueue());
+        }
+        vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+        return submitResult == VK_SUCCESS;
+    }
+
+    void VulkanRenderer::clearCompletedFrameResourceUse(uint32_t syncIndex)
+    {
+        if (syncIndex >= m_frameSyncResources.size())
+        {
+            return;
+        }
+
+        VulkanFrameResourceUse& resourceUse = m_frameSyncResources[syncIndex].m_resourceUse;
+        resourceUse.m_buffers.clear();
+        resourceUse.m_textures.clear();
+        resourceUse.m_samplers.clear();
+        resourceUse.m_descriptorSets.clear();
+    }
+
+    void VulkanRenderer::recordDescriptorSetUse(uint32_t syncIndex, DescriptorSetHandle descriptorSetHandle,
+                                                const VulkanDescriptorSetResource& descriptorSet)
+    {
+        if (syncIndex >= m_frameSyncResources.size())
+        {
+            return;
+        }
+
+        auto addDescriptorUse = [](auto& handles, auto handle)
+        {
+            for (const auto& existing : handles)
+            {
+                if (existing == handle)
+                {
+                    return;
+                }
+            }
+            handles.push_back(handle);
+        };
+
+        VulkanFrameResourceUse& resourceUse = m_frameSyncResources[syncIndex].m_resourceUse;
+        addDescriptorUse(resourceUse.m_descriptorSets, descriptorSetHandle);
+        for (const auto& reference : descriptorSet.m_buffers)
+        {
+            addDescriptorUse(resourceUse.m_buffers, reference.m_handle);
+        }
+        for (const auto& reference : descriptorSet.m_textures)
+        {
+            addDescriptorUse(resourceUse.m_textures, reference.m_handle);
+        }
+        for (const auto& reference : descriptorSet.m_samplers)
+        {
+            addDescriptorUse(resourceUse.m_samplers, reference.m_handle);
+        }
+    }
+
+    bool VulkanRenderer::frameResourceUses(BufferHandle buffer) const
+    {
+        if (!buffer.isValid())
+        {
+            return false;
+        }
+        for (const VulkanFrameSyncResource& frameSync : m_frameSyncResources)
+        {
+            for (const BufferHandle& usedBuffer : frameSync.m_resourceUse.m_buffers)
+            {
+                if (usedBuffer == buffer)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool VulkanRenderer::frameResourceUses(TextureHandle texture) const
+    {
+        if (!texture.isValid())
+        {
+            return false;
+        }
+        for (const VulkanFrameSyncResource& frameSync : m_frameSyncResources)
+        {
+            for (const TextureHandle& usedTexture : frameSync.m_resourceUse.m_textures)
+            {
+                if (usedTexture == texture)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool VulkanRenderer::frameResourceUses(SamplerHandle sampler) const
+    {
+        if (!sampler.isValid())
+        {
+            return false;
+        }
+        for (const VulkanFrameSyncResource& frameSync : m_frameSyncResources)
+        {
+            for (const SamplerHandle& usedSampler : frameSync.m_resourceUse.m_samplers)
+            {
+                if (usedSampler == sampler)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool VulkanRenderer::frameResourceUses(DescriptorSetHandle descriptorSet) const
+    {
+        if (!descriptorSet.isValid())
+        {
+            return false;
+        }
+        for (const VulkanFrameSyncResource& frameSync : m_frameSyncResources)
+        {
+            for (const DescriptorSetHandle& usedDescriptorSet : frameSync.m_resourceUse.m_descriptorSets)
+            {
+                if (usedDescriptorSet == descriptorSet)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     bool VulkanRenderer::descriptorSetsReference(BufferHandle buffer)
@@ -2091,7 +2556,7 @@ namespace kera
         m_renderTargets.forEach(
             [&referenced, texture](RenderTargetHandle, VulkanRenderTargetResource& renderTarget)
             {
-                if (renderTarget.m_colorTexture == texture)
+                if (renderTarget.m_colorTexture == texture || renderTarget.m_depthTexture == texture)
                 {
                     referenced = true;
                     return false;

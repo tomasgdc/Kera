@@ -10,6 +10,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -41,6 +42,8 @@ namespace kera
     struct VulkanBufferResource
     {
         Buffer m_buffer;
+        std::size_t m_ringSlotSize = 0;
+        uint32_t m_ringSlotCount = 1;
     };
 
     struct VulkanTextureResource
@@ -51,11 +54,13 @@ namespace kera
         VkImageView m_imageView = VK_NULL_HANDLE;
         VkFormat m_format = VK_FORMAT_R8G8B8A8_UNORM;
         VkExtent2D m_extent{};
+        VkImageAspectFlags m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         VkImageLayout m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         VkImageLayout m_renderTargetFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         bool m_sampled = false;
         bool m_renderTarget = false;
+        bool m_depthStencil = false;
 
         VulkanTextureResource() = default;
         ~VulkanTextureResource()
@@ -73,11 +78,13 @@ namespace kera
             , m_imageView(std::exchange(other.m_imageView, VK_NULL_HANDLE))
             , m_format(other.m_format)
             , m_extent(other.m_extent)
+            , m_aspectMask(other.m_aspectMask)
             , m_currentLayout(other.m_currentLayout)
             , m_descriptorLayout(other.m_descriptorLayout)
             , m_renderTargetFinalLayout(other.m_renderTargetFinalLayout)
             , m_sampled(other.m_sampled)
             , m_renderTarget(other.m_renderTarget)
+            , m_depthStencil(other.m_depthStencil)
         {
         }
 
@@ -92,11 +99,13 @@ namespace kera
                 m_imageView = std::exchange(other.m_imageView, VK_NULL_HANDLE);
                 m_format = other.m_format;
                 m_extent = other.m_extent;
+                m_aspectMask = other.m_aspectMask;
                 m_currentLayout = other.m_currentLayout;
                 m_descriptorLayout = other.m_descriptorLayout;
                 m_renderTargetFinalLayout = other.m_renderTargetFinalLayout;
                 m_sampled = other.m_sampled;
                 m_renderTarget = other.m_renderTarget;
+                m_depthStencil = other.m_depthStencil;
             }
             return *this;
         }
@@ -120,11 +129,13 @@ namespace kera
             }
             m_device = VK_NULL_HANDLE;
             m_extent = {};
+            m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             m_renderTargetFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             m_sampled = false;
             m_renderTarget = false;
+            m_depthStencil = false;
         }
     };
 
@@ -173,6 +184,7 @@ namespace kera
     struct VulkanRenderTargetResource
     {
         TextureHandle m_colorTexture;
+        TextureHandle m_depthTexture;
         std::unique_ptr<RenderPass> m_renderPass;
         std::unique_ptr<Framebuffer> m_framebuffer;
         VkExtent2D m_extent{};
@@ -203,6 +215,14 @@ namespace kera
         std::vector<VulkanDescriptorBindingReference<SamplerHandle>> m_samplers;
     };
 
+    struct VulkanFrameResourceUse
+    {
+        std::vector<BufferHandle> m_buffers;
+        std::vector<TextureHandle> m_textures;
+        std::vector<SamplerHandle> m_samplers;
+        std::vector<DescriptorSetHandle> m_descriptorSets;
+    };
+
     struct VulkanFrameResource
     {
         VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
@@ -213,6 +233,7 @@ namespace kera
         uint32_t m_syncIndex = 0;
         bool m_renderPassActive = false;
         TextureHandle m_activeRenderTargetTexture;
+        TextureHandle m_activeDepthTexture;
         VkImageLayout m_renderPassFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
 
@@ -221,6 +242,7 @@ namespace kera
         VkSemaphore m_imageAvailableSemaphore = VK_NULL_HANDLE;
         VkSemaphore m_renderFinishedSemaphore = VK_NULL_HANDLE;
         VkFence m_inFlightFence = VK_NULL_HANDLE;
+        VulkanFrameResourceUse m_resourceUse;
     };
 
     class VulkanRenderer : public IRenderer
@@ -264,8 +286,13 @@ namespace kera
         bool mapBuffer(BufferHandle bufferHandle, void** data);
         void unmapBuffer(BufferHandle bufferHandle);
         bool uploadBuffer(BufferHandle buffer, const void* data, std::size_t size, std::size_t offset = 0) override;
+        BufferHandle createUniformRingBuffer(std::size_t elementSize, uint32_t slotCount = 0) override;
+        bool uploadUniformRingBuffer(BufferHandle buffer, FrameHandle frame, const void* data,
+                                     std::size_t size) override;
+        std::size_t getUniformRingBufferOffset(BufferHandle buffer, FrameHandle frame) const override;
 
         TextureHandle createTexture(const TextureDesc& desc) override;
+        bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) override;
         bool destroyTexture(TextureHandle texture) override;
         SamplerHandle createSampler(const SamplerDesc& desc) override;
         bool destroySampler(SamplerHandle sampler) override;
@@ -304,6 +331,14 @@ namespace kera
         bool recreateSignaledFrameFence(uint32_t syncIndex);
         void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
                                      VkImageLayout newLayout);
+        bool copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture);
+        void clearCompletedFrameResourceUse(uint32_t syncIndex);
+        void recordDescriptorSetUse(uint32_t syncIndex, DescriptorSetHandle descriptorSetHandle,
+                                    const VulkanDescriptorSetResource& descriptorSet);
+        bool frameResourceUses(BufferHandle buffer) const;
+        bool frameResourceUses(TextureHandle texture) const;
+        bool frameResourceUses(SamplerHandle sampler) const;
+        bool frameResourceUses(DescriptorSetHandle descriptorSet) const;
         bool descriptorSetsReference(BufferHandle buffer);
         bool descriptorSetsReference(TextureHandle texture);
         bool descriptorSetsReference(SamplerHandle sampler);

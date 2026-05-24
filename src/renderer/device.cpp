@@ -25,6 +25,7 @@ namespace kera
         , present_queue_(VK_NULL_HANDLE)
         , command_pool_(VK_NULL_HANDLE)
         , graphics_queue_family_index_(0)
+        , synchronization2_enabled_(false)
     {
     }
 
@@ -40,6 +41,7 @@ namespace kera
         , present_queue_(other.present_queue_)
         , command_pool_(other.command_pool_)
         , graphics_queue_family_index_(other.graphics_queue_family_index_)
+        , synchronization2_enabled_(other.synchronization2_enabled_)
     {
         other.physical_device_ = VK_NULL_HANDLE;
         other.device_ = VK_NULL_HANDLE;
@@ -47,6 +49,7 @@ namespace kera
         other.present_queue_ = VK_NULL_HANDLE;
         other.command_pool_ = VK_NULL_HANDLE;
         other.graphics_queue_family_index_ = 0;
+        other.synchronization2_enabled_ = false;
     }
 
     Device& Device::operator=(Device&& other) noexcept
@@ -60,6 +63,7 @@ namespace kera
             present_queue_ = other.present_queue_;
             command_pool_ = other.command_pool_;
             graphics_queue_family_index_ = other.graphics_queue_family_index_;
+            synchronization2_enabled_ = other.synchronization2_enabled_;
 
             other.physical_device_ = VK_NULL_HANDLE;
             other.device_ = VK_NULL_HANDLE;
@@ -67,6 +71,7 @@ namespace kera
             other.present_queue_ = VK_NULL_HANDLE;
             other.command_pool_ = VK_NULL_HANDLE;
             other.graphics_queue_family_index_ = 0;
+            other.synchronization2_enabled_ = false;
         }
         return *this;
     }
@@ -98,14 +103,29 @@ namespace kera
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        VkPhysicalDeviceFeatures deviceFeatures{};
-        deviceFeatures.samplerAnisotropy = VK_TRUE;
+        VkPhysicalDeviceSynchronization2Features sync2Features{};
+        sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+
+        VkPhysicalDeviceFeatures2 supportedFeatures{};
+        supportedFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        supportedFeatures.pNext = &sync2Features;
+        vkGetPhysicalDeviceFeatures2(vkPhysicalDevice, &supportedFeatures);
+
+        VkPhysicalDeviceSynchronization2Features enabledSync2Features{};
+        enabledSync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+        enabledSync2Features.synchronization2 = sync2Features.synchronization2;
+
+        VkPhysicalDeviceFeatures2 enabledFeatures{};
+        enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        enabledFeatures.features.samplerAnisotropy = VK_TRUE;
+        enabledFeatures.pNext = enabledSync2Features.synchronization2 ? &enabledSync2Features : nullptr;
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        createInfo.pNext = &enabledFeatures;
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
-        createInfo.pEnabledFeatures = &deviceFeatures;
+        createInfo.pEnabledFeatures = nullptr;
         createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
@@ -115,6 +135,7 @@ namespace kera
             std::cerr << "Failed to create logical device: " << result << std::endl;
             return false;
         }
+        synchronization2_enabled_ = enabledSync2Features.synchronization2 == VK_TRUE;
 
         // Get queue handles
         vkGetDeviceQueue(device_, static_cast<uint32_t>(queueFamilies.graphicsFamily), 0, &graphics_queue_);
@@ -144,6 +165,7 @@ namespace kera
             graphics_queue_ = VK_NULL_HANDLE;
             present_queue_ = VK_NULL_HANDLE;
             graphics_queue_family_index_ = 0;
+            synchronization2_enabled_ = false;
             std::cout << "Logical device destroyed" << std::endl;
         }
     }

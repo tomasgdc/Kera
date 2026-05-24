@@ -62,8 +62,13 @@ namespace kera
         virtual bool mapBuffer(BufferHandle bufferHandle, void** data) = 0;
         virtual void unmapBuffer(BufferHandle bufferHandle) = 0;
         virtual bool uploadBuffer(BufferHandle buffer, const void* data, std::size_t size, std::size_t offset = 0) = 0;
+        virtual BufferHandle createUniformRingBuffer(std::size_t elementSize, uint32_t slotCount = 0) = 0;
+        virtual bool uploadUniformRingBuffer(BufferHandle buffer, FrameHandle frame, const void* data,
+                                             std::size_t size) = 0;
+        virtual std::size_t getUniformRingBufferOffset(BufferHandle buffer, FrameHandle frame) const = 0;
 
         virtual TextureHandle createTexture(const TextureDesc& desc) = 0;
+        virtual bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) = 0;
         virtual bool destroyTexture(TextureHandle texture) = 0;
         virtual SamplerHandle createSampler(const SamplerDesc& desc) = 0;
         virtual bool destroySampler(SamplerHandle sampler) = 0;
