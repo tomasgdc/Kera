@@ -1147,6 +1147,20 @@ namespace kera
             return {};
         }
 
+        const uint32_t swapchainImageCount = m_swapchain->getImageCount();
+        if (m_imagesInFlight.size() != swapchainImageCount || m_framebuffer->getFramebufferCount() < swapchainImageCount)
+        {
+            Logger::getInstance().error("Swapchain frame resources do not match swapchain image count.");
+            return {};
+        }
+
+        commandBuffer.reset();
+        if (!commandBuffer.begin())
+        {
+            Logger::getInstance().error("Failed to begin Vulkan command buffer.");
+            return {};
+        }
+
         uint32_t imageIndex = 0;
         const VkResult acquireResult =
             m_swapchain->acquireNextImage(frameSync.m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
@@ -1159,6 +1173,7 @@ namespace kera
             {
                 Logger::getInstance().error("Failed to recreate Vulkan swapchain after image acquire.");
             }
+            commandBuffer.reset();
             return {};
         }
 
@@ -1169,12 +1184,14 @@ namespace kera
         else if (acquireResult != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to acquire Vulkan swapchain image.");
+            commandBuffer.reset();
             return {};
         }
 
         if (imageIndex >= m_imagesInFlight.size())
         {
             Logger::getInstance().error("Swapchain image index exceeded in-flight image tracking.");
+            commandBuffer.reset();
             return {};
         }
 
@@ -1185,21 +1202,16 @@ namespace kera
             if (imageWaitResult != VK_SUCCESS)
             {
                 Logger::getInstance().error("Failed to wait for in-flight Vulkan swapchain image.");
+                commandBuffer.reset();
                 return {};
             }
-        }
-
-        commandBuffer.reset();
-        if (!commandBuffer.begin())
-        {
-            Logger::getInstance().error("Failed to begin Vulkan command buffer.");
-            return {};
         }
 
         VkFramebuffer framebuffer = m_framebuffer->getFramebuffer(imageIndex);
         if (framebuffer == VK_NULL_HANDLE)
         {
             Logger::getInstance().error("Failed to get Vulkan framebuffer.");
+            commandBuffer.reset();
             return {};
         }
 
