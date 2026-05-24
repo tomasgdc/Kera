@@ -51,6 +51,11 @@ namespace kera
         VkImageView m_imageView = VK_NULL_HANDLE;
         VkFormat m_format = VK_FORMAT_R8G8B8A8_UNORM;
         VkExtent2D m_extent{};
+        VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageLayout m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageLayout m_renderTargetFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        bool m_sampled = false;
+        bool m_renderTarget = false;
 
         VulkanTextureResource() = default;
         ~VulkanTextureResource()
@@ -68,6 +73,11 @@ namespace kera
             , m_imageView(std::exchange(other.m_imageView, VK_NULL_HANDLE))
             , m_format(other.m_format)
             , m_extent(other.m_extent)
+            , m_currentLayout(other.m_currentLayout)
+            , m_descriptorLayout(other.m_descriptorLayout)
+            , m_renderTargetFinalLayout(other.m_renderTargetFinalLayout)
+            , m_sampled(other.m_sampled)
+            , m_renderTarget(other.m_renderTarget)
         {
         }
 
@@ -82,6 +92,11 @@ namespace kera
                 m_imageView = std::exchange(other.m_imageView, VK_NULL_HANDLE);
                 m_format = other.m_format;
                 m_extent = other.m_extent;
+                m_currentLayout = other.m_currentLayout;
+                m_descriptorLayout = other.m_descriptorLayout;
+                m_renderTargetFinalLayout = other.m_renderTargetFinalLayout;
+                m_sampled = other.m_sampled;
+                m_renderTarget = other.m_renderTarget;
             }
             return *this;
         }
@@ -105,6 +120,11 @@ namespace kera
             }
             m_device = VK_NULL_HANDLE;
             m_extent = {};
+            m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_renderTargetFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_sampled = false;
+            m_renderTarget = false;
         }
     };
 
@@ -165,11 +185,22 @@ namespace kera
         ShaderProgramHandle m_program;
     };
 
+    template <typename HandleT>
+    struct VulkanDescriptorBindingReference
+    {
+        uint32_t m_binding = 0;
+        HandleT m_handle;
+    };
+
     struct VulkanDescriptorSetResource
     {
         VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
         GraphicsPipelineHandle m_pipeline;
         uint32_t m_set = 0;
+        DescriptorSetLayoutDesc m_layout;
+        std::vector<VulkanDescriptorBindingReference<BufferHandle>> m_buffers;
+        std::vector<VulkanDescriptorBindingReference<TextureHandle>> m_textures;
+        std::vector<VulkanDescriptorBindingReference<SamplerHandle>> m_samplers;
     };
 
     struct VulkanFrameResource
@@ -180,6 +211,9 @@ namespace kera
         VkExtent2D m_extent{};
         uint32_t m_imageIndex = 0;
         uint32_t m_syncIndex = 0;
+        bool m_renderPassActive = false;
+        TextureHandle m_activeRenderTargetTexture;
+        VkImageLayout m_renderPassFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
 
     struct VulkanFrameSyncResource
@@ -267,6 +301,14 @@ namespace kera
         bool recreateSwapchainFromWindow();
         bool hasActiveFrames() const;
         void releaseFrame(FrameHandle frame, uint32_t syncIndex);
+        bool descriptorSetsReference(BufferHandle buffer);
+        bool descriptorSetsReference(TextureHandle texture);
+        bool descriptorSetsReference(SamplerHandle sampler);
+        bool renderTargetsReference(TextureHandle texture);
+        const DescriptorSetLayoutDesc* resolveDescriptorSetLayout(const VulkanGraphicsPipelineResource& pipeline,
+                                                                  uint32_t set) const;
+        bool validateDescriptorBinding(const VulkanDescriptorSetResource& descriptorSet, uint32_t binding,
+                                       DescriptorType type) const;
         RenderPass* resolveRenderPass(RenderTargetHandle renderTarget);
         void waitForDeviceIdle();
         void destroySyncObjects();

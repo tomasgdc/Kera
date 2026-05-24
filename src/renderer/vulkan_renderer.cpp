@@ -2,6 +2,7 @@
 
 #include "kera/core/window.h"
 #include "kera/renderer/command_buffer.h"
+#include "kera/renderer/descriptor_contracts.h"
 #include "kera/renderer/device.h"
 #include "kera/renderer/framebuffer.h"
 #include "kera/renderer/instance.h"
@@ -488,6 +489,11 @@ namespace kera
             Logger::getInstance().error("Invalid frame handle passed to renderUi.");
             return;
         }
+        if (!frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot render ImGui draw data outside an active Vulkan render pass.");
+            return;
+        }
 
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), frame->m_commandBuffer);
 #else
@@ -647,6 +653,12 @@ namespace kera
 
     bool VulkanRenderer::destroyBuffer(BufferHandle buffer)
     {
+        if (descriptorSetsReference(buffer))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan buffer that is still referenced by a descriptor set.");
+            return false;
+        }
+
         waitForDeviceIdle();
         return m_buffers.remove(buffer);
     }
@@ -734,6 +746,12 @@ namespace kera
         resource.m_device = m_device->getVulkanDevice();
         resource.m_format = toVkTextureFormat(desc.format);
         resource.m_extent = {desc.width, desc.height};
+        resource.m_sampled = desc.sampled;
+        resource.m_renderTarget = desc.renderTarget;
+        resource.m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        resource.m_descriptorLayout = desc.sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+        resource.m_renderTargetFinalLayout =
+            desc.renderTarget ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
 
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -806,6 +824,18 @@ namespace kera
 
     bool VulkanRenderer::destroyTexture(TextureHandle texture)
     {
+        if (descriptorSetsReference(texture))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by a descriptor set.");
+            return false;
+        }
+
+        if (renderTargetsReference(texture))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by a render target.");
+            return false;
+        }
+
         waitForDeviceIdle();
         return m_textures.remove(texture);
     }
@@ -848,6 +878,12 @@ namespace kera
 
     bool VulkanRenderer::destroySampler(SamplerHandle sampler)
     {
+        if (descriptorSetsReference(sampler))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan sampler that is still referenced by a descriptor set.");
+            return false;
+        }
+
         waitForDeviceIdle();
         return m_samplers.remove(sampler);
     }
@@ -864,6 +900,11 @@ namespace kera
         if (!texture)
         {
             Logger::getInstance().error("Invalid color texture passed to createRenderTarget.");
+            return {};
+        }
+        if (!texture->m_renderTarget)
+        {
+            Logger::getInstance().error("Texture passed to createRenderTarget was not created for render-target usage.");
             return {};
         }
 
@@ -985,6 +1026,14 @@ namespace kera
         resource.m_descriptorSet = descriptorSet;
         resource.m_pipeline = pipelineHandle;
         resource.m_set = set;
+        const DescriptorSetLayoutDesc* layoutDesc = resolveDescriptorSetLayout(*pipeline, set);
+        if (!layoutDesc)
+        {
+            Logger::getInstance().error("Graphics pipeline descriptor set metadata is missing.");
+            vkFreeDescriptorSets(m_device->getVulkanDevice(), m_descriptorPool, 1, &descriptorSet);
+            return {};
+        }
+        resource.m_layout = *layoutDesc;
         return m_descriptorSets.emplace(resource);
     }
 
@@ -1002,6 +1051,11 @@ namespace kera
         if (!descriptorSet || !buffer)
         {
             Logger::getInstance().error("Invalid handle passed to updateDescriptorSet.");
+            return false;
+        }
+        if (!validateDescriptorBinding(*descriptorSet, binding, DescriptorType::UniformBuffer))
+        {
+            Logger::getInstance().error("Descriptor binding does not accept a uniform buffer.");
             return false;
         }
 
@@ -1034,6 +1088,20 @@ namespace kera
         write.pBufferInfo = &bufferInfo;
 
         vkUpdateDescriptorSets(m_device->getVulkanDevice(), 1, &write, 0, nullptr);
+        bool updatedBinding = false;
+        for (auto& reference : descriptorSet->m_buffers)
+        {
+            if (reference.m_binding == binding)
+            {
+                reference.m_handle = bufferHandle;
+                updatedBinding = true;
+                break;
+            }
+        }
+        if (!updatedBinding)
+        {
+            descriptorSet->m_buffers.push_back({binding, bufferHandle});
+        }
         return true;
     }
 
@@ -1053,9 +1121,19 @@ namespace kera
             Logger::getInstance().error("Invalid handle passed to texture updateDescriptorSet.");
             return false;
         }
+        if (!validateDescriptorBinding(*descriptorSet, binding, DescriptorType::SampledImage))
+        {
+            Logger::getInstance().error("Descriptor binding does not accept a sampled image.");
+            return false;
+        }
+        if (!texture->m_sampled || texture->m_descriptorLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            Logger::getInstance().error("Texture is not compatible with sampled-image descriptor usage.");
+            return false;
+        }
 
         VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageLayout = texture->m_descriptorLayout;
         imageInfo.imageView = texture->m_imageView;
 
         VkWriteDescriptorSet write{};
@@ -1067,6 +1145,20 @@ namespace kera
         write.pImageInfo = &imageInfo;
 
         vkUpdateDescriptorSets(m_device->getVulkanDevice(), 1, &write, 0, nullptr);
+        bool updatedBinding = false;
+        for (auto& reference : descriptorSet->m_textures)
+        {
+            if (reference.m_binding == binding)
+            {
+                reference.m_handle = textureHandle;
+                updatedBinding = true;
+                break;
+            }
+        }
+        if (!updatedBinding)
+        {
+            descriptorSet->m_textures.push_back({binding, textureHandle});
+        }
         return true;
     }
 
@@ -1086,6 +1178,11 @@ namespace kera
             Logger::getInstance().error("Invalid handle passed to sampler updateDescriptorSet.");
             return false;
         }
+        if (!validateDescriptorBinding(*descriptorSet, binding, DescriptorType::Sampler))
+        {
+            Logger::getInstance().error("Descriptor binding does not accept a sampler.");
+            return false;
+        }
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.sampler = sampler->m_sampler;
@@ -1099,6 +1196,20 @@ namespace kera
         write.pImageInfo = &imageInfo;
 
         vkUpdateDescriptorSets(m_device->getVulkanDevice(), 1, &write, 0, nullptr);
+        bool updatedBinding = false;
+        for (auto& reference : descriptorSet->m_samplers)
+        {
+            if (reference.m_binding == binding)
+            {
+                reference.m_handle = samplerHandle;
+                updatedBinding = true;
+                break;
+            }
+        }
+        if (!updatedBinding)
+        {
+            descriptorSet->m_samplers.push_back({binding, samplerHandle});
+        }
         return true;
     }
 
@@ -1247,6 +1358,11 @@ namespace kera
             Logger::getInstance().error("Invalid frame handle passed to beginRenderPass.");
             return;
         }
+        if (frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot begin a Vulkan render pass while another render pass is active.");
+            return;
+        }
 
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1262,6 +1378,9 @@ namespace kera
         renderPassInfo.pClearValues = &clearColor;
 
         vkCmdBeginRenderPass(frame->m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        frame->m_renderPassActive = true;
+        frame->m_activeRenderTargetTexture = {};
+        frame->m_renderPassFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
         VkViewport viewport{};
         viewport.x = 0.0f;
@@ -1288,6 +1407,17 @@ namespace kera
             Logger::getInstance().error("Invalid handle passed to render target beginRenderPass.");
             return;
         }
+        if (frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot begin a Vulkan render target pass while another render pass is active.");
+            return;
+        }
+        VulkanTextureResource* texture = m_textures.get(renderTarget->m_colorTexture);
+        if (!texture)
+        {
+            Logger::getInstance().error("Render target color texture is invalid.");
+            return;
+        }
 
         VkFramebuffer framebuffer = renderTarget->m_framebuffer->getFramebuffer(0);
         if (framebuffer == VK_NULL_HANDLE)
@@ -1310,6 +1440,10 @@ namespace kera
         renderPassInfo.pClearValues = &clearColor;
 
         vkCmdBeginRenderPass(frame->m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        frame->m_renderPassActive = true;
+        frame->m_activeRenderTargetTexture = renderTarget->m_colorTexture;
+        frame->m_renderPassFinalLayout = texture->m_renderTargetFinalLayout;
+        texture->m_currentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkViewport viewport{};
         viewport.x = 0.0f;
@@ -1334,8 +1468,24 @@ namespace kera
             Logger::getInstance().error("Invalid frame handle passed to endRenderPass.");
             return;
         }
+        if (!frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot end a Vulkan render pass when no render pass is active.");
+            return;
+        }
 
         vkCmdEndRenderPass(frame->m_commandBuffer);
+        frame->m_renderPassActive = false;
+        if (frame->m_activeRenderTargetTexture.isValid())
+        {
+            VulkanTextureResource* texture = m_textures.get(frame->m_activeRenderTargetTexture);
+            if (texture)
+            {
+                texture->m_currentLayout = frame->m_renderPassFinalLayout;
+            }
+            frame->m_activeRenderTargetTexture = {};
+        }
+        frame->m_renderPassFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
 
     void VulkanRenderer::bindPipeline(FrameHandle frameHandle, GraphicsPipelineHandle pipelineHandle)
@@ -1346,6 +1496,11 @@ namespace kera
         if (!frame || !pipeline)
         {
             Logger::getInstance().error("Invalid handle passed to bindPipeline.");
+            return;
+        }
+        if (!frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot bind a Vulkan graphics pipeline outside an active render pass.");
             return;
         }
 
@@ -1363,6 +1518,11 @@ namespace kera
             Logger::getInstance().error("Invalid handle passed to bindVertexBuffer.");
             return;
         }
+        if (!frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot bind a Vulkan vertex buffer outside an active render pass.");
+            return;
+        }
 
         VkBuffer vertexBuffers[] = {buffer->m_buffer.getVulkanBuffer()};
         VkDeviceSize offsets[] = {static_cast<VkDeviceSize>(offset)};
@@ -1377,6 +1537,11 @@ namespace kera
         if (!frame || !buffer)
         {
             Logger::getInstance().error("Invalid handle passed to bindIndexBuffer.");
+            return;
+        }
+        if (!frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot bind a Vulkan index buffer outside an active render pass.");
             return;
         }
 
@@ -1396,10 +1561,22 @@ namespace kera
             Logger::getInstance().error("Invalid handle passed to bindDescriptorSet.");
             return;
         }
+        if (!frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot bind a Vulkan descriptor set outside an active render pass.");
+            return;
+        }
 
         if (descriptorSet->m_set != set || descriptorSet->m_pipeline != pipelineHandle)
         {
             Logger::getInstance().error("Descriptor set is not compatible with the requested pipeline set.");
+            return;
+        }
+
+        const DescriptorSetLayoutDesc* expectedLayout = resolveDescriptorSetLayout(*pipeline, set);
+        if (!expectedLayout || !descriptorSetLayoutsCompatible(descriptorSet->m_layout, *expectedLayout))
+        {
+            Logger::getInstance().error("Descriptor set layout is not compatible with the requested pipeline.");
             return;
         }
 
@@ -1414,6 +1591,11 @@ namespace kera
         if (!frame)
         {
             Logger::getInstance().error("Invalid frame handle passed to drawIndexed.");
+            return;
+        }
+        if (!frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot draw Vulkan indexed geometry outside an active render pass.");
             return;
         }
 
@@ -1448,6 +1630,13 @@ namespace kera
         if (syncIndex >= m_activeFrameHandles.size() || m_activeFrameHandles[syncIndex] != frameHandle)
         {
             Logger::getInstance().error("Frame handle does not match the active Vulkan frame slot.");
+            releaseFrame(frameHandle, syncIndex);
+            return false;
+        }
+
+        if (frame->m_renderPassActive)
+        {
+            Logger::getInstance().error("Cannot end a Vulkan frame while a render pass is still active.");
             releaseFrame(frameHandle, syncIndex);
             return false;
         }
@@ -1714,6 +1903,118 @@ namespace kera
         }
 
         m_frames.remove(frameHandle);
+    }
+
+    bool VulkanRenderer::descriptorSetsReference(BufferHandle buffer)
+    {
+        if (!buffer.isValid())
+        {
+            return false;
+        }
+
+        bool referenced = false;
+        m_descriptorSets.forEach(
+            [&referenced, buffer](DescriptorSetHandle, VulkanDescriptorSetResource& descriptorSet)
+            {
+                for (const auto& reference : descriptorSet.m_buffers)
+                {
+                    if (reference.m_handle == buffer)
+                    {
+                        referenced = true;
+                        return false;
+                    }
+                }
+                return true;
+            });
+        return referenced;
+    }
+
+    bool VulkanRenderer::descriptorSetsReference(TextureHandle texture)
+    {
+        if (!texture.isValid())
+        {
+            return false;
+        }
+
+        bool referenced = false;
+        m_descriptorSets.forEach(
+            [&referenced, texture](DescriptorSetHandle, VulkanDescriptorSetResource& descriptorSet)
+            {
+                for (const auto& reference : descriptorSet.m_textures)
+                {
+                    if (reference.m_handle == texture)
+                    {
+                        referenced = true;
+                        return false;
+                    }
+                }
+                return true;
+            });
+        return referenced;
+    }
+
+    bool VulkanRenderer::descriptorSetsReference(SamplerHandle sampler)
+    {
+        if (!sampler.isValid())
+        {
+            return false;
+        }
+
+        bool referenced = false;
+        m_descriptorSets.forEach(
+            [&referenced, sampler](DescriptorSetHandle, VulkanDescriptorSetResource& descriptorSet)
+            {
+                for (const auto& reference : descriptorSet.m_samplers)
+                {
+                    if (reference.m_handle == sampler)
+                    {
+                        referenced = true;
+                        return false;
+                    }
+                }
+                return true;
+            });
+        return referenced;
+    }
+
+    bool VulkanRenderer::renderTargetsReference(TextureHandle texture)
+    {
+        if (!texture.isValid())
+        {
+            return false;
+        }
+
+        bool referenced = false;
+        m_renderTargets.forEach(
+            [&referenced, texture](RenderTargetHandle, VulkanRenderTargetResource& renderTarget)
+            {
+                if (renderTarget.m_colorTexture == texture)
+                {
+                    referenced = true;
+                    return false;
+                }
+                return true;
+            });
+        return referenced;
+    }
+
+    const DescriptorSetLayoutDesc* VulkanRenderer::resolveDescriptorSetLayout(
+        const VulkanGraphicsPipelineResource& pipeline, uint32_t set) const
+    {
+        for (const DescriptorSetLayoutDesc& layout : pipeline.m_desc.descriptorSets)
+        {
+            if (layout.set == set)
+            {
+                return &layout;
+            }
+        }
+        return nullptr;
+    }
+
+    bool VulkanRenderer::validateDescriptorBinding(const VulkanDescriptorSetResource& descriptorSet, uint32_t binding,
+                                                   DescriptorType type) const
+    {
+        return descriptorBindingAccepts(descriptorSet.m_layout, binding, type);
     }
 
     RenderPass* VulkanRenderer::resolveRenderPass(RenderTargetHandle renderTarget)
