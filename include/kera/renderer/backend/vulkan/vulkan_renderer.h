@@ -265,6 +265,8 @@ namespace kera
         bool recreateSwapchainResources(uint32_t width, uint32_t height);
         bool recreateLiveGraphicsPipelines();
         bool recreateSwapchainFromWindow();
+        bool hasActiveFrames() const;
+        void releaseFrame(FrameHandle frame, uint32_t syncIndex);
         RenderPass* resolveRenderPass(RenderTargetHandle renderTarget);
         void waitForDeviceIdle();
         void destroySyncObjects();
