@@ -177,7 +177,7 @@ namespace kera
         }
     }
 
-    void SampleApplication::run()
+    void SampleApplication::run(const SampleRunOptions& options)
     {
         Logger::getInstance().info("Starting Kera Sample Application");
 
@@ -229,6 +229,8 @@ namespace kera
         Logger::getInstance().info("Running windowed render loop");
 
         auto previousFrameTime = std::chrono::steady_clock::now();
+        uint32_t renderedFrames = 0;
+        bool resizeSmokeTriggered = false;
         while (!m_window->shouldClose())
         {
             const auto currentFrameTime = std::chrono::steady_clock::now();
@@ -242,6 +244,19 @@ namespace kera
             if (m_activeSampleIndex < 0 || m_activeSampleIndex >= static_cast<int>(m_samples.size()))
             {
                 break;
+            }
+
+            if (options.resizeSmoke && !resizeSmokeTriggered && renderedFrames > 0)
+            {
+                const Extent2D smokeExtent{800, 600};
+                Logger::getInstance().info("Running resize smoke step at 800x600.");
+                if (!m_renderer->resize(smokeExtent))
+                {
+                    Logger::getInstance().error("Resize smoke step failed.");
+                    break;
+                }
+                m_samples[m_activeSampleIndex]->resize(smokeExtent);
+                resizeSmokeTriggered = true;
             }
 
             if (m_window->wasResized())
@@ -288,6 +303,13 @@ namespace kera
             if (!m_renderer->endFrame(frame))
             {
                 Logger::getInstance().error("Failed to end frame");
+                break;
+            }
+
+            ++renderedFrames;
+            if (options.maxFrames > 0 && renderedFrames >= options.maxFrames)
+            {
+                Logger::getInstance().info("Sample smoke frame limit reached.");
                 break;
             }
         }

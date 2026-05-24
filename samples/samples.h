@@ -15,13 +15,19 @@ namespace kera
     class RenderContext;
     class StatsOverlay;
 
+    struct SampleRunOptions
+    {
+        uint32_t maxFrames = 0;
+        bool resizeSmoke = false;
+    };
+
     class SampleApplication
     {
     public:
         SampleApplication();
         ~SampleApplication();
 
-        void run();
+        void run(const SampleRunOptions& options = {});
         void addSample(std::unique_ptr<Sample> sample);
         void setActiveSample(int index);
 

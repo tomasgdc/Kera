@@ -43,6 +43,10 @@ namespace kera
         {
             return validation_enabled_;
         }
+        bool isDebugMessengerActive() const
+        {
+            return debug_messenger_ != VK_NULL_HANDLE;
+        }
 
     private:
         bool createInstance(const std::string& appName, uint32_t appVersion);

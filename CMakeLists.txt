@@ -5,8 +5,11 @@ project(Kera VERSION 0.1.0 LANGUAGES CXX)
 # Options
 option(KERA_BUILD_SAMPLES "Build Kera samples" ON)
 option(KERA_BUILD_SHARED "Build Kera as shared library" OFF)
+option(KERA_BUILD_TESTS "Build Kera tests" ON)
 option(KERA_ENABLE_SLANG "Enable Slang shader compilation support" ON)
 option(KERA_ENABLE_IMGUI "Enable Dear ImGui debug UI support" ${KERA_BUILD_SAMPLES})
+
+include(CTest)
 
 # C++ Standard
 set(CMAKE_CXX_STANDARD 20)
@@ -252,6 +255,11 @@ endif()
 # Samples
 if(KERA_BUILD_SAMPLES)
     add_subdirectory(samples)
+endif()
+
+# Tests
+if(BUILD_TESTING AND KERA_BUILD_TESTS)
+    add_subdirectory(tests)
 endif()
 
 # Install rules

@@ -66,3 +66,30 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
             "${CMAKE_BINARY_DIR}/samples/config"
     )
 endif()
+
+if(BUILD_TESTING)
+    add_test(NAME kera_samples_validation_smoke
+        COMMAND ${CMAKE_COMMAND}
+            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
+            -D KERA_SAMPLE_LABEL=Kera_validation_sample_smoke
+            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;1"
+            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_validation_smoke.log
+            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
+    )
+    set_tests_properties(kera_samples_validation_smoke PROPERTIES
+        LABELS "vulkan;validation;render"
+        ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+    )
+
+    add_test(NAME kera_samples_resize_smoke
+        COMMAND ${CMAKE_COMMAND}
+            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
+            -D KERA_SAMPLE_LABEL=Kera_resize_sample_smoke
+            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;2;--resize-smoke"
+            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_resize_smoke.log
+            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
+    )
+    set_tests_properties(kera_samples_resize_smoke PROPERTIES
+        LABELS "vulkan;render;resize"
+    )
+endif()
