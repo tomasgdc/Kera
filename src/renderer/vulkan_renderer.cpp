@@ -200,7 +200,12 @@ namespace kera
 
     }  // namespace
 
-    VulkanRenderer::VulkanRenderer() : m_window(nullptr), m_descriptorPool(VK_NULL_HANDLE), m_uiInitialized(false) {}
+    VulkanRenderer::VulkanRenderer()
+        : m_window(nullptr)
+        , m_descriptorPool(VK_NULL_HANDLE)
+        , m_uiInitialized(false)
+    {
+    }
 
     VulkanRenderer::~VulkanRenderer()
     {
@@ -1151,6 +1156,23 @@ namespace kera
             return {};
         }
 
+        if (imageIndex >= m_imagesInFlight.size())
+        {
+            Logger::getInstance().error("Swapchain image index exceeded in-flight image tracking.");
+            return {};
+        }
+
+        if (m_imagesInFlight[imageIndex] != VK_NULL_HANDLE)
+        {
+            const VkResult imageWaitResult = vkWaitForFences(vkDevice, 1, &m_imagesInFlight[imageIndex], VK_TRUE,
+                                                             UINT64_MAX);
+            if (imageWaitResult != VK_SUCCESS)
+            {
+                Logger::getInstance().error("Failed to wait for in-flight Vulkan swapchain image.");
+                return {};
+            }
+        }
+
         commandBuffer.reset();
         if (!commandBuffer.begin())
         {
@@ -1392,7 +1414,7 @@ namespace kera
         }
 
         const uint32_t imageIndex = frame->m_imageIndex;
-        if (imageIndex >= m_swapchain->getImageCount())
+        if (imageIndex >= m_swapchain->getImageCount() || imageIndex >= m_imagesInFlight.size())
         {
             Logger::getInstance().error("Swapchain image index exceeded available swapchain images.");
             m_frames.remove(frameHandle);
@@ -1426,6 +1448,7 @@ namespace kera
             m_frames.remove(frameHandle);
             return false;
         }
+        m_imagesInFlight[imageIndex] = frameSync.m_inFlightFence;
 
         const VkResult presentResult =
             m_swapchain->present(imageIndex, frameSync.m_renderFinishedSemaphore, m_device->getPresentQueue());
@@ -1660,6 +1683,7 @@ namespace kera
             }
         }
         m_frameSyncResources.clear();
+        m_imagesInFlight.clear();
         m_currentFrameSyncIndex = 0;
     }
 
@@ -1725,6 +1749,7 @@ namespace kera
 
         VkDevice vkDevice = m_device->getVulkanDevice();
         m_frameSyncResources.resize(frameSyncCount);
+        m_imagesInFlight.assign(m_swapchain->getImageCount(), VK_NULL_HANDLE);
 
         for (VulkanFrameSyncResource& frameSync : m_frameSyncResources)
         {
