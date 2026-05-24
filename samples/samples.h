@@ -18,6 +18,7 @@ namespace kera
     struct SampleRunOptions
     {
         uint32_t maxFrames = 0;
+        uint32_t initialSampleIndex = 0;
         bool resizeSmoke = false;
     };
 

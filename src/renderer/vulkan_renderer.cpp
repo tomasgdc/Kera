@@ -15,6 +15,7 @@
 #include <array>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #ifdef KERA_HAS_IMGUI
@@ -124,6 +125,37 @@ namespace kera
             }
 
             throw std::runtime_error("Failed to find suitable Vulkan memory type.");
+        }
+
+        VkAccessFlags accessMaskForLayout(VkImageLayout layout)
+        {
+            switch (layout)
+            {
+                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                    return VK_ACCESS_SHADER_READ_BIT;
+                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                case VK_IMAGE_LAYOUT_UNDEFINED:
+                default:
+                    return 0;
+            }
+        }
+
+        VkPipelineStageFlags stageMaskForLayout(VkImageLayout layout)
+        {
+            switch (layout)
+            {
+                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                    return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                    return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+                case VK_IMAGE_LAYOUT_UNDEFINED:
+                default:
+                    return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            }
         }
 
         ShaderStage shaderTypeToStage(ShaderType type)
@@ -1426,6 +1458,8 @@ namespace kera
             return;
         }
 
+        transitionTextureLayout(frame->m_commandBuffer, *texture, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderTarget->m_renderPass->getVulkanRenderPass();
@@ -1443,7 +1477,6 @@ namespace kera
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = renderTarget->m_colorTexture;
         frame->m_renderPassFinalLayout = texture->m_renderTargetFinalLayout;
-        texture->m_currentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkViewport viewport{};
         viewport.x = 0.0f;
@@ -1683,6 +1716,10 @@ namespace kera
         if (vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submitInfo, frameSync.m_inFlightFence) != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to submit Vulkan draw command buffer.");
+            if (!recreateSignaledFrameFence(syncIndex))
+            {
+                Logger::getInstance().error("Failed to recover Vulkan frame fence after submit failure.");
+            }
             releaseFrame(frameHandle, syncIndex);
             return false;
         }
@@ -1903,6 +1940,72 @@ namespace kera
         }
 
         m_frames.remove(frameHandle);
+    }
+
+    bool VulkanRenderer::recreateSignaledFrameFence(uint32_t syncIndex)
+    {
+        if (!m_device || syncIndex >= m_frameSyncResources.size())
+        {
+            return false;
+        }
+
+        VkDevice vkDevice = m_device->getVulkanDevice();
+        VkFence oldFence = m_frameSyncResources[syncIndex].m_inFlightFence;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        VkFence replacementFence = VK_NULL_HANDLE;
+        if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &replacementFence) != VK_SUCCESS)
+        {
+            return false;
+        }
+
+        for (VkFence& imageFence : m_imagesInFlight)
+        {
+            if (imageFence == oldFence)
+            {
+                imageFence = VK_NULL_HANDLE;
+            }
+        }
+
+        if (oldFence != VK_NULL_HANDLE)
+        {
+            vkDestroyFence(vkDevice, oldFence, nullptr);
+        }
+
+        m_frameSyncResources[syncIndex].m_inFlightFence = replacementFence;
+        return true;
+    }
+
+    void VulkanRenderer::transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
+                                                 VkImageLayout newLayout)
+    {
+        if (commandBuffer == VK_NULL_HANDLE || texture.m_image == VK_NULL_HANDLE || texture.m_currentLayout == newLayout)
+        {
+            return;
+        }
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.srcAccessMask = accessMaskForLayout(texture.m_currentLayout);
+        barrier.dstAccessMask = accessMaskForLayout(newLayout);
+        barrier.oldLayout = texture.m_currentLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = texture.m_image;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        vkCmdPipelineBarrier(commandBuffer, stageMaskForLayout(texture.m_currentLayout), stageMaskForLayout(newLayout),
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        texture.m_currentLayout = newLayout;
     }
 
     bool VulkanRenderer::descriptorSetsReference(BufferHandle buffer)

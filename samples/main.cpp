@@ -30,9 +30,19 @@ int main(int argc, char* argv[])
         {
             options.resizeSmoke = true;
         }
+        else if (arg == "--sample-index")
+        {
+            if (index + 1 >= argc)
+            {
+                std::cerr << "--sample-index requires a sample index\n";
+                return EXIT_FAILURE;
+            }
+            options.initialSampleIndex = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
+        }
         else if (arg == "--help")
         {
-            std::cout << "Usage: kera_samples [--smoke-test] [--smoke-frames N] [--resize-smoke]\n";
+            std::cout << "Usage: kera_samples [--smoke-test] [--smoke-frames N] [--resize-smoke] "
+                         "[--sample-index N]\n";
             return EXIT_SUCCESS;
         }
         else

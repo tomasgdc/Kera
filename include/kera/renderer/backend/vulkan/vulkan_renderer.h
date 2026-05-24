@@ -301,6 +301,9 @@ namespace kera
         bool recreateSwapchainFromWindow();
         bool hasActiveFrames() const;
         void releaseFrame(FrameHandle frame, uint32_t syncIndex);
+        bool recreateSignaledFrameFence(uint32_t syncIndex);
+        void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
+                                     VkImageLayout newLayout);
         bool descriptorSetsReference(BufferHandle buffer);
         bool descriptorSetsReference(TextureHandle texture);
         bool descriptorSetsReference(SamplerHandle sampler);

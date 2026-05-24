@@ -45,6 +45,15 @@ cmake --build --preset windows-debug  # or linux-debug
 ./build/windows-debug/samples/kera_samples
 ```
 
+### Validation
+
+```bash
+ctest --test-dir build/windows-debug -C Debug --output-on-failure
+```
+
+GPU-backed Vulkan smoke tests are registered with CTest but skip by default. Set `KERA_RUN_GPU_SMOKE=1` to launch
+them. See `docs/VALIDATION.md` for labels, shader contract checks, and smoke log paths.
+
 ## Project Structure
 
 ```

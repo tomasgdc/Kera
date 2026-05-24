@@ -225,7 +225,14 @@ namespace kera
                 }
             });
 
-        setActiveSample(0);
+        if (options.initialSampleIndex >= m_samples.size())
+        {
+            Logger::getInstance().error("Requested sample index is out of range: " +
+                                        std::to_string(options.initialSampleIndex));
+            return;
+        }
+
+        setActiveSample(static_cast<int>(options.initialSampleIndex));
         Logger::getInstance().info("Running windowed render loop");
 
         auto previousFrameTime = std::chrono::steady_clock::now();

@@ -1,6 +1,7 @@
 #include "kera/utilities/logger.h"
 
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -38,7 +39,7 @@ namespace kera
             ss << "Unknown Time";
         }
 
-        ss << "." << std::setfill('0') << std::setw(3) << ms.count();
+        ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
 
         // Level string
         std::string levelStr;
