@@ -2,6 +2,7 @@
 #include "kera/renderer/descriptor_contracts.h"
 #include "kera/renderer/descriptors.h"
 #include "kera/renderer/resource_registry.h"
+#include "kera/utilities/logger.h"
 
 #include <iostream>
 
@@ -32,6 +33,9 @@ namespace
 
 int main()
 {
+    const kera::LogLevel previousLogLevel = kera::Logger::getInstance().getLogLevel();
+    kera::Logger::getInstance().setLogLevel(kera::LogLevel::Fatal);
+
     kera::CommandBuffer commandBuffer;
     expect(!commandBuffer.begin(), "uninitialized command buffer begin should fail");
     expect(!commandBuffer.end(), "uninitialized command buffer end should fail");
@@ -40,6 +44,8 @@ int main()
     commandBuffer.markCompleted();
     expect(!commandBuffer.isRecording(), "uninitialized command buffer should not report recording");
     expect(!commandBuffer.isPending(), "uninitialized command buffer should not report pending");
+
+    kera::Logger::getInstance().setLogLevel(previousLogLevel);
 
     kera::ResourceRegistry<TestResource, TestHandle> registry;
     TestHandle handle = registry.emplace(TestResource{42});

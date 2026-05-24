@@ -38,7 +38,7 @@ namespace kera
             ss << "Unknown Time";
         }
 
-        ss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << ms.count();
+        ss << "." << std::setfill('0') << std::setw(3) << ms.count();
 
         // Level string
         std::string levelStr;
