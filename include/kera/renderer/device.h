@@ -51,10 +51,6 @@ namespace kera
         {
             return graphics_queue_family_index_;
         }
-        bool isSynchronization2Enabled() const
-        {
-            return synchronization2_enabled_;
-        }
 
         bool isValid() const
         {
@@ -72,7 +68,6 @@ namespace kera
         VkQueue present_queue_;
         VkCommandPool command_pool_;
         uint32_t graphics_queue_family_index_;
-        bool synchronization2_enabled_;
     };
 
 }  // namespace kera

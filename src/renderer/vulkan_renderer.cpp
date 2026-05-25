@@ -129,45 +129,6 @@ namespace kera
             throw std::runtime_error("Failed to find suitable Vulkan memory type.");
         }
 
-        VkAccessFlags accessMaskForLayout(VkImageLayout layout)
-        {
-            switch (layout)
-            {
-                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-                    return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-                    return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-                    return VK_ACCESS_TRANSFER_WRITE_BIT;
-                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-                    return VK_ACCESS_SHADER_READ_BIT;
-                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-                case VK_IMAGE_LAYOUT_UNDEFINED:
-                default:
-                    return 0;
-            }
-        }
-
-        VkPipelineStageFlags stageMaskForLayout(VkImageLayout layout)
-        {
-            switch (layout)
-            {
-                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-                    return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-                    return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-                    return VK_PIPELINE_STAGE_TRANSFER_BIT;
-                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-                    return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-                    return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-                case VK_IMAGE_LAYOUT_UNDEFINED:
-                default:
-                    return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            }
-        }
-
         VkAccessFlags2 accessMask2ForLayout(VkImageLayout layout)
         {
             switch (layout)
@@ -1944,20 +1905,6 @@ namespace kera
             return false;
         }
 
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-
-        VkCommandBuffer commandBuffers[] = {frame->m_commandBuffer};
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = &frameSync.m_imageAvailableSemaphore;
-        submitInfo.pWaitDstStageMask = waitStages;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = commandBuffers;
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &frameSync.m_renderFinishedSemaphore;
-
         if (vkResetFences(m_device->getVulkanDevice(), 1, &frameSync.m_inFlightFence) != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to reset Vulkan frame fence.");
@@ -1965,7 +1912,32 @@ namespace kera
             return false;
         }
 
-        if (vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submitInfo, frameSync.m_inFlightFence) != VK_SUCCESS)
+        VkSemaphoreSubmitInfo waitSemaphoreInfo{};
+        waitSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        waitSemaphoreInfo.semaphore = frameSync.m_imageAvailableSemaphore;
+        waitSemaphoreInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+        VkCommandBufferSubmitInfo commandBufferInfo{};
+        commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferInfo.commandBuffer = frame->m_commandBuffer;
+
+        VkSemaphoreSubmitInfo signalSemaphoreInfo{};
+        signalSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalSemaphoreInfo.semaphore = frameSync.m_renderFinishedSemaphore;
+        signalSemaphoreInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.waitSemaphoreInfoCount = 1;
+        submitInfo.pWaitSemaphoreInfos = &waitSemaphoreInfo;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = &commandBufferInfo;
+        submitInfo.signalSemaphoreInfoCount = 1;
+        submitInfo.pSignalSemaphoreInfos = &signalSemaphoreInfo;
+        VkResult submitResult =
+            vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, frameSync.m_inFlightFence);
+
+        if (submitResult != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to submit Vulkan draw command buffer.");
             if (!recreateSignaledFrameFence(syncIndex))
@@ -2239,51 +2211,28 @@ namespace kera
             return;
         }
 
-        if (m_device && m_device->isSynchronization2Enabled())
-        {
-            VkImageMemoryBarrier2 barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            barrier.srcStageMask = stageMask2ForLayout(texture.m_currentLayout);
-            barrier.srcAccessMask = accessMask2ForLayout(texture.m_currentLayout);
-            barrier.dstStageMask = stageMask2ForLayout(newLayout);
-            barrier.dstAccessMask = accessMask2ForLayout(newLayout);
-            barrier.oldLayout = texture.m_currentLayout;
-            barrier.newLayout = newLayout;
-            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.image = texture.m_image;
-            barrier.subresourceRange.aspectMask = texture.m_aspectMask;
-            barrier.subresourceRange.baseMipLevel = 0;
-            barrier.subresourceRange.levelCount = 1;
-            barrier.subresourceRange.baseArrayLayer = 0;
-            barrier.subresourceRange.layerCount = 1;
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = stageMask2ForLayout(texture.m_currentLayout);
+        barrier.srcAccessMask = accessMask2ForLayout(texture.m_currentLayout);
+        barrier.dstStageMask = stageMask2ForLayout(newLayout);
+        barrier.dstAccessMask = accessMask2ForLayout(newLayout);
+        barrier.oldLayout = texture.m_currentLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = texture.m_image;
+        barrier.subresourceRange.aspectMask = texture.m_aspectMask;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
 
-            VkDependencyInfo dependencyInfo{};
-            dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            dependencyInfo.imageMemoryBarrierCount = 1;
-            dependencyInfo.pImageMemoryBarriers = &barrier;
-            vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
-        }
-        else
-        {
-            VkImageMemoryBarrier barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barrier.srcAccessMask = accessMaskForLayout(texture.m_currentLayout);
-            barrier.dstAccessMask = accessMaskForLayout(newLayout);
-            barrier.oldLayout = texture.m_currentLayout;
-            barrier.newLayout = newLayout;
-            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.image = texture.m_image;
-            barrier.subresourceRange.aspectMask = texture.m_aspectMask;
-            barrier.subresourceRange.baseMipLevel = 0;
-            barrier.subresourceRange.levelCount = 1;
-            barrier.subresourceRange.baseArrayLayer = 0;
-            barrier.subresourceRange.layerCount = 1;
-
-            vkCmdPipelineBarrier(commandBuffer, stageMaskForLayout(texture.m_currentLayout),
-                                 stageMaskForLayout(newLayout), 0, 0, nullptr, 0, nullptr, 1, &barrier);
-        }
+        VkDependencyInfo dependencyInfo{};
+        dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependencyInfo.imageMemoryBarrierCount = 1;
+        dependencyInfo.pImageMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
 
         texture.m_currentLayout = newLayout;
     }
@@ -2333,12 +2282,15 @@ namespace kera
             return false;
         }
 
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
+        VkCommandBufferSubmitInfo commandBufferInfo{};
+        commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferInfo.commandBuffer = commandBuffer;
 
-        const VkResult submitResult = vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = &commandBufferInfo;
+        const VkResult submitResult = vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
         if (submitResult == VK_SUCCESS)
         {
             vkQueueWaitIdle(m_device->getGraphicsQueue());
