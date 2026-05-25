@@ -63,6 +63,25 @@ namespace kera
             return true;
         }
 
+        std::optional<T> take(HandleT handle)
+        {
+            Slot* slot = getSlot(handle);
+            if (!slot || !slot->m_value)
+            {
+                return std::nullopt;
+            }
+
+            std::optional<T> value{std::move(*slot->m_value)};
+            slot->m_value.reset();
+            ++slot->m_generation;
+            if (slot->m_generation == 0)
+            {
+                slot->m_generation = 1;
+            }
+            m_freeList.push_back(static_cast<uint32_t>(handle.m_index));
+            return value;
+        }
+
         uint32_t activeCount() const
         {
             uint32_t count = 0;

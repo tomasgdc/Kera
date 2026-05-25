@@ -196,11 +196,14 @@ namespace kera
     {
         uint32_t m_binding = 0;
         HandleT m_handle;
+        std::size_t m_offset = 0;
+        std::size_t m_range = 0;
     };
 
     struct VulkanDescriptorSetResource
     {
         VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
+        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
         GraphicsPipelineHandle m_pipeline;
         uint32_t m_set = 0;
         DescriptorSetLayoutDesc m_layout;
@@ -242,7 +245,23 @@ namespace kera
     {
         uint64_t m_timelineValue = 0;
         std::vector<Buffer> m_buffers;
+        std::vector<VulkanBufferResource> m_bufferResources;
+        std::vector<VulkanTextureResource> m_textures;
+        std::vector<VulkanSamplerResource> m_samplers;
+        std::vector<VulkanGraphicsPipelineResource> m_graphicsPipelines;
+        std::vector<VulkanDescriptorSetResource> m_descriptorSets;
         std::vector<VkCommandBuffer> m_commandBuffers;
+    };
+
+    struct VulkanUploadContext
+    {
+        std::vector<Buffer> m_availableStagingBuffers;
+    };
+
+    struct VulkanDescriptorPoolResource
+    {
+        VkDescriptorPool m_pool = VK_NULL_HANDLE;
+        uint32_t m_allocatedSets = 0;
     };
 
     class VulkanRenderer : public IRenderer
@@ -330,10 +349,18 @@ namespace kera
         void releaseFrame(FrameHandle frame, uint32_t syncIndex);
         bool waitForTimelineValue(uint64_t timelineValue);
         uint64_t reserveTimelineValue();
+        uint64_t getLastSubmittedTimelineValue() const;
         bool submitImmediateCommandBuffer(VkCommandBuffer commandBuffer, uint64_t& timelineValue);
+        Buffer acquireStagingBuffer(VkDeviceSize size);
+        void releaseStagingBuffer(Buffer&& buffer);
+        bool allocateDescriptorSet(const VulkanGraphicsPipelineResource& pipeline, uint32_t set,
+                                   VkDescriptorSet& descriptorSet, VkDescriptorPool& descriptorPool);
+        bool reallocateDescriptorSetsForPipeline(GraphicsPipelineHandle pipelineHandle,
+                                                 VulkanGraphicsPipelineResource& pipeline);
         void queueDeferredDeletion(VulkanDeferredDeletion deletion);
         void collectDeferredDeletions();
         void flushDeferredDeletions();
+        bool createDescriptorPoolBlock();
         void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
                                      VkImageLayout newLayout);
         bool copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture);
@@ -374,11 +401,13 @@ namespace kera
         std::vector<uint64_t> m_imagesInFlight;
         std::vector<VkImageLayout> m_swapchainImageLayouts;
         std::vector<VulkanDeferredDeletion> m_deferredDeletions;
+        VulkanUploadContext m_uploadContext;
         std::vector<FrameHandle> m_activeFrameHandles;
         VkSemaphore m_frameTimelineSemaphore = VK_NULL_HANDLE;
         uint64_t m_nextFrameTimelineValue = 1;
         uint32_t m_currentFrameSyncIndex = 0;
-        VkDescriptorPool m_descriptorPool;
+        VkPipelineCache m_pipelineCache = VK_NULL_HANDLE;
+        std::vector<VulkanDescriptorPoolResource> m_descriptorPools;
 
         ResourceRegistry<VulkanShaderModuleResource, ShaderModuleHandle> m_shaderModules;
         ResourceRegistry<VulkanShaderProgramResource, ShaderProgramHandle> m_shaderPrograms;

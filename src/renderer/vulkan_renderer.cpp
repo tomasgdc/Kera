@@ -11,6 +11,7 @@
 #include "kera/utilities/logger.h"
 
 #include <array>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -159,10 +160,102 @@ namespace kera
                 case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
                     return VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
                 case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-                    return VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
                 case VK_IMAGE_LAYOUT_UNDEFINED:
                 default:
-                    return VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+                    return VK_PIPELINE_STAGE_2_NONE;
+            }
+        }
+
+        const char* layoutName(VkImageLayout layout)
+        {
+            switch (layout)
+            {
+                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    return "ColorAttachment";
+                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+                    return "DepthAttachment";
+                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                    return "TransferDst";
+                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                    return "ShaderRead";
+                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                    return "Present";
+                case VK_IMAGE_LAYOUT_UNDEFINED:
+                default:
+                    return "Undefined";
+            }
+        }
+
+        VkPipelineStageFlags2 signalStageForTimelineSubmit(VkPipelineStageFlags2 producerStage)
+        {
+            return producerStage == 0 ? VK_PIPELINE_STAGE_2_NONE : producerStage;
+        }
+
+        VkPipelineStageFlags2 renderCompleteStageMask()
+        {
+            return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+        }
+
+        void setDebugObjectName(VkDevice device, VkObjectType objectType, uint64_t objectHandle, const std::string& name)
+        {
+            if (device == VK_NULL_HANDLE || objectHandle == 0 || name.empty())
+            {
+                return;
+            }
+
+            auto setName =
+                reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(vkGetDeviceProcAddr(device,
+                                                                                       "vkSetDebugUtilsObjectNameEXT"));
+            if (!setName)
+            {
+                return;
+            }
+
+            VkDebugUtilsObjectNameInfoEXT nameInfo{};
+            nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+            nameInfo.objectType = objectType;
+            nameInfo.objectHandle = objectHandle;
+            nameInfo.pObjectName = name.c_str();
+            setName(device, &nameInfo);
+        }
+
+        void beginDebugLabel(VkDevice device, VkCommandBuffer commandBuffer, const char* name, float r, float g, float b)
+        {
+            if (device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE || !name)
+            {
+                return;
+            }
+
+            auto beginLabel = reinterpret_cast<PFN_vkCmdBeginDebugUtilsLabelEXT>(
+                vkGetDeviceProcAddr(device, "vkCmdBeginDebugUtilsLabelEXT"));
+            if (!beginLabel)
+            {
+                return;
+            }
+
+            VkDebugUtilsLabelEXT label{};
+            label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+            label.pLabelName = name;
+            label.color[0] = r;
+            label.color[1] = g;
+            label.color[2] = b;
+            label.color[3] = 1.0f;
+            beginLabel(commandBuffer, &label);
+        }
+
+        void endDebugLabel(VkDevice device, VkCommandBuffer commandBuffer)
+        {
+            if (device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE)
+            {
+                return;
+            }
+
+            auto endLabel =
+                reinterpret_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(vkGetDeviceProcAddr(device,
+                                                                                     "vkCmdEndDebugUtilsLabelEXT"));
+            if (endLabel)
+            {
+                endLabel(commandBuffer);
             }
         }
 
@@ -245,7 +338,7 @@ namespace kera
         : m_window(nullptr)
         , m_frameTimelineSemaphore(VK_NULL_HANDLE)
         , m_nextFrameTimelineValue(1)
-        , m_descriptorPool(VK_NULL_HANDLE)
+        , m_pipelineCache(VK_NULL_HANDLE)
         , m_uiInitialized(false)
     {
     }
@@ -290,6 +383,17 @@ namespace kera
             return false;
         }
 
+        VkPipelineCacheCreateInfo pipelineCacheInfo{};
+        pipelineCacheInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+        if (vkCreatePipelineCache(m_device->getVulkanDevice(), &pipelineCacheInfo, nullptr, &m_pipelineCache) !=
+            VK_SUCCESS)
+        {
+            Logger::getInstance().error("Failed to create Vulkan pipeline cache");
+            return false;
+        }
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_PIPELINE_CACHE,
+                           (uint64_t)m_pipelineCache, "Kera Pipeline Cache");
+
         if (!createDescriptorPool())
         {
             Logger::getInstance().error("Failed to create Vulkan descriptor pool");
@@ -330,6 +434,11 @@ namespace kera
 
         destroySyncObjects();
         destroyDescriptorPool();
+        if (m_device && m_pipelineCache != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineCache(m_device->getVulkanDevice(), m_pipelineCache, nullptr);
+            m_pipelineCache = VK_NULL_HANDLE;
+        }
 
         for (std::unique_ptr<CommandBuffer>& commandBuffer : m_commandBuffers)
         {
@@ -668,6 +777,23 @@ namespace kera
 
     bool VulkanRenderer::destroyShaderProgram(ShaderProgramHandle program)
     {
+        bool referencedByPipeline = false;
+        m_graphicsPipelines.forEach(
+            [&referencedByPipeline, program](GraphicsPipelineHandle, VulkanGraphicsPipelineResource& pipeline)
+            {
+                if (pipeline.m_program == program)
+                {
+                    referencedByPipeline = true;
+                    return false;
+                }
+                return true;
+            });
+        if (referencedByPipeline)
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan shader program referenced by a graphics pipeline.");
+            return false;
+        }
+
         waitForDeviceIdle();
         return m_shaderPrograms.remove(program);
     }
@@ -688,24 +814,34 @@ namespace kera
             return {};
         }
 
-        return m_buffers.emplace(std::move(resource));
+        BufferHandle handle = m_buffers.emplace(std::move(resource));
+        if (VulkanBufferResource* namedResource = m_buffers.get(handle))
+        {
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_BUFFER,
+                               (uint64_t)namedResource->m_buffer.getVulkanBuffer(), "Kera Buffer");
+        }
+        return handle;
     }
 
     bool VulkanRenderer::destroyBuffer(BufferHandle buffer)
     {
-        if (frameResourceUses(buffer))
-        {
-            Logger::getInstance().error("Cannot destroy a Vulkan buffer that is still referenced by an in-flight frame.");
-            return false;
-        }
         if (descriptorSetsReference(buffer))
         {
             Logger::getInstance().error("Cannot destroy a Vulkan buffer that is still referenced by a descriptor set.");
             return false;
         }
 
-        waitForDeviceIdle();
-        return m_buffers.remove(buffer);
+        std::optional<VulkanBufferResource> resource = m_buffers.take(buffer);
+        if (!resource)
+        {
+            return false;
+        }
+
+        VulkanDeferredDeletion deletion{};
+        deletion.m_timelineValue = getLastSubmittedTimelineValue();
+        deletion.m_bufferResources.push_back(std::move(*resource));
+        queueDeferredDeletion(std::move(deletion));
+        return true;
     }
 
     bool VulkanRenderer::mapBuffer(BufferHandle bufferHandle, void** data)
@@ -780,7 +916,14 @@ namespace kera
             return {};
         }
 
-        return m_buffers.emplace(std::move(resource));
+        BufferHandle handle = m_buffers.emplace(std::move(resource));
+        if (VulkanBufferResource* namedResource = m_buffers.get(handle))
+        {
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_BUFFER,
+                               (uint64_t)namedResource->m_buffer.getVulkanBuffer(),
+                               "Kera Uniform Ring Buffer");
+        }
+        return handle;
     }
 
     bool VulkanRenderer::uploadUniformRingBuffer(BufferHandle bufferHandle, FrameHandle frameHandle, const void* data,
@@ -930,7 +1073,15 @@ namespace kera
             return {};
         }
 
-        return m_textures.emplace(std::move(resource));
+        TextureHandle handle = m_textures.emplace(std::move(resource));
+        if (VulkanTextureResource* namedResource = m_textures.get(handle))
+        {
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_IMAGE,
+                               (uint64_t)namedResource->m_image, "Kera Texture Image");
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_IMAGE_VIEW,
+                               (uint64_t)namedResource->m_imageView, "Kera Texture View");
+        }
+        return handle;
     }
 
     bool VulkanRenderer::uploadTexture(TextureHandle textureHandle, const void* data, std::size_t size)
@@ -971,9 +1122,8 @@ namespace kera
             return false;
         }
 
-        Buffer stagingBuffer;
-        if (!stagingBuffer.initialize(*m_device, static_cast<VkDeviceSize>(expectedSize), BufferUsage::TransferSrc,
-                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+        Buffer stagingBuffer = acquireStagingBuffer(static_cast<VkDeviceSize>(expectedSize));
+        if (!stagingBuffer.isValid())
         {
             Logger::getInstance().error("Failed to create Vulkan texture staging buffer.");
             return false;
@@ -995,11 +1145,6 @@ namespace kera
 
     bool VulkanRenderer::destroyTexture(TextureHandle texture)
     {
-        if (frameResourceUses(texture))
-        {
-            Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by an in-flight frame.");
-            return false;
-        }
         if (descriptorSetsReference(texture))
         {
             Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by a descriptor set.");
@@ -1012,8 +1157,17 @@ namespace kera
             return false;
         }
 
-        waitForDeviceIdle();
-        return m_textures.remove(texture);
+        std::optional<VulkanTextureResource> resource = m_textures.take(texture);
+        if (!resource)
+        {
+            return false;
+        }
+
+        VulkanDeferredDeletion deletion{};
+        deletion.m_timelineValue = getLastSubmittedTimelineValue();
+        deletion.m_textures.push_back(std::move(*resource));
+        queueDeferredDeletion(std::move(deletion));
+        return true;
     }
 
     SamplerHandle VulkanRenderer::createSampler(const SamplerDesc& desc)
@@ -1049,24 +1203,34 @@ namespace kera
             return {};
         }
 
-        return m_samplers.emplace(std::move(resource));
+        SamplerHandle handle = m_samplers.emplace(std::move(resource));
+        if (VulkanSamplerResource* namedResource = m_samplers.get(handle))
+        {
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_SAMPLER,
+                               (uint64_t)namedResource->m_sampler, "Kera Sampler");
+        }
+        return handle;
     }
 
     bool VulkanRenderer::destroySampler(SamplerHandle sampler)
     {
-        if (frameResourceUses(sampler))
-        {
-            Logger::getInstance().error("Cannot destroy a Vulkan sampler that is still referenced by an in-flight frame.");
-            return false;
-        }
         if (descriptorSetsReference(sampler))
         {
             Logger::getInstance().error("Cannot destroy a Vulkan sampler that is still referenced by a descriptor set.");
             return false;
         }
 
-        waitForDeviceIdle();
-        return m_samplers.remove(sampler);
+        std::optional<VulkanSamplerResource> resource = m_samplers.take(sampler);
+        if (!resource)
+        {
+            return false;
+        }
+
+        VulkanDeferredDeletion deletion{};
+        deletion.m_timelineValue = getLastSubmittedTimelineValue();
+        deletion.m_samplers.push_back(std::move(*resource));
+        queueDeferredDeletion(std::move(deletion));
+        return true;
     }
 
     RenderTargetHandle VulkanRenderer::createRenderTarget(const RenderTargetDesc& desc)
@@ -1125,7 +1289,6 @@ namespace kera
 
     bool VulkanRenderer::destroyRenderTarget(RenderTargetHandle renderTarget)
     {
-        waitForDeviceIdle();
         return m_renderTargets.remove(renderTarget);
     }
 
@@ -1165,7 +1328,7 @@ namespace kera
         VulkanGraphicsPipelineResource resource{};
         resource.m_desc = desc;
         resource.m_program = program;
-        if (!resource.m_pipeline.initialize(*m_device, colorFormat, depthFormat,
+        if (!resource.m_pipeline.initialize(*m_device, m_pipelineCache, colorFormat, depthFormat,
                                             std::span<const Shader* const>(graphicsShaders.data(),
                                                                           graphicsShaders.size()),
                                             desc))
@@ -1174,18 +1337,34 @@ namespace kera
             return {};
         }
 
-        return m_graphicsPipelines.emplace(std::move(resource));
+        GraphicsPipelineHandle handle = m_graphicsPipelines.emplace(std::move(resource));
+        if (VulkanGraphicsPipelineResource* namedResource = m_graphicsPipelines.get(handle))
+        {
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_PIPELINE,
+                               (uint64_t)namedResource->m_pipeline.getVulkanPipeline(),
+                               "Kera Graphics Pipeline");
+        }
+        return handle;
     }
 
     bool VulkanRenderer::destroyGraphicsPipeline(GraphicsPipelineHandle pipeline)
     {
-        waitForDeviceIdle();
-        return m_graphicsPipelines.remove(pipeline);
+        std::optional<VulkanGraphicsPipelineResource> resource = m_graphicsPipelines.take(pipeline);
+        if (!resource)
+        {
+            return false;
+        }
+
+        VulkanDeferredDeletion deletion{};
+        deletion.m_timelineValue = getLastSubmittedTimelineValue();
+        deletion.m_graphicsPipelines.push_back(std::move(*resource));
+        queueDeferredDeletion(std::move(deletion));
+        return true;
     }
 
     DescriptorSetHandle VulkanRenderer::createDescriptorSet(GraphicsPipelineHandle pipelineHandle, uint32_t set)
     {
-        if (!m_device || m_descriptorPool == VK_NULL_HANDLE)
+        if (!m_device || m_descriptorPools.empty())
         {
             Logger::getInstance().error("Renderer descriptor resources are not initialized.");
             return {};
@@ -1198,21 +1377,9 @@ namespace kera
             return {};
         }
 
-        VkDescriptorSetLayout layout = pipeline->m_pipeline.getDescriptorSetLayout(set);
-        if (layout == VK_NULL_HANDLE)
-        {
-            Logger::getInstance().error("Graphics pipeline does not declare the requested descriptor set.");
-            return {};
-        }
-
-        VkDescriptorSetAllocateInfo allocateInfo{};
-        allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocateInfo.descriptorPool = m_descriptorPool;
-        allocateInfo.descriptorSetCount = 1;
-        allocateInfo.pSetLayouts = &layout;
-
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-        if (vkAllocateDescriptorSets(m_device->getVulkanDevice(), &allocateInfo, &descriptorSet) != VK_SUCCESS)
+        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        if (!allocateDescriptorSet(*pipeline, set, descriptorSet, descriptorPool))
         {
             Logger::getInstance().error("Failed to allocate Vulkan descriptor set.");
             return {};
@@ -1220,17 +1387,21 @@ namespace kera
 
         VulkanDescriptorSetResource resource{};
         resource.m_descriptorSet = descriptorSet;
+        resource.m_descriptorPool = descriptorPool;
         resource.m_pipeline = pipelineHandle;
         resource.m_set = set;
         const DescriptorSetLayoutDesc* layoutDesc = resolveDescriptorSetLayout(*pipeline, set);
         if (!layoutDesc)
         {
             Logger::getInstance().error("Graphics pipeline descriptor set metadata is missing.");
-            vkFreeDescriptorSets(m_device->getVulkanDevice(), m_descriptorPool, 1, &descriptorSet);
+            vkFreeDescriptorSets(m_device->getVulkanDevice(), descriptorPool, 1, &descriptorSet);
             return {};
         }
         resource.m_layout = *layoutDesc;
-        return m_descriptorSets.emplace(resource);
+        DescriptorSetHandle descriptorSetHandle = m_descriptorSets.emplace(resource);
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                           (uint64_t)descriptorSet, "Kera Descriptor Set");
+        return descriptorSetHandle;
     }
 
     bool VulkanRenderer::updateDescriptorSet(DescriptorSetHandle setHandle, uint32_t binding, BufferHandle bufferHandle,
@@ -1290,13 +1461,15 @@ namespace kera
             if (reference.m_binding == binding)
             {
                 reference.m_handle = bufferHandle;
+                reference.m_offset = offset;
+                reference.m_range = static_cast<std::size_t>(descriptorRange);
                 updatedBinding = true;
                 break;
             }
         }
         if (!updatedBinding)
         {
-            descriptorSet->m_buffers.push_back({binding, bufferHandle});
+            descriptorSet->m_buffers.push_back({binding, bufferHandle, offset, static_cast<std::size_t>(descriptorRange)});
         }
         return true;
     }
@@ -1353,7 +1526,7 @@ namespace kera
         }
         if (!updatedBinding)
         {
-            descriptorSet->m_textures.push_back({binding, textureHandle});
+            descriptorSet->m_textures.push_back({binding, textureHandle, 0, 0});
         }
         return true;
     }
@@ -1404,33 +1577,30 @@ namespace kera
         }
         if (!updatedBinding)
         {
-            descriptorSet->m_samplers.push_back({binding, samplerHandle});
+            descriptorSet->m_samplers.push_back({binding, samplerHandle, 0, 0});
         }
         return true;
     }
 
     bool VulkanRenderer::destroyDescriptorSet(DescriptorSetHandle setHandle)
     {
-        if (frameResourceUses(setHandle))
-        {
-            Logger::getInstance().error("Cannot destroy a Vulkan descriptor set that is still referenced by an in-flight frame.");
-            return false;
-        }
-
         VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(setHandle);
         if (!descriptorSet)
         {
             return false;
         }
 
-        waitForDeviceIdle();
-
-        if (m_device && m_descriptorPool != VK_NULL_HANDLE && descriptorSet->m_descriptorSet != VK_NULL_HANDLE)
+        std::optional<VulkanDescriptorSetResource> resource = m_descriptorSets.take(setHandle);
+        if (!resource)
         {
-            vkFreeDescriptorSets(m_device->getVulkanDevice(), m_descriptorPool, 1, &descriptorSet->m_descriptorSet);
+            return false;
         }
 
-        return m_descriptorSets.remove(setHandle);
+        VulkanDeferredDeletion deletion{};
+        deletion.m_timelineValue = getLastSubmittedTimelineValue();
+        deletion.m_descriptorSets.push_back(std::move(*resource));
+        queueDeferredDeletion(std::move(deletion));
+        return true;
     }
 
     FrameHandle VulkanRenderer::beginFrame()
@@ -1584,6 +1754,7 @@ namespace kera
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachments = &colorAttachment;
 
+        beginDebugLabel(m_device->getVulkanDevice(), frame->m_commandBuffer, "Kera Backbuffer Pass", 0.2f, 0.4f, 0.9f);
         vkCmdBeginRendering(frame->m_commandBuffer, &renderingInfo);
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = {};
@@ -1669,6 +1840,7 @@ namespace kera
         renderingInfo.pColorAttachments = &colorAttachment;
         renderingInfo.pDepthAttachment = depthTexture ? &depthAttachment : nullptr;
 
+        beginDebugLabel(m_device->getVulkanDevice(), frame->m_commandBuffer, "Kera Render Target Pass", 0.4f, 0.8f, 0.4f);
         vkCmdBeginRendering(frame->m_commandBuffer, &renderingInfo);
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = renderTarget->m_colorTexture;
@@ -1705,6 +1877,7 @@ namespace kera
         }
 
         vkCmdEndRendering(frame->m_commandBuffer);
+        endDebugLabel(m_device->getVulkanDevice(), frame->m_commandBuffer);
         frame->m_renderPassActive = false;
         if (frame->m_activeRenderTargetTexture.isValid())
         {
@@ -1917,11 +2090,11 @@ namespace kera
         std::array<VkSemaphoreSubmitInfo, 2> signalSemaphoreInfos{};
         signalSemaphoreInfos[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         signalSemaphoreInfos[0].semaphore = frameSync.m_renderFinishedSemaphore;
-        signalSemaphoreInfos[0].stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        signalSemaphoreInfos[0].stageMask = renderCompleteStageMask();
         signalSemaphoreInfos[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         signalSemaphoreInfos[1].semaphore = m_frameTimelineSemaphore;
         signalSemaphoreInfos[1].value = signalTimelineValue;
-        signalSemaphoreInfos[1].stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        signalSemaphoreInfos[1].stageMask = renderCompleteStageMask();
 
         VkSubmitInfo2 submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
@@ -2054,7 +2227,7 @@ namespace kera
         }
 
         return m_graphicsPipelines.forEach(
-            [this](GraphicsPipelineHandle, VulkanGraphicsPipelineResource& resource)
+            [this](GraphicsPipelineHandle pipelineHandle, VulkanGraphicsPipelineResource& resource)
             {
                 VulkanShaderProgramResource* shaderProgram = m_shaderPrograms.get(resource.m_program);
                 if (!shaderProgram)
@@ -2078,12 +2251,18 @@ namespace kera
                     return false;
                 }
 
-                if (!resource.m_pipeline.initialize(*m_device, colorFormat, depthFormat,
+                if (!resource.m_pipeline.initialize(*m_device, m_pipelineCache, colorFormat, depthFormat,
                                                     std::span<const Shader* const>(graphicsShaders.data(),
                                                                                   graphicsShaders.size()),
                                                     resource.m_desc))
                 {
                     Logger::getInstance().error("Failed to recreate live graphics pipeline.");
+                    return false;
+                }
+
+                if (!reallocateDescriptorSetsForPipeline(pipelineHandle, resource))
+                {
+                    Logger::getInstance().error("Failed to refresh descriptor sets for recreated live pipeline.");
                     return false;
                 }
 
@@ -2163,6 +2342,20 @@ namespace kera
         return m_nextFrameTimelineValue++;
     }
 
+    uint64_t VulkanRenderer::getLastSubmittedTimelineValue() const
+    {
+        uint64_t timelineValue = 0;
+        for (const VulkanFrameSyncResource& frameSync : m_frameSyncResources)
+        {
+            timelineValue = timelineValue < frameSync.m_timelineValue ? frameSync.m_timelineValue : timelineValue;
+        }
+        for (const uint64_t imageTimelineValue : m_imagesInFlight)
+        {
+            timelineValue = timelineValue < imageTimelineValue ? imageTimelineValue : timelineValue;
+        }
+        return timelineValue;
+    }
+
     bool VulkanRenderer::submitImmediateCommandBuffer(VkCommandBuffer commandBuffer, uint64_t& timelineValue)
     {
         if (!m_device || m_frameTimelineSemaphore == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE)
@@ -2180,7 +2373,7 @@ namespace kera
         signalSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         signalSemaphoreInfo.semaphore = m_frameTimelineSemaphore;
         signalSemaphoreInfo.value = timelineValue;
-        signalSemaphoreInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        signalSemaphoreInfo.stageMask = signalStageForTimelineSubmit(VK_PIPELINE_STAGE_2_TRANSFER_BIT);
 
         VkSubmitInfo2 submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
@@ -2191,10 +2384,175 @@ namespace kera
         return vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS;
     }
 
+    Buffer VulkanRenderer::acquireStagingBuffer(VkDeviceSize size)
+    {
+        for (auto bufferIt = m_uploadContext.m_availableStagingBuffers.begin();
+             bufferIt != m_uploadContext.m_availableStagingBuffers.end(); ++bufferIt)
+        {
+            if (bufferIt->getSize() >= size)
+            {
+                Buffer buffer = std::move(*bufferIt);
+                m_uploadContext.m_availableStagingBuffers.erase(bufferIt);
+                return buffer;
+            }
+        }
+
+        Buffer buffer;
+        buffer.initialize(*m_device, size, BufferUsage::TransferSrc,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        return buffer;
+    }
+
+    void VulkanRenderer::releaseStagingBuffer(Buffer&& buffer)
+    {
+        if (buffer.isValid())
+        {
+            m_uploadContext.m_availableStagingBuffers.push_back(std::move(buffer));
+        }
+    }
+
+    bool VulkanRenderer::allocateDescriptorSet(const VulkanGraphicsPipelineResource& pipeline, uint32_t set,
+                                               VkDescriptorSet& descriptorSet, VkDescriptorPool& descriptorPool)
+    {
+        if (!m_device || m_descriptorPools.empty())
+        {
+            return false;
+        }
+
+        VkDescriptorSetLayout layout = pipeline.m_pipeline.getDescriptorSetLayout(set);
+        if (layout == VK_NULL_HANDLE)
+        {
+            Logger::getInstance().error("Graphics pipeline does not declare the requested descriptor set.");
+            return false;
+        }
+
+        VkDescriptorSetAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocateInfo.descriptorSetCount = 1;
+        allocateInfo.pSetLayouts = &layout;
+
+        VkResult allocateResult = VK_ERROR_OUT_OF_POOL_MEMORY;
+        for (VulkanDescriptorPoolResource& pool : m_descriptorPools)
+        {
+            allocateInfo.descriptorPool = pool.m_pool;
+            allocateResult = vkAllocateDescriptorSets(m_device->getVulkanDevice(), &allocateInfo, &descriptorSet);
+            if (allocateResult == VK_SUCCESS)
+            {
+                descriptorPool = pool.m_pool;
+                ++pool.m_allocatedSets;
+                break;
+            }
+        }
+
+        if (allocateResult == VK_ERROR_OUT_OF_POOL_MEMORY || allocateResult == VK_ERROR_FRAGMENTED_POOL)
+        {
+            if (createDescriptorPoolBlock())
+            {
+                VulkanDescriptorPoolResource& pool = m_descriptorPools.back();
+                allocateInfo.descriptorPool = pool.m_pool;
+                allocateResult = vkAllocateDescriptorSets(m_device->getVulkanDevice(), &allocateInfo, &descriptorSet);
+                if (allocateResult == VK_SUCCESS)
+                {
+                    descriptorPool = pool.m_pool;
+                    ++pool.m_allocatedSets;
+                }
+            }
+        }
+
+        return allocateResult == VK_SUCCESS;
+    }
+
+    bool VulkanRenderer::reallocateDescriptorSetsForPipeline(GraphicsPipelineHandle pipelineHandle,
+                                                             VulkanGraphicsPipelineResource& pipeline)
+    {
+        bool success = true;
+        m_descriptorSets.forEach(
+            [this, pipelineHandle, &pipeline, &success](DescriptorSetHandle descriptorSetHandle,
+                                                        VulkanDescriptorSetResource& descriptorSet)
+            {
+                if (descriptorSet.m_pipeline != pipelineHandle)
+                {
+                    return true;
+                }
+
+                const std::vector<VulkanDescriptorBindingReference<BufferHandle>> buffers = descriptorSet.m_buffers;
+                const std::vector<VulkanDescriptorBindingReference<TextureHandle>> textures = descriptorSet.m_textures;
+                const std::vector<VulkanDescriptorBindingReference<SamplerHandle>> samplers = descriptorSet.m_samplers;
+
+                VkDescriptorSet newDescriptorSet = VK_NULL_HANDLE;
+                VkDescriptorPool newDescriptorPool = VK_NULL_HANDLE;
+                if (!allocateDescriptorSet(pipeline, descriptorSet.m_set, newDescriptorSet, newDescriptorPool))
+                {
+                    Logger::getInstance().error("Failed to reallocate Vulkan descriptor set for recreated pipeline.");
+                    success = false;
+                    return false;
+                }
+
+                VulkanDeferredDeletion deletion{};
+                deletion.m_timelineValue = getLastSubmittedTimelineValue();
+                VulkanDescriptorSetResource oldDescriptorSet{};
+                oldDescriptorSet.m_descriptorSet = descriptorSet.m_descriptorSet;
+                oldDescriptorSet.m_descriptorPool = descriptorSet.m_descriptorPool;
+                deletion.m_descriptorSets.push_back(std::move(oldDescriptorSet));
+
+                descriptorSet.m_descriptorSet = newDescriptorSet;
+                descriptorSet.m_descriptorPool = newDescriptorPool;
+                descriptorSet.m_buffers.clear();
+                descriptorSet.m_textures.clear();
+                descriptorSet.m_samplers.clear();
+                setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                                   (uint64_t)newDescriptorSet, "Kera Descriptor Set");
+
+                for (const auto& reference : buffers)
+                {
+                    if (!updateDescriptorSet(descriptorSetHandle, reference.m_binding, reference.m_handle,
+                                             reference.m_offset, reference.m_range))
+                    {
+                        success = false;
+                        return false;
+                    }
+                }
+                for (const auto& reference : textures)
+                {
+                    if (!updateDescriptorSet(descriptorSetHandle, reference.m_binding, reference.m_handle))
+                    {
+                        success = false;
+                        return false;
+                    }
+                }
+                for (const auto& reference : samplers)
+                {
+                    if (!updateDescriptorSet(descriptorSetHandle, reference.m_binding, reference.m_handle))
+                    {
+                        success = false;
+                        return false;
+                    }
+                }
+
+                queueDeferredDeletion(std::move(deletion));
+                return true;
+            });
+        return success;
+    }
+
     void VulkanRenderer::queueDeferredDeletion(VulkanDeferredDeletion deletion)
     {
         if (deletion.m_timelineValue == 0)
         {
+            for (VulkanDescriptorSetResource& descriptorSet : deletion.m_descriptorSets)
+            {
+                if (m_device && descriptorSet.m_descriptorSet != VK_NULL_HANDLE &&
+                    descriptorSet.m_descriptorPool != VK_NULL_HANDLE)
+                {
+                    vkFreeDescriptorSets(m_device->getVulkanDevice(), descriptorSet.m_descriptorPool, 1,
+                                         &descriptorSet.m_descriptorSet);
+                    descriptorSet.m_descriptorSet = VK_NULL_HANDLE;
+                }
+            }
+            for (Buffer& buffer : deletion.m_buffers)
+            {
+                releaseStagingBuffer(std::move(buffer));
+            }
             return;
         }
         m_deferredDeletions.push_back(std::move(deletion));
@@ -2227,6 +2585,20 @@ namespace kera
                                              &commandBuffer);
                     }
                 }
+                for (VulkanDescriptorSetResource& descriptorSet : deletionIt->m_descriptorSets)
+                {
+                    if (descriptorSet.m_descriptorSet != VK_NULL_HANDLE &&
+                        descriptorSet.m_descriptorPool != VK_NULL_HANDLE)
+                    {
+                        vkFreeDescriptorSets(m_device->getVulkanDevice(), descriptorSet.m_descriptorPool, 1,
+                                             &descriptorSet.m_descriptorSet);
+                        descriptorSet.m_descriptorSet = VK_NULL_HANDLE;
+                    }
+                }
+                for (Buffer& buffer : deletionIt->m_buffers)
+                {
+                    releaseStagingBuffer(std::move(buffer));
+                }
                 deletionIt = m_deferredDeletions.erase(deletionIt);
             }
             else
@@ -2253,8 +2625,18 @@ namespace kera
                     vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
                 }
             }
+            for (VulkanDescriptorSetResource& descriptorSet : deletion.m_descriptorSets)
+            {
+                if (descriptorSet.m_descriptorSet != VK_NULL_HANDLE && descriptorSet.m_descriptorPool != VK_NULL_HANDLE)
+                {
+                    vkFreeDescriptorSets(m_device->getVulkanDevice(), descriptorSet.m_descriptorPool, 1,
+                                         &descriptorSet.m_descriptorSet);
+                    descriptorSet.m_descriptorSet = VK_NULL_HANDLE;
+                }
+            }
         }
         m_deferredDeletions.clear();
+        m_uploadContext.m_availableStagingBuffers.clear();
 
     }
 
@@ -2317,6 +2699,7 @@ namespace kera
             return false;
         }
 
+        beginDebugLabel(m_device->getVulkanDevice(), commandBuffer, "Kera Texture Upload", 0.9f, 0.6f, 0.2f);
         transitionTextureLayout(commandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         VkBufferImageCopy copyRegion{};
@@ -2329,6 +2712,7 @@ namespace kera
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
         transitionTextureLayout(commandBuffer, texture, texture.m_descriptorLayout);
+        endDebugLabel(m_device->getVulkanDevice(), commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
         {
@@ -2713,38 +3097,60 @@ namespace kera
     bool VulkanRenderer::createDescriptorPool()
     {
         destroyDescriptorPool();
+        return createDescriptorPoolBlock();
+    }
+
+    void VulkanRenderer::destroyDescriptorPool()
+    {
+        if (!m_device)
+        {
+            return;
+        }
+
+        for (VulkanDescriptorPoolResource& pool : m_descriptorPools)
+        {
+            if (pool.m_pool != VK_NULL_HANDLE)
+            {
+                vkDestroyDescriptorPool(m_device->getVulkanDevice(), pool.m_pool, nullptr);
+            }
+        }
+        m_descriptorPools.clear();
+    }
+
+    bool VulkanRenderer::createDescriptorPoolBlock()
+    {
         if (!m_device)
         {
             return false;
         }
 
+        constexpr uint32_t poolIndexScale = 1;
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = 128;
+        poolSizes[0].descriptorCount = 128 * poolIndexScale;
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        poolSizes[1].descriptorCount = 64;
+        poolSizes[1].descriptorCount = 64 * poolIndexScale;
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
-        poolSizes[2].descriptorCount = 64;
+        poolSizes[2].descriptorCount = 64 * poolIndexScale;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        poolInfo.maxSets = 128;
+        poolInfo.maxSets = 128 * poolIndexScale;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
 
-        return vkCreateDescriptorPool(m_device->getVulkanDevice(), &poolInfo, nullptr, &m_descriptorPool) == VK_SUCCESS;
-    }
-
-    void VulkanRenderer::destroyDescriptorPool()
-    {
-        if (!m_device || m_descriptorPool == VK_NULL_HANDLE)
+        VulkanDescriptorPoolResource pool{};
+        if (vkCreateDescriptorPool(m_device->getVulkanDevice(), &poolInfo, nullptr, &pool.m_pool) != VK_SUCCESS)
         {
-            return;
+            return false;
         }
 
-        vkDestroyDescriptorPool(m_device->getVulkanDevice(), m_descriptorPool, nullptr);
-        m_descriptorPool = VK_NULL_HANDLE;
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+                           (uint64_t)pool.m_pool,
+                           "Kera Descriptor Pool " + std::to_string(m_descriptorPools.size()));
+        m_descriptorPools.push_back(pool);
+        return true;
     }
 
     bool VulkanRenderer::createSyncObjects()

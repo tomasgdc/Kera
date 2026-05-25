@@ -55,6 +55,8 @@ When `KERA_RUN_GPU_SMOKE=1` is set, sample smoke logs are written beside the sam
 - `build/windows-debug/samples/Debug/kera_resize_smoke.log`
 - `build/windows-debug/samples/Debug/kera_many_lights_smoke.log`
 - `build/windows-debug/samples/Debug/kera_depth_smoke.log`
+- `build/windows-debug/samples/Debug/kera_many_lights_resize_smoke.log`
+- `build/windows-debug/samples/Debug/kera_instanced_resize_smoke.log`
 
 ## Frame Capture Lane
 

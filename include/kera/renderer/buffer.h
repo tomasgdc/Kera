@@ -65,6 +65,8 @@ namespace kera
         VkBuffer buffer_;
         VkDeviceMemory memory_;
         VkDeviceSize size_;
+        VkDeviceSize non_coherent_atom_size_;
+        VkMemoryPropertyFlags memory_properties_;
         void* mapped_data_;
     };
 

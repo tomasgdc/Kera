@@ -144,7 +144,8 @@ namespace kera
         return *this;
     }
 
-    bool Pipeline::initialize(const Device& device, VkFormat colorFormat, VkFormat depthFormat,
+    bool Pipeline::initialize(const Device& device, VkPipelineCache pipelineCache, VkFormat colorFormat,
+                              VkFormat depthFormat,
                               std::span<const Shader* const> shaders, const GraphicsPipelineDesc& desc)
     {
         if (pipeline_ || pipeline_layout_ || !descriptor_set_layouts_.empty())
@@ -326,7 +327,7 @@ namespace kera
         pipelineInfo.renderPass = VK_NULL_HANDLE;
         pipelineInfo.subpass = 0;
 
-        result = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_);
+        result = vkCreateGraphicsPipelines(vkDevice, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline_);
         if (result != VK_SUCCESS)
         {
             std::cerr << "Failed to create graphics pipeline: " << result << std::endl;

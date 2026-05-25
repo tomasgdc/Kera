@@ -33,7 +33,13 @@ namespace kera
     }  // anonymous namespace
 
     Buffer::Buffer()
-        : device_(VK_NULL_HANDLE), buffer_(VK_NULL_HANDLE), memory_(VK_NULL_HANDLE), size_(0), mapped_data_(nullptr)
+        : device_(VK_NULL_HANDLE)
+        , buffer_(VK_NULL_HANDLE)
+        , memory_(VK_NULL_HANDLE)
+        , size_(0)
+        , non_coherent_atom_size_(1)
+        , memory_properties_(0)
+        , mapped_data_(nullptr)
     {
     }
 
@@ -47,12 +53,16 @@ namespace kera
         , buffer_(other.buffer_)
         , memory_(other.memory_)
         , size_(other.size_)
+        , non_coherent_atom_size_(other.non_coherent_atom_size_)
+        , memory_properties_(other.memory_properties_)
         , mapped_data_(other.mapped_data_)
     {
         other.device_ = VK_NULL_HANDLE;
         other.buffer_ = VK_NULL_HANDLE;
         other.memory_ = VK_NULL_HANDLE;
         other.size_ = 0;
+        other.non_coherent_atom_size_ = 1;
+        other.memory_properties_ = 0;
         other.mapped_data_ = nullptr;
     }
 
@@ -65,12 +75,16 @@ namespace kera
             buffer_ = other.buffer_;
             memory_ = other.memory_;
             size_ = other.size_;
+            non_coherent_atom_size_ = other.non_coherent_atom_size_;
+            memory_properties_ = other.memory_properties_;
             mapped_data_ = other.mapped_data_;
 
             other.device_ = VK_NULL_HANDLE;
             other.buffer_ = VK_NULL_HANDLE;
             other.memory_ = VK_NULL_HANDLE;
             other.size_ = 0;
+            other.non_coherent_atom_size_ = 1;
+            other.memory_properties_ = 0;
             other.mapped_data_ = nullptr;
         }
         return *this;
@@ -88,6 +102,11 @@ namespace kera
         VkPhysicalDevice vkPhysicalDevice = device.getVulkanPhysicalDevice();
         device_ = vkDevice;
         size_ = size;
+        memory_properties_ = properties;
+
+        VkPhysicalDeviceProperties physicalDeviceProperties{};
+        vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
+        non_coherent_atom_size_ = physicalDeviceProperties.limits.nonCoherentAtomSize;
 
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -168,6 +187,8 @@ namespace kera
 
         device_ = VK_NULL_HANDLE;
         size_ = 0;
+        non_coherent_atom_size_ = 1;
+        memory_properties_ = 0;
     }
 
     bool Buffer::map(void** data)
@@ -210,6 +231,19 @@ namespace kera
         }
 
         memcpy(static_cast<char*>(mappedData) + offset, data, size);
+        if ((memory_properties_ & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
+        {
+            const VkDeviceSize atomSize = non_coherent_atom_size_ == 0 ? 1 : non_coherent_atom_size_;
+            const VkDeviceSize alignedOffset = (offset / atomSize) * atomSize;
+            const VkDeviceSize end = offset + size;
+            const VkDeviceSize alignedEnd = ((end + atomSize - 1) / atomSize) * atomSize;
+            VkMappedMemoryRange range{};
+            range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+            range.memory = memory_;
+            range.offset = alignedOffset;
+            range.size = alignedEnd > size_ ? VK_WHOLE_SIZE : alignedEnd - alignedOffset;
+            vkFlushMappedMemoryRanges(device_, 1, &range);
+        }
         unmap();
 
         return true;
