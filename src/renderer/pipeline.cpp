@@ -1,7 +1,6 @@
 #include "kera/renderer/pipeline.h"
 
 #include "kera/renderer/device.h"
-#include "kera/renderer/render_pass.h"
 #include "kera/renderer/shader.h"
 
 #include <vulkan/vulkan.h>
@@ -145,7 +144,7 @@ namespace kera
         return *this;
     }
 
-    bool Pipeline::initialize(const Device& device, const RenderPass& renderPass,
+    bool Pipeline::initialize(const Device& device, VkFormat colorFormat, VkFormat depthFormat,
                               std::span<const Shader* const> shaders, const GraphicsPipelineDesc& desc)
     {
         if (pipeline_ || pipeline_layout_ || !descriptor_set_layouts_.empty())
@@ -303,9 +302,16 @@ namespace kera
         dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
         dynamicState.pDynamicStates = dynamicStates.data();
 
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = &colorFormat;
+        renderingInfo.depthAttachmentFormat = depthFormat;
+
         // Pipeline creation
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.pNext = &renderingInfo;
         pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
         pipelineInfo.pStages = shaderStages.data();
         pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -317,7 +323,7 @@ namespace kera
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.layout = pipeline_layout_;
-        pipelineInfo.renderPass = renderPass.getVulkanRenderPass();
+        pipelineInfo.renderPass = VK_NULL_HANDLE;
         pipelineInfo.subpass = 0;
 
         result = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_);

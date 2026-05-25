@@ -1,10 +1,8 @@
 #pragma once
 
 #include "kera/renderer/buffer.h"
-#include "kera/renderer/framebuffer.h"
 #include "kera/renderer/interfaces.h"
-#include "kera/renderer/pipeline.h"
-#include "kera/renderer/render_pass.h"
+#include "kera/renderer/pipeline.h" 
 #include "kera/renderer/resource_registry.h"
 #include "kera/renderer/shader.h"
 
@@ -24,8 +22,6 @@ namespace kera
     class Device;
     class Surface;
     class SwapChain;
-    class RenderPass;
-    class Framebuffer;
     class CommandBuffer;
 
     struct VulkanShaderModuleResource
@@ -185,8 +181,6 @@ namespace kera
     {
         TextureHandle m_colorTexture;
         TextureHandle m_depthTexture;
-        std::unique_ptr<RenderPass> m_renderPass;
-        std::unique_ptr<Framebuffer> m_framebuffer;
         VkExtent2D m_extent{};
     };
 
@@ -226,8 +220,7 @@ namespace kera
     struct VulkanFrameResource
     {
         VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
-        VkRenderPass m_renderPass = VK_NULL_HANDLE;
-        VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
+        VkImageView m_colorImageView = VK_NULL_HANDLE;
         VkExtent2D m_extent{};
         uint32_t m_imageIndex = 0;
         uint32_t m_syncIndex = 0;
@@ -347,7 +340,10 @@ namespace kera
                                                                   uint32_t set) const;
         bool validateDescriptorBinding(const VulkanDescriptorSetResource& descriptorSet, uint32_t binding,
                                        DescriptorType type) const;
-        RenderPass* resolveRenderPass(RenderTargetHandle renderTarget);
+        bool resolvePipelineRenderingFormats(RenderTargetHandle renderTarget, VkFormat& colorFormat,
+                                             VkFormat& depthFormat) const;
+        void transitionSwapchainImageLayout(VkCommandBuffer commandBuffer, uint32_t imageIndex,
+                                             VkImageLayout newLayout);
         void waitForDeviceIdle();
         void destroySyncObjects();
         bool createSyncObjects();
@@ -360,12 +356,11 @@ namespace kera
         std::shared_ptr<Device> m_device;
         std::shared_ptr<Surface> m_surface;
         std::shared_ptr<SwapChain> m_swapchain;
-        std::unique_ptr<RenderPass> m_renderPass;
-        std::unique_ptr<Framebuffer> m_framebuffer;
         std::vector<std::unique_ptr<CommandBuffer>> m_commandBuffers;
 
         std::vector<VulkanFrameSyncResource> m_frameSyncResources;
         std::vector<VkFence> m_imagesInFlight;
+        std::vector<VkImageLayout> m_swapchainImageLayouts;
         std::vector<FrameHandle> m_activeFrameHandles;
         uint32_t m_currentFrameSyncIndex = 0;
         VkDescriptorPool m_descriptorPool;

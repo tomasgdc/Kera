@@ -4,10 +4,8 @@
 #include "kera/renderer/command_buffer.h"
 #include "kera/renderer/descriptor_contracts.h"
 #include "kera/renderer/device.h"
-#include "kera/renderer/framebuffer.h"
 #include "kera/renderer/instance.h"
 #include "kera/renderer/physical_device.h"
-#include "kera/renderer/render_pass.h"
 #include "kera/renderer/surface.h"
 #include "kera/renderer/swapchain.h"
 #include "kera/utilities/logger.h"
@@ -338,18 +336,7 @@ namespace kera
             }
         }
         m_commandBuffers.clear();
-
-        if (m_framebuffer)
-        {
-            m_framebuffer->shutdown();
-            m_framebuffer.reset();
-        }
-
-        if (m_renderPass)
-        {
-            m_renderPass->shutdown();
-            m_renderPass.reset();
-        }
+        m_swapchainImageLayouts.clear();
 
         if (m_swapchain)
         {
@@ -410,7 +397,7 @@ namespace kera
             return true;
         }
 
-        if (!m_window || !m_instance || !m_device || !m_renderPass || !m_swapchain)
+        if (!m_window || !m_instance || !m_device || !m_swapchain)
         {
             Logger::getInstance().warning("Cannot initialize ImGui before Vulkan renderer resources are ready.");
             return false;
@@ -435,6 +422,7 @@ namespace kera
             return false;
         }
 
+        const VkFormat uiColorAttachmentFormat = m_swapchain->getImageFormat();
         ImGui_ImplVulkan_InitInfo initInfo{};
         initInfo.ApiVersion = VK_API_VERSION_1_3;
         initInfo.Instance = m_instance->getVulkanInstance();
@@ -445,9 +433,16 @@ namespace kera
         initInfo.DescriptorPoolSize = 256;
         initInfo.MinImageCount = minImageCount;
         initInfo.ImageCount = imageCount;
-        initInfo.PipelineInfoMain.RenderPass = m_renderPass->getVulkanRenderPass();
+        initInfo.UseDynamicRendering = true;
+        initInfo.PipelineInfoMain.RenderPass = VK_NULL_HANDLE;
         initInfo.PipelineInfoMain.Subpass = 0;
         initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+#ifdef IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
+        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.sType =
+            VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &uiColorAttachmentFormat;
+#endif
 
         if (!ImGui_ImplVulkan_Init(&initInfo))
         {
@@ -1122,24 +1117,6 @@ namespace kera
         resource.m_colorTexture = desc.colorTexture;
         resource.m_depthTexture = desc.depthTexture;
         resource.m_extent = texture->m_extent;
-        resource.m_renderPass = std::make_unique<RenderPass>();
-        if (!resource.m_renderPass->initializeColorTarget(
-                *m_device, texture->m_format, depthTexture ? depthTexture->m_format : VK_FORMAT_UNDEFINED))
-        {
-            Logger::getInstance().error("Failed to create render target render pass.");
-            return {};
-        }
-
-        resource.m_framebuffer = std::make_unique<Framebuffer>();
-        if (!resource.m_framebuffer->initializeSingleColorTarget(*m_device, *resource.m_renderPass,
-                                                                 texture->m_imageView, texture->m_extent,
-                                                                 depthTexture ? depthTexture->m_imageView
-                                                                              : VK_NULL_HANDLE))
-        {
-            Logger::getInstance().error("Failed to create render target framebuffer.");
-            return {};
-        }
-
         return m_renderTargets.emplace(std::move(resource));
     }
 
@@ -1152,14 +1129,15 @@ namespace kera
     GraphicsPipelineHandle VulkanRenderer::createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                                   ShaderProgramHandle program)
     {
-        if (!m_device || !m_renderPass)
+        if (!m_device || !m_swapchain)
         {
             Logger::getInstance().error("Renderer is not initialized.");
             return {};
         }
 
-        RenderPass* renderPass = resolveRenderPass(desc.renderTarget);
-        if (!renderPass)
+        VkFormat colorFormat = VK_FORMAT_UNDEFINED;
+        VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+        if (!resolvePipelineRenderingFormats(desc.renderTarget, colorFormat, depthFormat))
         {
             Logger::getInstance().error("Invalid render target passed to createGraphicsPipeline.");
             return {};
@@ -1184,9 +1162,10 @@ namespace kera
         VulkanGraphicsPipelineResource resource{};
         resource.m_desc = desc;
         resource.m_program = program;
-        if (!resource.m_pipeline.initialize(
-                *m_device, *renderPass, std::span<const Shader* const>(graphicsShaders.data(), graphicsShaders.size()),
-                desc))
+        if (!resource.m_pipeline.initialize(*m_device, colorFormat, depthFormat,
+                                            std::span<const Shader* const>(graphicsShaders.data(),
+                                                                          graphicsShaders.size()),
+                                            desc))
         {
             Logger::getInstance().error("Failed to create Vulkan graphics pipeline.");
             return {};
@@ -1453,8 +1432,7 @@ namespace kera
 
     FrameHandle VulkanRenderer::beginFrame()
     {
-        if (!m_device || !m_swapchain || m_commandBuffers.empty() || m_frameSyncResources.empty() || !m_framebuffer ||
-            !m_renderPass)
+        if (!m_device || !m_swapchain || m_commandBuffers.empty() || m_frameSyncResources.empty())
         {
             Logger::getInstance().error("Renderer frame resources are not initialized.");
             return {};
@@ -1491,7 +1469,8 @@ namespace kera
         clearCompletedFrameResourceUse(syncIndex);
 
         const uint32_t swapchainImageCount = m_swapchain->getImageCount();
-        if (m_imagesInFlight.size() != swapchainImageCount || m_framebuffer->getFramebufferCount() < swapchainImageCount)
+        if (m_imagesInFlight.size() != swapchainImageCount || m_swapchainImageLayouts.size() != swapchainImageCount ||
+            m_swapchain->getImageViews().size() < swapchainImageCount)
         {
             Logger::getInstance().error("Swapchain frame resources do not match swapchain image count.");
             return {};
@@ -1549,18 +1528,17 @@ namespace kera
             }
         }
 
-        VkFramebuffer framebuffer = m_framebuffer->getFramebuffer(imageIndex);
-        if (framebuffer == VK_NULL_HANDLE)
+        VkImageView imageView = m_swapchain->getImageViews()[imageIndex];
+        if (imageView == VK_NULL_HANDLE)
         {
-            Logger::getInstance().error("Failed to get Vulkan framebuffer.");
+            Logger::getInstance().error("Failed to get Vulkan swapchain image view.");
             commandBuffer.reset();
             return {};
         }
 
         VulkanFrameResource frame{};
         frame.m_commandBuffer = commandBuffer.getVulkanCommandBuffer();
-        frame.m_renderPass = m_renderPass->getVulkanRenderPass();
-        frame.m_framebuffer = framebuffer;
+        frame.m_colorImageView = imageView;
         frame.m_extent = m_swapchain->getExtent();
         frame.m_imageIndex = imageIndex;
         frame.m_syncIndex = syncIndex;
@@ -1585,20 +1563,27 @@ namespace kera
             return;
         }
 
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = frame->m_renderPass;
-        renderPassInfo.framebuffer = frame->m_framebuffer;
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = frame->m_extent;
+        transitionSwapchainImageLayout(frame->m_commandBuffer, frame->m_imageIndex,
+                                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-        VkClearValue clearColor{};
-        clearColor.color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b, desc.clearColor.a}};
+        VkRenderingAttachmentInfo colorAttachment{};
+        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        colorAttachment.imageView = frame->m_colorImageView;
+        colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.clearValue.color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b,
+                                             desc.clearColor.a}};
 
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
+        VkRenderingInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderingInfo.renderArea.offset = {0, 0};
+        renderingInfo.renderArea.extent = frame->m_extent;
+        renderingInfo.layerCount = 1;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachments = &colorAttachment;
 
-        vkCmdBeginRenderPass(frame->m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRendering(frame->m_commandBuffer, &renderingInfo);
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = {};
         frame->m_activeDepthTexture = {};
@@ -1624,7 +1609,7 @@ namespace kera
     {
         VulkanFrameResource* frame = m_frames.get(frameHandle);
         VulkanRenderTargetResource* renderTarget = m_renderTargets.get(renderTargetHandle);
-        if (!frame || !renderTarget || !renderTarget->m_renderPass || !renderTarget->m_framebuffer)
+        if (!frame || !renderTarget)
         {
             Logger::getInstance().error("Invalid handle passed to render target beginRenderPass.");
             return;
@@ -1641,13 +1626,6 @@ namespace kera
             return;
         }
 
-        VkFramebuffer framebuffer = renderTarget->m_framebuffer->getFramebuffer(0);
-        if (framebuffer == VK_NULL_HANDLE)
-        {
-            Logger::getInstance().error("Render target framebuffer is invalid.");
-            return;
-        }
-
         transitionTextureLayout(frame->m_commandBuffer, *texture, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         VulkanTextureResource* depthTexture =
             renderTarget->m_depthTexture.isValid() ? m_textures.get(renderTarget->m_depthTexture) : nullptr;
@@ -1661,21 +1639,36 @@ namespace kera
             transitionTextureLayout(frame->m_commandBuffer, *depthTexture, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         }
 
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderTarget->m_renderPass->getVulkanRenderPass();
-        renderPassInfo.framebuffer = framebuffer;
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent = renderTarget->m_extent;
+        VkRenderingAttachmentInfo colorAttachment{};
+        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        colorAttachment.imageView = texture->m_imageView;
+        colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.clearValue.color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b,
+                                             desc.clearColor.a}};
 
-        VkClearValue clearValues[2]{};
-        clearValues[0].color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b, desc.clearColor.a}};
-        clearValues[1].depthStencil = {desc.clearDepth, 0};
+        VkRenderingAttachmentInfo depthAttachment{};
+        if (depthTexture)
+        {
+            depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            depthAttachment.imageView = depthTexture->m_imageView;
+            depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.clearValue.depthStencil = {desc.clearDepth, 0};
+        }
 
-        renderPassInfo.clearValueCount = depthTexture ? 2u : 1u;
-        renderPassInfo.pClearValues = clearValues;
+        VkRenderingInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderingInfo.renderArea.offset = {0, 0};
+        renderingInfo.renderArea.extent = renderTarget->m_extent;
+        renderingInfo.layerCount = 1;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachments = &colorAttachment;
+        renderingInfo.pDepthAttachment = depthTexture ? &depthAttachment : nullptr;
 
-        vkCmdBeginRenderPass(frame->m_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRendering(frame->m_commandBuffer, &renderingInfo);
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = renderTarget->m_colorTexture;
         frame->m_activeDepthTexture = renderTarget->m_depthTexture;
@@ -1710,16 +1703,20 @@ namespace kera
             return;
         }
 
-        vkCmdEndRenderPass(frame->m_commandBuffer);
+        vkCmdEndRendering(frame->m_commandBuffer);
         frame->m_renderPassActive = false;
         if (frame->m_activeRenderTargetTexture.isValid())
         {
             VulkanTextureResource* texture = m_textures.get(frame->m_activeRenderTargetTexture);
             if (texture)
             {
-                texture->m_currentLayout = frame->m_renderPassFinalLayout;
+                transitionTextureLayout(frame->m_commandBuffer, *texture, frame->m_renderPassFinalLayout);
             }
             frame->m_activeRenderTargetTexture = {};
+        }
+        else
+        {
+            transitionSwapchainImageLayout(frame->m_commandBuffer, frame->m_imageIndex, frame->m_renderPassFinalLayout);
         }
         if (frame->m_activeDepthTexture.isValid())
         {
@@ -2010,18 +2007,6 @@ namespace kera
         }
         m_commandBuffers.clear();
 
-        if (m_framebuffer)
-        {
-            m_framebuffer->shutdown();
-            m_framebuffer.reset();
-        }
-
-        if (m_renderPass)
-        {
-            m_renderPass->shutdown();
-            m_renderPass.reset();
-        }
-
         if (m_swapchain)
         {
             m_swapchain->shutdown();
@@ -2040,18 +2025,7 @@ namespace kera
         {
             return false;
         }
-
-        m_renderPass = std::make_unique<RenderPass>();
-        if (!m_renderPass->initialize(*m_device, *m_swapchain))
-        {
-            return false;
-        }
-
-        m_framebuffer = std::make_unique<Framebuffer>();
-        if (!m_framebuffer->initialize(*m_device, *m_renderPass, *m_swapchain))
-        {
-            return false;
-        }
+        m_swapchainImageLayouts.assign(m_swapchain->getImageCount(), VK_IMAGE_LAYOUT_UNDEFINED);
 
         const uint32_t frameResourceCount =
             m_swapchain->getImageCount() < kMaxFramesInFlight ? m_swapchain->getImageCount() : kMaxFramesInFlight;
@@ -2076,7 +2050,7 @@ namespace kera
 
     bool VulkanRenderer::recreateLiveGraphicsPipelines()
     {
-        if (!m_device || !m_renderPass)
+        if (!m_device || !m_swapchain)
         {
             return false;
         }
@@ -2098,17 +2072,18 @@ namespace kera
                     return false;
                 }
 
-                RenderPass* renderPass = resolveRenderPass(resource.m_desc.renderTarget);
-                if (!renderPass)
+                VkFormat colorFormat = VK_FORMAT_UNDEFINED;
+                VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+                if (!resolvePipelineRenderingFormats(resource.m_desc.renderTarget, colorFormat, depthFormat))
                 {
                     Logger::getInstance().error("Live graphics pipeline references an invalid render target.");
                     return false;
                 }
 
-                if (!resource.m_pipeline.initialize(
-                        *m_device, *renderPass,
-                        std::span<const Shader* const>(graphicsShaders.data(), graphicsShaders.size()),
-                        resource.m_desc))
+                if (!resource.m_pipeline.initialize(*m_device, colorFormat, depthFormat,
+                                                    std::span<const Shader* const>(graphicsShaders.data(),
+                                                                                  graphicsShaders.size()),
+                                                    resource.m_desc))
                 {
                     Logger::getInstance().error("Failed to recreate live graphics pipeline.");
                     return false;
@@ -2537,20 +2512,79 @@ namespace kera
         return descriptorBindingAccepts(descriptorSet.m_layout, binding, type);
     }
 
-    RenderPass* VulkanRenderer::resolveRenderPass(RenderTargetHandle renderTarget)
+    bool VulkanRenderer::resolvePipelineRenderingFormats(RenderTargetHandle renderTarget, VkFormat& colorFormat,
+                                                         VkFormat& depthFormat) const
     {
         if (!renderTarget.isValid())
         {
-            return m_renderPass.get();
+            if (!m_swapchain)
+            {
+                return false;
+            }
+            colorFormat = m_swapchain->getImageFormat();
+            depthFormat = VK_FORMAT_UNDEFINED;
+            return true;
         }
 
-        VulkanRenderTargetResource* resource = m_renderTargets.get(renderTarget);
-        if (!resource || !resource->m_renderPass)
+        const VulkanRenderTargetResource* resource = m_renderTargets.get(renderTarget);
+        if (!resource)
         {
-            return nullptr;
+            return false;
         }
 
-        return resource->m_renderPass.get();
+        const VulkanTextureResource* colorTexture = m_textures.get(resource->m_colorTexture);
+        if (!colorTexture)
+        {
+            return false;
+        }
+
+        colorFormat = colorTexture->m_format;
+        depthFormat = VK_FORMAT_UNDEFINED;
+        if (resource->m_depthTexture.isValid())
+        {
+            const VulkanTextureResource* depthTexture = m_textures.get(resource->m_depthTexture);
+            if (!depthTexture)
+            {
+                return false;
+            }
+            depthFormat = depthTexture->m_format;
+        }
+        return true;
+    }
+
+    void VulkanRenderer::transitionSwapchainImageLayout(VkCommandBuffer commandBuffer, uint32_t imageIndex,
+                                                        VkImageLayout newLayout)
+    {
+        if (!m_swapchain || commandBuffer == VK_NULL_HANDLE || imageIndex >= m_swapchain->getImages().size() ||
+            imageIndex >= m_swapchainImageLayouts.size() || m_swapchainImageLayouts[imageIndex] == newLayout)
+        {
+            return;
+        }
+
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = stageMask2ForLayout(m_swapchainImageLayouts[imageIndex]);
+        barrier.srcAccessMask = accessMask2ForLayout(m_swapchainImageLayouts[imageIndex]);
+        barrier.dstStageMask = stageMask2ForLayout(newLayout);
+        barrier.dstAccessMask = accessMask2ForLayout(newLayout);
+        barrier.oldLayout = m_swapchainImageLayouts[imageIndex];
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = m_swapchain->getImages()[imageIndex];
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        VkDependencyInfo dependencyInfo{};
+        dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependencyInfo.imageMemoryBarrierCount = 1;
+        dependencyInfo.pImageMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+
+        m_swapchainImageLayouts[imageIndex] = newLayout;
     }
 
     void VulkanRenderer::waitForDeviceIdle()
