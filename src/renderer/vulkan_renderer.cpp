@@ -243,6 +243,8 @@ namespace kera
 
     VulkanRenderer::VulkanRenderer()
         : m_window(nullptr)
+        , m_frameTimelineSemaphore(VK_NULL_HANDLE)
+        , m_nextFrameTimelineValue(1)
         , m_descriptorPool(VK_NULL_HANDLE)
         , m_uiInitialized(false)
     {
@@ -313,6 +315,7 @@ namespace kera
     void VulkanRenderer::shutdown()
     {
         waitForDeviceIdle();
+        flushDeferredDeletions();
         shutdownUi();
 
         m_frames.clear();
@@ -1438,7 +1441,6 @@ namespace kera
             return {};
         }
 
-        VkDevice vkDevice = m_device->getVulkanDevice();
         const uint32_t syncIndex = m_currentFrameSyncIndex;
         VulkanFrameSyncResource& frameSync = m_frameSyncResources[syncIndex];
         CommandBuffer& commandBuffer = *m_commandBuffers[syncIndex];
@@ -1459,14 +1461,14 @@ namespace kera
             activeFrameHandle = {};
         }
 
-        const VkResult waitResult = vkWaitForFences(vkDevice, 1, &frameSync.m_inFlightFence, VK_TRUE, UINT64_MAX);
-        if (waitResult != VK_SUCCESS)
+        if (!waitForTimelineValue(frameSync.m_timelineValue))
         {
-            Logger::getInstance().error("Failed to wait for Vulkan frame fence.");
+            Logger::getInstance().error("Failed to wait for Vulkan frame timeline.");
             return {};
         }
         commandBuffer.markCompleted();
         clearCompletedFrameResourceUse(syncIndex);
+        collectDeferredDeletions();
 
         const uint32_t swapchainImageCount = m_swapchain->getImageCount();
         if (m_imagesInFlight.size() != swapchainImageCount || m_swapchainImageLayouts.size() != swapchainImageCount ||
@@ -1516,16 +1518,15 @@ namespace kera
             return {};
         }
 
-        if (m_imagesInFlight[imageIndex] != VK_NULL_HANDLE)
+        if (m_imagesInFlight[imageIndex] != 0)
         {
-            const VkResult imageWaitResult = vkWaitForFences(vkDevice, 1, &m_imagesInFlight[imageIndex], VK_TRUE,
-                                                             UINT64_MAX);
-            if (imageWaitResult != VK_SUCCESS)
+            if (!waitForTimelineValue(m_imagesInFlight[imageIndex]))
             {
-                Logger::getInstance().error("Failed to wait for in-flight Vulkan swapchain image.");
+                Logger::getInstance().error("Failed to wait for in-flight Vulkan swapchain image timeline.");
                 commandBuffer.reset();
                 return {};
             }
+            collectDeferredDeletions();
         }
 
         VkImageView imageView = m_swapchain->getImageViews()[imageIndex];
@@ -1902,12 +1903,7 @@ namespace kera
             return false;
         }
 
-        if (vkResetFences(m_device->getVulkanDevice(), 1, &frameSync.m_inFlightFence) != VK_SUCCESS)
-        {
-            Logger::getInstance().error("Failed to reset Vulkan frame fence.");
-            releaseFrame(frameHandle, syncIndex);
-            return false;
-        }
+        const uint64_t signalTimelineValue = reserveTimelineValue();
 
         VkSemaphoreSubmitInfo waitSemaphoreInfo{};
         waitSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
@@ -1918,10 +1914,14 @@ namespace kera
         commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
         commandBufferInfo.commandBuffer = frame->m_commandBuffer;
 
-        VkSemaphoreSubmitInfo signalSemaphoreInfo{};
-        signalSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        signalSemaphoreInfo.semaphore = frameSync.m_renderFinishedSemaphore;
-        signalSemaphoreInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        std::array<VkSemaphoreSubmitInfo, 2> signalSemaphoreInfos{};
+        signalSemaphoreInfos[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalSemaphoreInfos[0].semaphore = frameSync.m_renderFinishedSemaphore;
+        signalSemaphoreInfos[0].stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        signalSemaphoreInfos[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalSemaphoreInfos[1].semaphore = m_frameTimelineSemaphore;
+        signalSemaphoreInfos[1].value = signalTimelineValue;
+        signalSemaphoreInfos[1].stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 
         VkSubmitInfo2 submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
@@ -1929,23 +1929,20 @@ namespace kera
         submitInfo.pWaitSemaphoreInfos = &waitSemaphoreInfo;
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = &commandBufferInfo;
-        submitInfo.signalSemaphoreInfoCount = 1;
-        submitInfo.pSignalSemaphoreInfos = &signalSemaphoreInfo;
+        submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphoreInfos.size());
+        submitInfo.pSignalSemaphoreInfos = signalSemaphoreInfos.data();
         VkResult submitResult =
-            vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, frameSync.m_inFlightFence);
+            vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 
         if (submitResult != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to submit Vulkan draw command buffer.");
-            if (!recreateSignaledFrameFence(syncIndex))
-            {
-                Logger::getInstance().error("Failed to recover Vulkan frame fence after submit failure.");
-            }
             releaseFrame(frameHandle, syncIndex);
             return false;
         }
         commandBuffer.markSubmitted();
-        m_imagesInFlight[imageIndex] = frameSync.m_inFlightFence;
+        frameSync.m_timelineValue = signalTimelineValue;
+        m_imagesInFlight[imageIndex] = signalTimelineValue;
 
         const VkResult presentResult =
             m_swapchain->present(imageIndex, frameSync.m_renderFinishedSemaphore, m_device->getPresentQueue());
@@ -1973,6 +1970,7 @@ namespace kera
                 return false;
             }
         }
+        collectDeferredDeletions();
         return true;
     }
 
@@ -2141,41 +2139,123 @@ namespace kera
         m_frames.remove(frameHandle);
     }
 
-    bool VulkanRenderer::recreateSignaledFrameFence(uint32_t syncIndex)
+    bool VulkanRenderer::waitForTimelineValue(uint64_t timelineValue)
     {
-        if (!m_device || syncIndex >= m_frameSyncResources.size())
+        if (timelineValue == 0)
+        {
+            return true;
+        }
+        if (!m_device || m_frameTimelineSemaphore == VK_NULL_HANDLE)
         {
             return false;
         }
 
-        VkDevice vkDevice = m_device->getVulkanDevice();
-        VkFence oldFence = m_frameSyncResources[syncIndex].m_inFlightFence;
+        VkSemaphoreWaitInfo waitInfo{};
+        waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+        waitInfo.semaphoreCount = 1;
+        waitInfo.pSemaphores = &m_frameTimelineSemaphore;
+        waitInfo.pValues = &timelineValue;
+        return vkWaitSemaphores(m_device->getVulkanDevice(), &waitInfo, UINT64_MAX) == VK_SUCCESS;
+    }
 
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    uint64_t VulkanRenderer::reserveTimelineValue()
+    {
+        return m_nextFrameTimelineValue++;
+    }
 
-        VkFence replacementFence = VK_NULL_HANDLE;
-        if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &replacementFence) != VK_SUCCESS)
+    bool VulkanRenderer::submitImmediateCommandBuffer(VkCommandBuffer commandBuffer, uint64_t& timelineValue)
+    {
+        if (!m_device || m_frameTimelineSemaphore == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE)
         {
             return false;
         }
 
-        for (VkFence& imageFence : m_imagesInFlight)
+        timelineValue = reserveTimelineValue();
+
+        VkCommandBufferSubmitInfo commandBufferInfo{};
+        commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferInfo.commandBuffer = commandBuffer;
+
+        VkSemaphoreSubmitInfo signalSemaphoreInfo{};
+        signalSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalSemaphoreInfo.semaphore = m_frameTimelineSemaphore;
+        signalSemaphoreInfo.value = timelineValue;
+        signalSemaphoreInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = &commandBufferInfo;
+        submitInfo.signalSemaphoreInfoCount = 1;
+        submitInfo.pSignalSemaphoreInfos = &signalSemaphoreInfo;
+        return vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS;
+    }
+
+    void VulkanRenderer::queueDeferredDeletion(VulkanDeferredDeletion deletion)
+    {
+        if (deletion.m_timelineValue == 0)
         {
-            if (imageFence == oldFence)
+            return;
+        }
+        m_deferredDeletions.push_back(std::move(deletion));
+    }
+
+    void VulkanRenderer::collectDeferredDeletions()
+    {
+        if (!m_device || m_frameTimelineSemaphore == VK_NULL_HANDLE || m_deferredDeletions.empty())
+        {
+            return;
+        }
+
+        uint64_t completedTimelineValue = 0;
+        if (vkGetSemaphoreCounterValue(m_device->getVulkanDevice(), m_frameTimelineSemaphore,
+                                       &completedTimelineValue) != VK_SUCCESS)
+        {
+            return;
+        }
+
+        auto deletionIt = m_deferredDeletions.begin();
+        while (deletionIt != m_deferredDeletions.end())
+        {
+            if (deletionIt->m_timelineValue <= completedTimelineValue)
             {
-                imageFence = VK_NULL_HANDLE;
+                for (VkCommandBuffer commandBuffer : deletionIt->m_commandBuffers)
+                {
+                    if (commandBuffer != VK_NULL_HANDLE)
+                    {
+                        vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1,
+                                             &commandBuffer);
+                    }
+                }
+                deletionIt = m_deferredDeletions.erase(deletionIt);
+            }
+            else
+            {
+                ++deletionIt;
             }
         }
+    }
 
-        if (oldFence != VK_NULL_HANDLE)
+    void VulkanRenderer::flushDeferredDeletions()
+    {
+        if (!m_device)
         {
-            vkDestroyFence(vkDevice, oldFence, nullptr);
+            m_deferredDeletions.clear();
+            return;
         }
 
-        m_frameSyncResources[syncIndex].m_inFlightFence = replacementFence;
-        return true;
+        for (VulkanDeferredDeletion& deletion : m_deferredDeletions)
+        {
+            for (VkCommandBuffer commandBuffer : deletion.m_commandBuffers)
+            {
+                if (commandBuffer != VK_NULL_HANDLE)
+                {
+                    vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+                }
+            }
+        }
+        m_deferredDeletions.clear();
+
     }
 
     void VulkanRenderer::transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
@@ -2257,21 +2337,20 @@ namespace kera
             return false;
         }
 
-        VkCommandBufferSubmitInfo commandBufferInfo{};
-        commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        commandBufferInfo.commandBuffer = commandBuffer;
-
-        VkSubmitInfo2 submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submitInfo.commandBufferInfoCount = 1;
-        submitInfo.pCommandBufferInfos = &commandBufferInfo;
-        const VkResult submitResult = vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-        if (submitResult == VK_SUCCESS)
+        uint64_t uploadTimelineValue = 0;
+        if (!submitImmediateCommandBuffer(commandBuffer, uploadTimelineValue))
         {
-            vkQueueWaitIdle(m_device->getGraphicsQueue());
+            vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            Logger::getInstance().error("Failed to submit Vulkan texture upload command buffer.");
+            return false;
         }
-        vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
-        return submitResult == VK_SUCCESS;
+
+        VulkanDeferredDeletion deletion{};
+        deletion.m_timelineValue = uploadTimelineValue;
+        deletion.m_buffers.push_back(std::move(stagingBuffer));
+        deletion.m_commandBuffers.push_back(commandBuffer);
+        queueDeferredDeletion(std::move(deletion));
+        return true;
     }
 
     void VulkanRenderer::clearCompletedFrameResourceUse(uint32_t syncIndex)
@@ -2602,14 +2681,11 @@ namespace kera
             return;
         }
 
+        flushDeferredDeletions();
+
         VkDevice vkDevice = m_device->getVulkanDevice();
         for (VulkanFrameSyncResource& frameSync : m_frameSyncResources)
         {
-            if (frameSync.m_inFlightFence != VK_NULL_HANDLE)
-            {
-                vkDestroyFence(vkDevice, frameSync.m_inFlightFence, nullptr);
-                frameSync.m_inFlightFence = VK_NULL_HANDLE;
-            }
             if (frameSync.m_renderFinishedSemaphore != VK_NULL_HANDLE)
             {
                 vkDestroySemaphore(vkDevice, frameSync.m_renderFinishedSemaphore, nullptr);
@@ -2620,10 +2696,17 @@ namespace kera
                 vkDestroySemaphore(vkDevice, frameSync.m_imageAvailableSemaphore, nullptr);
                 frameSync.m_imageAvailableSemaphore = VK_NULL_HANDLE;
             }
+            frameSync.m_timelineValue = 0;
+        }
+        if (m_frameTimelineSemaphore != VK_NULL_HANDLE)
+        {
+            vkDestroySemaphore(vkDevice, m_frameTimelineSemaphore, nullptr);
+            m_frameTimelineSemaphore = VK_NULL_HANDLE;
         }
         m_frameSyncResources.clear();
         m_imagesInFlight.clear();
         m_activeFrameHandles.clear();
+        m_nextFrameTimelineValue = 1;
         m_currentFrameSyncIndex = 0;
     }
 
@@ -2683,17 +2766,29 @@ namespace kera
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        VkSemaphoreTypeCreateInfo timelineSemaphoreTypeInfo{};
+        timelineSemaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+        timelineSemaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+        timelineSemaphoreTypeInfo.initialValue = 0;
+
+        VkSemaphoreCreateInfo timelineSemaphoreInfo{};
+        timelineSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        timelineSemaphoreInfo.pNext = &timelineSemaphoreTypeInfo;
 
         VkDevice vkDevice = m_device->getVulkanDevice();
+        if (vkCreateSemaphore(vkDevice, &timelineSemaphoreInfo, nullptr, &m_frameTimelineSemaphore) != VK_SUCCESS)
+        {
+            destroySyncObjects();
+            return false;
+        }
+
         m_frameSyncResources.resize(frameSyncCount);
-        m_imagesInFlight.assign(m_swapchain->getImageCount(), VK_NULL_HANDLE);
+        m_imagesInFlight.assign(m_swapchain->getImageCount(), 0);
         m_activeFrameHandles.assign(frameSyncCount, {});
 
         for (VulkanFrameSyncResource& frameSync : m_frameSyncResources)
         {
+            frameSync.m_timelineValue = 0;
             if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &frameSync.m_imageAvailableSemaphore) !=
                 VK_SUCCESS)
             {
@@ -2707,14 +2802,9 @@ namespace kera
                 destroySyncObjects();
                 return false;
             }
-
-            if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &frameSync.m_inFlightFence) != VK_SUCCESS)
-            {
-                destroySyncObjects();
-                return false;
-            }
         }
 
+        m_nextFrameTimelineValue = 1;
         m_currentFrameSyncIndex = 0;
         return true;
     }

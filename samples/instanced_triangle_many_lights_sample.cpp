@@ -247,8 +247,22 @@ namespace kera
             return false;
         }
 
+        m_sceneDepthTexture = m_renderer.createTexture({
+            .width = extent.width,
+            .height = extent.height,
+            .format = TextureFormat::Depth32,
+            .renderTarget = true,
+            .sampled = false,
+            .depthStencil = true,
+        });
+        if (!m_sceneDepthTexture.isValid())
+        {
+            return false;
+        }
+
         m_sceneRenderTarget = m_renderer.createRenderTarget({
             .colorTexture = m_sceneTexture,
+            .depthTexture = m_sceneDepthTexture,
         });
         if (!m_sceneRenderTarget.isValid())
         {
@@ -272,6 +286,8 @@ namespace kera
         GraphicsPipelineDesc geometryPipelineDesc{};
         geometryPipelineDesc.renderTarget = m_sceneRenderTarget;
         geometryPipelineDesc.cullMode = CullModeKind::None;
+        geometryPipelineDesc.depthTest = true;
+        geometryPipelineDesc.depthWrite = true;
         geometryPipelineDesc.vertexLayout.bindings.push_back({
             .binding = 0,
             .stride = static_cast<uint32_t>(sizeof(Vertex)),
@@ -576,6 +592,11 @@ namespace kera
         {
             m_renderer.destroyTexture(m_sceneTexture);
             m_sceneTexture = {};
+        }
+        if (m_sceneDepthTexture.isValid())
+        {
+            m_renderer.destroyTexture(m_sceneDepthTexture);
+            m_sceneDepthTexture = {};
         }
     }
 

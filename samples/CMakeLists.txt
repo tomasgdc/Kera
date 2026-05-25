@@ -105,4 +105,17 @@ if(BUILD_TESTING)
         LABELS "vulkan;validation;render;descriptor;render_target"
         ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
     )
+
+    add_test(NAME kera_samples_depth_smoke
+        COMMAND ${CMAKE_COMMAND}
+            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
+            -D KERA_SAMPLE_LABEL=Kera_depth_sample_smoke
+            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;2;--sample-index;2"
+            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_depth_smoke.log
+            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
+    )
+    set_tests_properties(kera_samples_depth_smoke PROPERTIES
+        LABELS "vulkan;validation;render;render_target;depth"
+        ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+    )
 endif()

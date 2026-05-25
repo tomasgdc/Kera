@@ -4,6 +4,7 @@
 #include "samples.h"
 
 #include <cstdint>
+#include <vector>
 
 namespace kera
 {
@@ -29,7 +30,7 @@ namespace kera
         BufferHandle m_indexBuffer;
         BufferHandle m_instanceBuffer;
         BufferHandle m_uniformBuffer;
-        DescriptorSetHandle m_uniformDescriptorSet;
+        std::vector<DescriptorSetHandle> m_uniformDescriptorSets;
         uint32_t m_indexCount;
         uint32_t m_instanceCount;
         GraphicsPipelineHandle m_pipeline;

@@ -43,6 +43,7 @@ namespace kera
         BufferHandle m_geometryUniformBuffer;
         BufferHandle m_lightingUniformBuffer;
         TextureHandle m_sceneTexture;
+        TextureHandle m_sceneDepthTexture;
         SamplerHandle m_sceneSampler;
         RenderTargetHandle m_sceneRenderTarget;
         GraphicsPipelineHandle m_geometryPipeline;

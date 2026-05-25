@@ -2,7 +2,7 @@
 
 #include "kera/renderer/buffer.h"
 #include "kera/renderer/interfaces.h"
-#include "kera/renderer/pipeline.h" 
+#include "kera/renderer/pipeline.h"
 #include "kera/renderer/resource_registry.h"
 #include "kera/renderer/shader.h"
 
@@ -234,8 +234,15 @@ namespace kera
     {
         VkSemaphore m_imageAvailableSemaphore = VK_NULL_HANDLE;
         VkSemaphore m_renderFinishedSemaphore = VK_NULL_HANDLE;
-        VkFence m_inFlightFence = VK_NULL_HANDLE;
+        uint64_t m_timelineValue = 0;
         VulkanFrameResourceUse m_resourceUse;
+    };
+
+    struct VulkanDeferredDeletion
+    {
+        uint64_t m_timelineValue = 0;
+        std::vector<Buffer> m_buffers;
+        std::vector<VkCommandBuffer> m_commandBuffers;
     };
 
     class VulkanRenderer : public IRenderer
@@ -321,7 +328,12 @@ namespace kera
         bool recreateSwapchainFromWindow();
         bool hasActiveFrames() const;
         void releaseFrame(FrameHandle frame, uint32_t syncIndex);
-        bool recreateSignaledFrameFence(uint32_t syncIndex);
+        bool waitForTimelineValue(uint64_t timelineValue);
+        uint64_t reserveTimelineValue();
+        bool submitImmediateCommandBuffer(VkCommandBuffer commandBuffer, uint64_t& timelineValue);
+        void queueDeferredDeletion(VulkanDeferredDeletion deletion);
+        void collectDeferredDeletions();
+        void flushDeferredDeletions();
         void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
                                      VkImageLayout newLayout);
         bool copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture);
@@ -343,7 +355,7 @@ namespace kera
         bool resolvePipelineRenderingFormats(RenderTargetHandle renderTarget, VkFormat& colorFormat,
                                              VkFormat& depthFormat) const;
         void transitionSwapchainImageLayout(VkCommandBuffer commandBuffer, uint32_t imageIndex,
-                                             VkImageLayout newLayout);
+                                            VkImageLayout newLayout);
         void waitForDeviceIdle();
         void destroySyncObjects();
         bool createSyncObjects();
@@ -359,9 +371,12 @@ namespace kera
         std::vector<std::unique_ptr<CommandBuffer>> m_commandBuffers;
 
         std::vector<VulkanFrameSyncResource> m_frameSyncResources;
-        std::vector<VkFence> m_imagesInFlight;
+        std::vector<uint64_t> m_imagesInFlight;
         std::vector<VkImageLayout> m_swapchainImageLayouts;
+        std::vector<VulkanDeferredDeletion> m_deferredDeletions;
         std::vector<FrameHandle> m_activeFrameHandles;
+        VkSemaphore m_frameTimelineSemaphore = VK_NULL_HANDLE;
+        uint64_t m_nextFrameTimelineValue = 1;
         uint32_t m_currentFrameSyncIndex = 0;
         VkDescriptorPool m_descriptorPool;
 

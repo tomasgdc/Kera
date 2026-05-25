@@ -54,6 +54,7 @@ When `KERA_RUN_GPU_SMOKE=1` is set, sample smoke logs are written beside the sam
 - `build/windows-debug/samples/Debug/kera_validation_smoke.log`
 - `build/windows-debug/samples/Debug/kera_resize_smoke.log`
 - `build/windows-debug/samples/Debug/kera_many_lights_smoke.log`
+- `build/windows-debug/samples/Debug/kera_depth_smoke.log`
 
 ## Frame Capture Lane
 
@@ -78,6 +79,7 @@ Expected first capture target:
 
 - sample index `2` (`InstancedTriangleManyLightsSample`)
 - geometry pass writes an offscreen render target
+- geometry pass clears and uses a depth attachment
 - lighting pass samples that texture through sampled-image and sampler descriptors
 - validation output should contain no `[ERROR] Vulkan validation:` lines
 

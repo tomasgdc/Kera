@@ -16,6 +16,46 @@ namespace kera
         // Required device extensions
         const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
+        struct VulkanRequiredFeaturePolicy
+        {
+            VkPhysicalDeviceFeatures2 features{};
+            VkPhysicalDeviceSynchronization2Features synchronization2{};
+            VkPhysicalDeviceDynamicRenderingFeatures dynamicRendering{};
+            VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphore{};
+        };
+
+        void linkRequiredFeaturePolicy(VulkanRequiredFeaturePolicy& policy)
+        {
+            policy.features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+            policy.synchronization2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+            policy.dynamicRendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+            policy.timelineSemaphore.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+
+            policy.features.pNext = &policy.synchronization2;
+            policy.synchronization2.pNext = &policy.dynamicRendering;
+            policy.dynamicRendering.pNext = &policy.timelineSemaphore;
+        }
+
+        bool validateRequiredFeaturePolicy(const VulkanRequiredFeaturePolicy& policy)
+        {
+            if (policy.synchronization2.synchronization2 != VK_TRUE)
+            {
+                std::cerr << "Kera requires Vulkan 1.3 synchronization2 support." << std::endl;
+                return false;
+            }
+            if (policy.dynamicRendering.dynamicRendering != VK_TRUE)
+            {
+                std::cerr << "Kera requires Vulkan 1.3 dynamic rendering support." << std::endl;
+                return false;
+            }
+            if (policy.timelineSemaphore.timelineSemaphore != VK_TRUE)
+            {
+                std::cerr << "Kera requires Vulkan 1.3 timeline semaphore support." << std::endl;
+                return false;
+            }
+            return true;
+        }
+
     }  // anonymous namespace
 
     Device::Device()
@@ -106,43 +146,24 @@ namespace kera
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        VkPhysicalDeviceSynchronization2Features sync2Features{};
-        sync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
-        VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{};
-        dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
-        sync2Features.pNext = &dynamicRenderingFeatures;
-
-        VkPhysicalDeviceFeatures2 supportedFeatures{};
-        supportedFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        supportedFeatures.pNext = &sync2Features;
-        vkGetPhysicalDeviceFeatures2(vkPhysicalDevice, &supportedFeatures);
-        if (sync2Features.synchronization2 != VK_TRUE)
+        VulkanRequiredFeaturePolicy supportedFeaturePolicy{};
+        linkRequiredFeaturePolicy(supportedFeaturePolicy);
+        vkGetPhysicalDeviceFeatures2(vkPhysicalDevice, &supportedFeaturePolicy.features);
+        if (!validateRequiredFeaturePolicy(supportedFeaturePolicy))
         {
-            std::cerr << "Kera requires Vulkan 1.3 synchronization2 support." << std::endl;
-            return false;
-        }
-        if (dynamicRenderingFeatures.dynamicRendering != VK_TRUE)
-        {
-            std::cerr << "Kera requires Vulkan 1.3 dynamic rendering support." << std::endl;
             return false;
         }
 
-        VkPhysicalDeviceSynchronization2Features enabledSync2Features{};
-        enabledSync2Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
-        enabledSync2Features.synchronization2 = VK_TRUE;
-        VkPhysicalDeviceDynamicRenderingFeatures enabledDynamicRenderingFeatures{};
-        enabledDynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
-        enabledDynamicRenderingFeatures.dynamicRendering = VK_TRUE;
-        enabledSync2Features.pNext = &enabledDynamicRenderingFeatures;
-
-        VkPhysicalDeviceFeatures2 enabledFeatures{};
-        enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        enabledFeatures.features.samplerAnisotropy = VK_TRUE;
-        enabledFeatures.pNext = &enabledSync2Features;
+        VulkanRequiredFeaturePolicy enabledFeaturePolicy{};
+        linkRequiredFeaturePolicy(enabledFeaturePolicy);
+        enabledFeaturePolicy.features.features.samplerAnisotropy = VK_TRUE;
+        enabledFeaturePolicy.synchronization2.synchronization2 = VK_TRUE;
+        enabledFeaturePolicy.dynamicRendering.dynamicRendering = VK_TRUE;
+        enabledFeaturePolicy.timelineSemaphore.timelineSemaphore = VK_TRUE;
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.pNext = &enabledFeatures;
+        createInfo.pNext = &enabledFeaturePolicy.features;
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
         createInfo.pEnabledFeatures = nullptr;
