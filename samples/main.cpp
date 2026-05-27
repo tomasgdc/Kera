@@ -40,6 +40,25 @@ int main(int argc, char* argv[])
         {
             options.showStatsOverlay = false;
         }
+        else if (arg == "--damaged-helmet-debug-view")
+        {
+            if (index + 1 >= argc)
+            {
+                kera::Logger::getInstance().error("--damaged-helmet-debug-view requires a mode index");
+                return EXIT_FAILURE;
+            }
+            options.damagedHelmetDebugView = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
+        }
+        else if (arg == "--damaged-helmet-fixed-yaw-degrees")
+        {
+            if (index + 1 >= argc)
+            {
+                kera::Logger::getInstance().error("--damaged-helmet-fixed-yaw-degrees requires a degree value");
+                return EXIT_FAILURE;
+            }
+            options.damagedHelmetFixedYaw = true;
+            options.damagedHelmetYawRadians = std::strtof(argv[++index], nullptr) * 0.017453292519943295f;
+        }
         else if (arg == "--sample-index")
         {
             if (index + 1 >= argc)
@@ -53,6 +72,7 @@ int main(int argc, char* argv[])
         {
             std::cout << "Usage: kera_samples [--smoke-test] [--smoke-frames N] [--resize-smoke] "
                          "[--zero-resize-smoke] [--sample-index N] [--hide-stats-overlay] "
+                         "[--damaged-helmet-debug-view N] [--damaged-helmet-fixed-yaw-degrees N]\n";
             return EXIT_SUCCESS;
         }
         else

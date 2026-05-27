@@ -36,6 +36,21 @@ add_test(NAME kera_renderer_public_api_tests COMMAND kera_renderer_public_api_te
 set_tests_properties(kera_renderer_public_api_tests PROPERTIES
     LABELS "quick;renderer;api"
 )
+
+add_executable(kera_gltf_loader_tests
+    gltf_loader_tests.cpp
+)
+
+target_link_libraries(kera_gltf_loader_tests PRIVATE kera)
+target_compile_definitions(kera_gltf_loader_tests PRIVATE
+    KERA_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+add_test(NAME kera_gltf_loader_tests COMMAND kera_gltf_loader_tests)
+set_tests_properties(kera_gltf_loader_tests PROPERTIES
+    LABELS "quick;renderer;gltf;texture"
+)
+
 add_executable(kera_logger_tests
     logger_tests.cpp
 )

@@ -16,8 +16,8 @@ add_executable(kera_samples
     sample_utils.h
     basic_triangle_sample.cpp
     basic_triangle_sample.h
-    compute_sample.cpp
-    compute_sample.h
+    damaged_helmet_sample.cpp
+    damaged_helmet_sample.h
     instanced_triangle_sample.cpp
     instanced_triangle_sample.h
     instanced_triangle_many_lights_sample.cpp
@@ -167,34 +167,50 @@ if(BUILD_TESTING)
         LABELS vulkan validation render resize descriptor
         VALIDATION_LAYER
     )
-    set_tests_properties(kera_samples_depth_smoke PROPERTIES
-        LABELS "vulkan;validation;render;render_target;depth"
-        ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+
+    kera_add_sample_smoke(kera_samples_damaged_helmet_smoke
+        LABEL Kera_damaged_helmet_smoke
+        ARGS --smoke-test --smoke-frames 2 --sample-index 3 --hide-stats-overlay
+        LOG kera_damaged_helmet_smoke.log
+        LABELS vulkan validation render texture gltf descriptor
+        VALIDATION_LAYER
     )
 
-    add_test(NAME kera_samples_many_lights_resize_smoke
-        COMMAND ${CMAKE_COMMAND}
-            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
-            -D KERA_SAMPLE_LABEL=Kera_many_lights_resize_smoke
-            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;3;--resize-smoke;--sample-index;2"
-            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_many_lights_resize_smoke.log
-            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
-    )
-    set_tests_properties(kera_samples_many_lights_resize_smoke PROPERTIES
-        LABELS "vulkan;validation;render;resize;render_target;descriptor;depth"
-        ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+    kera_add_sample_smoke(kera_samples_damaged_helmet_zero_resize_smoke
+        LABEL Kera_damaged_helmet_zero_resize_smoke
+        ARGS --smoke-test --smoke-frames 3 --sample-index 3 --zero-resize-smoke --hide-stats-overlay
+        LOG kera_damaged_helmet_zero_resize_smoke.log
+        LABELS vulkan validation render resize texture gltf descriptor
+        VALIDATION_LAYER
     )
 
-    add_test(NAME kera_samples_instanced_resize_smoke
-        COMMAND ${CMAKE_COMMAND}
-            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
-            -D KERA_SAMPLE_LABEL=Kera_instanced_resize_smoke
-            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;3;--resize-smoke;--sample-index;1"
-            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_instanced_resize_smoke.log
-            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
+    kera_add_sample_smoke(kera_samples_damaged_helmet_visual_regression_smoke
+        LABEL Kera_damaged_helmet_visual_regression_smoke
+        ARGS --smoke-test --smoke-frames 40 --sample-index 3 --hide-stats-overlay
+        LOG kera_damaged_helmet_visual_regression_smoke.log
+        LABELS vulkan validation render texture gltf descriptor visual
+        SCREENSHOT_FRAMES 24
+        SCREENSHOT_DIR visual_regression/damaged_helmet
+        METRICS_ARGS --min-coverage 0.08 --max-coverage 0.45 --min-luma-range 0.45
     )
-    set_tests_properties(kera_samples_instanced_resize_smoke PROPERTIES
-        LABELS "vulkan;validation;render;resize;descriptor"
-        ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+
+    kera_add_sample_smoke(kera_samples_damaged_helmet_back_visual_smoke
+        LABEL Kera_damaged_helmet_back_visual_smoke
+        ARGS --smoke-test --smoke-frames 3 --sample-index 3 --hide-stats-overlay --damaged-helmet-fixed-yaw-degrees 0
+        LOG kera_damaged_helmet_back_visual_smoke.log
+        LABELS vulkan validation render texture gltf descriptor visual
+        SCREENSHOT_FRAMES 2
+        SCREENSHOT_DIR visual_regression/damaged_helmet_back
+        METRICS_ARGS --min-coverage 0.08 --max-coverage 0.45 --min-luma-range 0.35
+    )
+
+    kera_add_sample_smoke(kera_samples_damaged_helmet_gamma_audit_smoke
+        LABEL Kera_damaged_helmet_gamma_audit_smoke
+        ARGS --smoke-test --smoke-frames 40 --sample-index 3 --hide-stats-overlay --damaged-helmet-debug-view 10
+        LOG kera_damaged_helmet_gamma_audit_smoke.log
+        LABELS vulkan validation render texture gltf descriptor visual gamma
+        SCREENSHOT_FRAMES 24
+        SCREENSHOT_DIR visual_regression/damaged_helmet_gamma
+        METRICS_ARGS --min-coverage 0.08 --max-coverage 0.45 --min-luma-range 0.35
     )
 endif()

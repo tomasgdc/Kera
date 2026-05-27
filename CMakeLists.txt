@@ -201,6 +201,7 @@ set(KERA_RENDERER_SOURCES
     src/renderer/slang_compiler.cpp
     src/renderer/slang_reflection.cpp
     src/renderer/reflection_contracts.cpp
+    src/renderer/gltf_loader.cpp
     src/renderer/buffer.cpp
     src/renderer/image.cpp
 )
@@ -232,6 +233,7 @@ set(KERA_RENDERER_INTERNAL_HEADERS
     include/kera/renderer/slang_compiler.h
     include/kera/renderer/slang_reflection.h
     include/kera/renderer/reflection_contracts.h
+    include/kera/renderer/gltf_loader.h
     include/kera/renderer/result.h
     include/kera/renderer/buffer.h
     include/kera/renderer/image.h
@@ -298,6 +300,14 @@ target_include_directories(kera
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/json/include
+)
+
+target_compile_definitions(kera PRIVATE
+    TINYGLTF_NOEXCEPTION
+    JSON_NOEXCEPTION
 )
 
 # Link libraries

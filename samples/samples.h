@@ -22,6 +22,9 @@ namespace kera
         bool resizeSmoke = false;
         bool zeroResizeSmoke = false;
         bool showStatsOverlay = true;
+        uint32_t damagedHelmetDebugView = 0;
+        bool damagedHelmetFixedYaw = false;
+        float damagedHelmetYawRadians = 0.0f;
     };
 
     class SampleApplication

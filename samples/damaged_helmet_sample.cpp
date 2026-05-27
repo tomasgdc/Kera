@@ -1,0 +1,522 @@
+#include "damaged_helmet_sample.h"
+
+#include "kera/renderer/reflection_contracts.h"
+#include "kera/utilities/logger.h"
+#include "render_context.h"
+#include "sample_utils.h"
+
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <cstddef>
+#include <string>
+
+namespace kera
+{
+    namespace
+    {
+        struct HelmetUniforms
+        {
+            glm::mat4 model;
+            glm::mat4 view;
+            glm::mat4 projection;
+            glm::vec4 cameraPosition;
+            glm::vec4 lightDirectionAmbient;
+            glm::vec4 baseColorFactor;
+            glm::vec4 emissiveFactorNormalScale;
+            glm::vec4 metallicRoughnessOcclusion;
+            glm::vec4 alphaModeCutoffReflectionExposure;
+            glm::vec4 debugViewGamma;
+            glm::vec4 padding2;
+        };
+
+        namespace DamagedHelmetShader
+        {
+            constexpr const char* Path = "shaders/damaged_helmet.slang";
+            constexpr const char* MeshVertexEntryPoint = "helmetVertexMain";
+            constexpr const char* MeshFragmentEntryPoint = "helmetFragmentMain";
+            constexpr const char* FullscreenVertexEntryPoint = "fullscreenVertexMain";
+            constexpr const char* FullscreenFragmentEntryPoint = "fullscreenFragmentMain";
+            constexpr const char* MeshVertexBinding = "meshVertex";
+            constexpr const char* FullscreenVertexBinding = "fullscreenVertex";
+            constexpr const char* HelmetParams = "helmetParams";
+            constexpr const char* BaseColorTexture = "baseColorTexture";
+            constexpr const char* MetalRoughnessTexture = "metalRoughnessTexture";
+            constexpr const char* EmissiveTexture = "emissiveTexture";
+            constexpr const char* OcclusionTexture = "occlusionTexture";
+            constexpr const char* NormalTexture = "normalTexture";
+            constexpr const char* SceneTexture = "sceneTexture";
+            constexpr const char* MaterialSampler = "materialSampler";
+        }  // namespace DamagedHelmetShader
+
+        constexpr uint32_t kUniformRingSlots = 3;
+        constexpr uint32_t kMaxDamagedHelmetDebugView = 11;
+
+        float toShaderAlphaMode(GltfAlphaMode mode)
+        {
+            switch (mode)
+            {
+                case GltfAlphaMode::Mask:
+                    return 1.0f;
+                case GltfAlphaMode::Blend:
+                    return 2.0f;
+                case GltfAlphaMode::Opaque:
+                default:
+                    return 0.0f;
+            }
+        }
+    }  // namespace
+
+    DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer)
+        : Sample("DamagedHelmet Texture Loading"), m_renderer(renderer)
+    {
+    }
+
+    DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer, uint32_t debugView)
+        : Sample("DamagedHelmet Texture Loading"),
+          m_renderer(renderer),
+          m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
+    {
+    }
+
+    DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer, uint32_t debugView, bool fixedYaw, float yawRadians)
+        : Sample("DamagedHelmet Texture Loading"),
+          m_renderer(renderer),
+          m_initialYawRadians(fixedYaw ? yawRadians : 2.2f),
+          m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0),
+          m_fixedYaw(fixedYaw)
+    {
+    }
+
+    void DamagedHelmetSample::initialize()
+    {
+        Logger::getInstance().info("Initializing " + std::string(getName()));
+        m_initialized = false;
+
+        if (!createShaderPrograms())
+        {
+            Logger::getInstance().error("Failed to create DamagedHelmet shader programs.");
+            cleanup();
+            return;
+        }
+
+        if (!loadGltfModelResources())
+        {
+            Logger::getInstance().error("Failed to load DamagedHelmet glTF model resources.");
+            cleanup();
+            return;
+        }
+
+        if (!createFullscreenGeometry())
+        {
+            Logger::getInstance().error("Failed to create DamagedHelmet fullscreen geometry.");
+            cleanup();
+            return;
+        }
+
+        if (!recreateRenderResources(m_renderer.getDrawableExtent()))
+        {
+            Logger::getInstance().error("Failed to create DamagedHelmet render resources.");
+            cleanup();
+            return;
+        }
+
+        m_initialized = true;
+        Logger::getInstance().info("DamagedHelmet sample initialized successfully.");
+    }
+
+    bool DamagedHelmetSample::createShaderPrograms()
+    {
+        const std::string shaderPath = resolveShaderPath(DamagedHelmetShader::Path);
+        m_meshShaderProgram = m_renderer.createGraphicsShaderProgram({
+            .path = shaderPath,
+            .vertexEntryPoint = DamagedHelmetShader::MeshVertexEntryPoint,
+            .fragmentEntryPoint = DamagedHelmetShader::MeshFragmentEntryPoint,
+        });
+        if (!m_meshShaderProgram.isValid())
+        {
+            return false;
+        }
+
+        m_displayShaderProgram = m_renderer.createGraphicsShaderProgram({
+            .path = shaderPath,
+            .vertexEntryPoint = DamagedHelmetShader::FullscreenVertexEntryPoint,
+            .fragmentEntryPoint = DamagedHelmetShader::FullscreenFragmentEntryPoint,
+        });
+        return m_displayShaderProgram.isValid();
+    }
+
+    bool DamagedHelmetSample::loadGltfModelResources()
+    {
+        const std::string assetPath = resolveSampleAssetPath("assets/gltf/DamagedHelmet/DamagedHelmet.gltf");
+        RendererResult<GltfLoadedModel> result = loadGltfModel(m_renderer, {
+                                                                               .path = assetPath,
+                                                                               .debugName = "DamagedHelmet",
+                                                                           });
+        if (!result)
+        {
+            Logger::getInstance().error("DamagedHelmet glTF load failed: " + result.errorMessage());
+            return false;
+        }
+
+        m_model = std::move(result.value());
+        m_uniformBuffer = m_renderer.createUniformRingBuffer(sizeof(HelmetUniforms), kUniformRingSlots);
+        return m_uniformBuffer.isValid();
+    }
+
+    bool DamagedHelmetSample::createFullscreenGeometry()
+    {
+        const auto& vertices = fullscreenTriangleVertices();
+        const auto& indices = fullscreenTriangleIndices();
+        m_fullscreenIndexCount = static_cast<uint32_t>(indices.size());
+
+        m_fullscreenVertexBuffer = m_renderer.createBuffer({
+            .size = vertices.size() * sizeof(FullscreenTriangleVertex),
+            .usage = BufferUsageKind::Vertex,
+            .memoryAccess = MemoryAccess::CpuWrite,
+            .debugName = "DamagedHelmet Fullscreen Vertex Buffer",
+        });
+        m_fullscreenIndexBuffer = m_renderer.createBuffer({
+            .size = indices.size() * sizeof(uint16_t),
+            .usage = BufferUsageKind::Index,
+            .memoryAccess = MemoryAccess::CpuWrite,
+            .debugName = "DamagedHelmet Fullscreen Index Buffer",
+        });
+
+        return m_fullscreenVertexBuffer.isValid() && m_fullscreenIndexBuffer.isValid() &&
+               m_renderer.uploadBuffer(m_fullscreenVertexBuffer, vertices.data(),
+                                       vertices.size() * sizeof(FullscreenTriangleVertex)) &&
+               m_renderer.uploadBuffer(m_fullscreenIndexBuffer, indices.data(), indices.size() * sizeof(uint16_t));
+    }
+
+    bool DamagedHelmetSample::recreateRenderResources(Extent2D extent)
+    {
+        if (extent.width == 0 || extent.height == 0)
+        {
+            return false;
+        }
+
+        destroyRenderResources();
+        m_renderExtent = extent;
+
+        m_sceneTexture = m_renderer.createTexture({
+            .width = extent.width,
+            .height = extent.height,
+            .format = TextureFormat::RGBA8,
+            .renderTarget = true,
+            .sampled = true,
+            .debugName = "DamagedHelmet Scene Texture",
+        });
+        m_sceneDepthTexture = m_renderer.createTexture({
+            .width = extent.width,
+            .height = extent.height,
+            .format = TextureFormat::Depth32,
+            .renderTarget = true,
+            .sampled = false,
+            .depthStencil = true,
+            .debugName = "DamagedHelmet Depth Texture",
+        });
+        if (!m_sceneTexture.isValid() || !m_sceneDepthTexture.isValid())
+        {
+            return false;
+        }
+
+        m_sceneRenderTarget = m_renderer.createRenderTarget({
+            .colorTexture = m_sceneTexture,
+            .depthTexture = m_sceneDepthTexture,
+            .debugName = "DamagedHelmet Render Target",
+        });
+        return m_sceneRenderTarget.isValid() && createPipelinesAndDescriptors();
+    }
+
+    bool DamagedHelmetSample::createPipelinesAndDescriptors()
+    {
+        const PipelineReflectionContract meshContract =
+            PipelineReflectionBuilder{}
+                .debugName("DamagedHelmet Mesh Pipeline")
+                .vertexEntry(DamagedHelmetShader::MeshVertexEntryPoint)
+                .vertexBinding<GltfVertex>(DamagedHelmetShader::MeshVertexBinding, 0)
+                .semantic("POSITION", DamagedHelmetShader::MeshVertexBinding, 0, VertexFormat::Float3)
+                .semantic("NORMAL", DamagedHelmetShader::MeshVertexBinding,
+                          static_cast<uint32_t>(offsetof(GltfVertex, normal)), VertexFormat::Float3)
+                .semantic("TEXCOORD0", DamagedHelmetShader::MeshVertexBinding,
+                          static_cast<uint32_t>(offsetof(GltfVertex, uv)), VertexFormat::Float2)
+                .semantic("TANGENT", DamagedHelmetShader::MeshVertexBinding,
+                          static_cast<uint32_t>(offsetof(GltfVertex, tangent)), VertexFormat::Float4)
+                .uniform<HelmetUniforms>(DamagedHelmetShader::HelmetParams)
+                .sampledImage(DamagedHelmetShader::BaseColorTexture)
+                .sampledImage(DamagedHelmetShader::MetalRoughnessTexture)
+                .sampledImage(DamagedHelmetShader::EmissiveTexture)
+                .sampledImage(DamagedHelmetShader::OcclusionTexture)
+                .sampledImage(DamagedHelmetShader::NormalTexture)
+                .sampler(DamagedHelmetShader::MaterialSampler)
+                .build();
+
+        m_meshPipeline = m_renderer.createGraphicsPipeline({
+            .shaderProgram = m_meshShaderProgram,
+            .reflectionContract = meshContract,
+            .renderTarget = m_sceneRenderTarget,
+            .cullMode = m_model.materialFactors.doubleSided ? CullModeKind::None : CullModeKind::Back,
+            .frontFace = FrontFaceKind::Clockwise,
+            .blendMode = m_model.materialFactors.alphaMode == GltfAlphaMode::Blend ? BlendModeKind::Alpha
+                                                                                   : BlendModeKind::Opaque,
+            .depthTest = true,
+            .depthWrite = m_model.materialFactors.alphaMode != GltfAlphaMode::Blend,
+            .debugName = "DamagedHelmet Mesh Pipeline",
+        });
+        if (!m_meshPipeline.isValid())
+        {
+            return false;
+        }
+
+        m_meshDescriptorSets.clear();
+        m_meshDescriptorSets.reserve(kUniformRingSlots);
+        for (uint32_t index = 0; index < kUniformRingSlots; ++index)
+        {
+            DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_meshPipeline);
+            if (!descriptorSet.isValid())
+            {
+                return false;
+            }
+
+            const std::size_t uniformOffset = sizeof(HelmetUniforms) * index;
+            if (!m_renderer.updateDescriptors(descriptorSet)
+                     .uniform<HelmetUniforms>(DamagedHelmetShader::HelmetParams, m_uniformBuffer, uniformOffset)
+                     .sampledImage(DamagedHelmetShader::BaseColorTexture, m_model.materialTextures.baseColor)
+                     .sampledImage(DamagedHelmetShader::MetalRoughnessTexture,
+                                   m_model.materialTextures.metalRoughness)
+                     .sampledImage(DamagedHelmetShader::EmissiveTexture, m_model.materialTextures.emissive)
+                     .sampledImage(DamagedHelmetShader::OcclusionTexture, m_model.materialTextures.occlusion)
+                     .sampledImage(DamagedHelmetShader::NormalTexture, m_model.materialTextures.normal)
+                     .sampler(DamagedHelmetShader::MaterialSampler, m_model.materialSampler)
+                     .ok())
+            {
+                return false;
+            }
+            m_meshDescriptorSets.push_back(descriptorSet);
+        }
+
+        const PipelineReflectionContract displayContract =
+            PipelineReflectionBuilder{}
+                .debugName("DamagedHelmet Display Pipeline")
+                .vertexEntry(DamagedHelmetShader::FullscreenVertexEntryPoint)
+                .vertexBinding<FullscreenTriangleVertex>(DamagedHelmetShader::FullscreenVertexBinding, 0)
+                .semantic("POSITION", DamagedHelmetShader::FullscreenVertexBinding, 0, VertexFormat::Float2)
+                .semantic("TEXCOORD0", DamagedHelmetShader::FullscreenVertexBinding,
+                          static_cast<uint32_t>(offsetof(FullscreenTriangleVertex, uv)), VertexFormat::Float2)
+                .sampledImage(DamagedHelmetShader::SceneTexture)
+                .sampler(DamagedHelmetShader::MaterialSampler)
+                .build();
+
+        m_displayPipeline = m_renderer.createGraphicsPipeline({
+            .shaderProgram = m_displayShaderProgram,
+            .reflectionContract = displayContract,
+            .cullMode = CullModeKind::None,
+            .debugName = "DamagedHelmet Display Pipeline",
+        });
+        if (!m_displayPipeline.isValid())
+        {
+            return false;
+        }
+
+        m_displayDescriptorSet = m_renderer.createDescriptorSet(m_displayPipeline);
+        return m_displayDescriptorSet.isValid() &&
+               m_renderer.updateDescriptors(m_displayDescriptorSet)
+                   .sampledImage(DamagedHelmetShader::SceneTexture, m_sceneTexture)
+                   .sampler(DamagedHelmetShader::MaterialSampler, m_model.materialSampler)
+                   .ok();
+    }
+
+    void DamagedHelmetSample::update(float deltaTime)
+    {
+        if (m_initialized)
+        {
+            m_elapsedTime += deltaTime;
+        }
+    }
+
+    void DamagedHelmetSample::resize(Extent2D extent)
+    {
+        if (extent == m_renderExtent || extent.width == 0 || extent.height == 0)
+        {
+            return;
+        }
+
+        if (!recreateRenderResources(extent))
+        {
+            Logger::getInstance().error("Failed to resize DamagedHelmet render resources.");
+            m_initialized = false;
+        }
+    }
+
+    void DamagedHelmetSample::render(RenderContext& context)
+    {
+        if (!m_initialized)
+        {
+            return;
+        }
+        if (!m_meshPipeline.isValid() || !m_displayPipeline.isValid() || !m_sceneRenderTarget.isValid() ||
+            m_meshDescriptorSets.empty() || !m_displayDescriptorSet.isValid())
+        {
+            Logger::getInstance().warning("Render called before DamagedHelmet resources were initialized.");
+            return;
+        }
+
+        context.renderToTexture(m_sceneRenderTarget, getClearColor(),
+                                [this](FrameHandle frame)
+                                {
+                                    HelmetUniforms uniforms{};
+                                    const float aspect =
+                                        m_renderExtent.height == 0
+                                            ? 16.0f / 9.0f
+                                            : static_cast<float>(m_renderExtent.width) /
+                                                  static_cast<float>(m_renderExtent.height);
+                                    const glm::vec3 cameraPosition(0.36f, 0.08f, -3.0f);
+                                    const float yawRadians =
+                                        m_fixedYaw ? m_initialYawRadians : m_initialYawRadians + m_elapsedTime * 0.25f;
+                                    uniforms.model =
+                                        glm::rotate(glm::mat4(1.0f), yawRadians, glm::vec3(0.0f, 1.0f, 0.0f)) *
+                                        m_model.transform;
+                                    uniforms.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, -0.05f, 0.0f),
+                                                                glm::vec3(0.0f, 1.0f, 0.0f));
+                                    uniforms.projection =
+                                        glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
+                                    uniforms.cameraPosition = glm::vec4(cameraPosition, 1.0f);
+                                    uniforms.lightDirectionAmbient =
+                                        glm::vec4(glm::normalize(glm::vec3(-0.42f, -0.72f, -0.48f)), 0.08f);
+                                    uniforms.baseColorFactor = m_model.materialFactors.baseColor;
+                                    uniforms.emissiveFactorNormalScale =
+                                        glm::vec4(m_model.materialFactors.emissive,
+                                                  m_model.materialFactors.normalScale);
+                                    uniforms.metallicRoughnessOcclusion =
+                                        glm::vec4(m_model.materialFactors.metallic,
+                                                  m_model.materialFactors.roughness,
+                                                  m_model.materialFactors.occlusionStrength, 0.0f);
+                                    uniforms.alphaModeCutoffReflectionExposure =
+                                        glm::vec4(toShaderAlphaMode(m_model.materialFactors.alphaMode),
+                                                  m_model.materialFactors.alphaCutoff, 1.22f, 0.86f);
+                                    uniforms.debugViewGamma =
+                                        glm::vec4(static_cast<float>(m_debugView), 2.2f, 1.0f / 2.2f, 0.0f);
+                                    uniforms.padding2 =
+                                        glm::vec4(m_model.materialFactors.doubleSided ? 1.0f : 0.0f, 0.0f, 0.0f,
+                                                  0.0f);
+
+                                    if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms,
+                                                                            sizeof(uniforms)))
+                                    {
+                                        Logger::getInstance().error("Failed to upload DamagedHelmet uniforms.");
+                                        return;
+                                    }
+
+                                    const std::size_t uniformOffset =
+                                        m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
+                                    const std::size_t descriptorIndex =
+                                        (uniformOffset / sizeof(HelmetUniforms)) % m_meshDescriptorSets.size();
+
+                                    m_renderer.bindPipeline(frame, m_meshPipeline);
+                                    m_renderer.bindVertexBuffer(frame, 0, m_model.vertexBuffer);
+                                    m_renderer.bindIndexBuffer(frame, m_model.indexBuffer, m_model.indexFormat);
+                                    m_renderer.bindDescriptorSet(frame, m_meshPipeline,
+                                                                 m_meshDescriptorSets[descriptorIndex]);
+                                    m_renderer.drawIndexed(frame, m_model.indexCount);
+                                });
+
+        context.renderToBackbuffer(getClearColor(),
+                                   [this](FrameHandle frame)
+                                   {
+                                       m_renderer.bindPipeline(frame, m_displayPipeline);
+                                       m_renderer.bindVertexBuffer(frame, 0, m_fullscreenVertexBuffer);
+                                       m_renderer.bindIndexBuffer(frame, m_fullscreenIndexBuffer, IndexFormat::UInt16);
+                                       m_renderer.bindDescriptorSet(frame, m_displayPipeline, m_displayDescriptorSet);
+                                       m_renderer.drawIndexed(frame, m_fullscreenIndexCount);
+                                   });
+    }
+
+    ClearColorValue DamagedHelmetSample::getClearColor() const
+    {
+        return {0.9f, 0.9f, 0.88f, 1.0f};
+    }
+
+    void DamagedHelmetSample::destroyRenderResources()
+    {
+        if (m_displayDescriptorSet.isValid())
+        {
+            m_renderer.destroyDescriptorSet(m_displayDescriptorSet);
+            m_displayDescriptorSet = {};
+        }
+        for (DescriptorSetHandle descriptorSet : m_meshDescriptorSets)
+        {
+            if (descriptorSet.isValid())
+            {
+                m_renderer.destroyDescriptorSet(descriptorSet);
+            }
+        }
+        m_meshDescriptorSets.clear();
+
+        if (m_displayPipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_displayPipeline);
+            m_displayPipeline = {};
+        }
+        if (m_meshPipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_meshPipeline);
+            m_meshPipeline = {};
+        }
+        if (m_sceneRenderTarget.isValid())
+        {
+            m_renderer.destroyRenderTarget(m_sceneRenderTarget);
+            m_sceneRenderTarget = {};
+        }
+        if (m_sceneDepthTexture.isValid())
+        {
+            m_renderer.destroyTexture(m_sceneDepthTexture);
+            m_sceneDepthTexture = {};
+        }
+        if (m_sceneTexture.isValid())
+        {
+            m_renderer.destroyTexture(m_sceneTexture);
+            m_sceneTexture = {};
+        }
+    }
+
+    void DamagedHelmetSample::destroyLoadedResources()
+    {
+        if (m_uniformBuffer.isValid())
+        {
+            m_renderer.destroyBuffer(m_uniformBuffer);
+            m_uniformBuffer = {};
+        }
+        if (m_fullscreenIndexBuffer.isValid())
+        {
+            m_renderer.destroyBuffer(m_fullscreenIndexBuffer);
+            m_fullscreenIndexBuffer = {};
+        }
+        if (m_fullscreenVertexBuffer.isValid())
+        {
+            m_renderer.destroyBuffer(m_fullscreenVertexBuffer);
+            m_fullscreenVertexBuffer = {};
+        }
+        destroyGltfModel(m_renderer, m_model);
+    }
+
+    void DamagedHelmetSample::cleanup()
+    {
+        Logger::getInstance().info("Cleaning up " + std::string(getName()));
+        m_initialized = false;
+
+        destroyRenderResources();
+        destroyLoadedResources();
+
+        if (m_displayShaderProgram.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_displayShaderProgram);
+            m_displayShaderProgram = {};
+        }
+        if (m_meshShaderProgram.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_meshShaderProgram);
+            m_meshShaderProgram = {};
+        }
+    }
+
+}  // namespace kera
