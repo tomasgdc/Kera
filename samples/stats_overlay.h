@@ -14,6 +14,10 @@ namespace kera
         {
             m_visible = !m_visible;
         }
+        void setVisible(bool visible)
+        {
+            m_visible = visible;
+        }
         bool isVisible() const
         {
             return m_visible;

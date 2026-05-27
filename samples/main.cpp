@@ -32,6 +32,14 @@ int main(int argc, char* argv[])
         {
             options.resizeSmoke = true;
         }
+        else if (arg == "--zero-resize-smoke")
+        {
+            options.zeroResizeSmoke = true;
+        }
+        else if (arg == "--hide-stats-overlay")
+        {
+            options.showStatsOverlay = false;
+        }
         else if (arg == "--sample-index")
         {
             if (index + 1 >= argc)
@@ -44,7 +52,7 @@ int main(int argc, char* argv[])
         else if (arg == "--help")
         {
             std::cout << "Usage: kera_samples [--smoke-test] [--smoke-frames N] [--resize-smoke] "
-                         "[--sample-index N]\n";
+                         "[--zero-resize-smoke] [--sample-index N] [--hide-stats-overlay] "
             return EXIT_SUCCESS;
         }
         else

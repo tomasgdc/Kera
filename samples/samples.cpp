@@ -18,6 +18,10 @@ namespace kera
 
     namespace
     {
+        constexpr int kInitialWindowWidth = 1280;
+        constexpr int kInitialWindowHeight = 720;
+        constexpr Extent2D kResizeSmokeExtent{800, 600};
+        constexpr Extent2D kZeroResizeSmokeExtent{0, 0};
 
         void cleanupActiveSample(std::vector<std::unique_ptr<Sample>>& samples, int& activeSampleIndex)
         {
@@ -83,12 +87,13 @@ namespace kera
         Logger::getInstance().info("Initializing renderer");
 
         m_window = std::make_unique<Window>();
-        if (!m_window->initialize("Kera Triangle Sample", 1280, 720))
+        if (!m_window->initialize("Kera Samples", kInitialWindowWidth, kInitialWindowHeight))
         {
             Logger::getInstance().error("Failed to create window");
             return false;
         }
-        Logger::getInstance().info("Window created successfully (1280x720)");
+        Logger::getInstance().info("Window created successfully (" + std::to_string(kInitialWindowWidth) + "x" +
+                                   std::to_string(kInitialWindowHeight) + ")");
 
         m_renderer = CreateRenderer(GraphicsBackend::Vulkan, *m_window);
         if (!m_renderer)
@@ -186,6 +191,10 @@ namespace kera
             Logger::getInstance().error("Failed to initialize renderer");
             return;
         }
+        if (m_statsOverlay)
+        {
+            m_statsOverlay->setVisible(options.showStatsOverlay);
+        }
 
         addSample(std::make_unique<BasicTriangleSample>(*m_renderer));
         addSample(std::make_unique<InstancedTriangleSample>(*m_renderer));
@@ -238,6 +247,7 @@ namespace kera
         auto previousFrameTime = std::chrono::steady_clock::now();
         uint32_t renderedFrames = 0;
         bool resizeSmokeTriggered = false;
+        bool zeroResizeSmokeTriggered = false;
         while (!m_window->shouldClose())
         {
             const auto currentFrameTime = std::chrono::steady_clock::now();
@@ -252,18 +262,32 @@ namespace kera
             {
                 break;
             }
+            if (m_window->getWidth() <= 0 || m_window->getHeight() <= 0)
+            {
+                continue;
+            }
 
             if (options.resizeSmoke && !resizeSmokeTriggered && renderedFrames > 0)
             {
-                const Extent2D smokeExtent{800, 600};
                 Logger::getInstance().info("Running resize smoke step at 800x600.");
-                if (!m_renderer->resize(smokeExtent))
+                if (!m_renderer->resize(kResizeSmokeExtent))
                 {
                     Logger::getInstance().error("Resize smoke step failed.");
                     break;
                 }
-                m_samples[m_activeSampleIndex]->resize(smokeExtent);
+                m_samples[m_activeSampleIndex]->resize(kResizeSmokeExtent);
                 resizeSmokeTriggered = true;
+            }
+            if (options.zeroResizeSmoke && !zeroResizeSmokeTriggered && renderedFrames > 0)
+            {
+                Logger::getInstance().info("Running zero-size resize smoke step.");
+                if (!m_renderer->resize(kZeroResizeSmokeExtent))
+                {
+                    Logger::getInstance().error("Zero-size resize smoke step failed.");
+                    break;
+                }
+                m_samples[m_activeSampleIndex]->resize(kZeroResizeSmokeExtent);
+                zeroResizeSmokeTriggered = true;
             }
 
             if (m_window->wasResized())

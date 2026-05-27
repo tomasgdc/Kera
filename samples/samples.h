@@ -20,6 +20,8 @@ namespace kera
         uint32_t maxFrames = 0;
         uint32_t initialSampleIndex = 0;
         bool resizeSmoke = false;
+        bool zeroResizeSmoke = false;
+        bool showStatsOverlay = true;
     };
 
     class SampleApplication

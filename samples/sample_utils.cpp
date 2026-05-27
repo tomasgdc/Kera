@@ -6,35 +6,62 @@
 
 namespace kera
 {
+    namespace
+    {
+        bool isRegularFile(const std::filesystem::path& path)
+        {
+            return std::filesystem::exists(path) && std::filesystem::is_regular_file(path);
+        }
+
+        std::string resolveSampleFilePath(const std::string& path)
+        {
+            if (FileUtils::fileExists(path))
+            {
+                return path;
+            }
+
+            const std::filesystem::path cwd = std::filesystem::current_path();
+            const std::array<std::filesystem::path, 3> candidates = {
+                cwd / path,
+                cwd.parent_path() / path,
+                cwd / "samples" / path,
+            };
+            for (const std::filesystem::path& candidate : candidates)
+            {
+                if (isRegularFile(candidate))
+                {
+                    return candidate.string();
+                }
+            }
+
+            return path;
+        }
+    }  // namespace
 
     std::string resolveShaderPath(const std::string& shaderPath)
     {
-        // Prefer the path exactly as provided.
-        if (FileUtils::fileExists(shaderPath))
-        {
-            return shaderPath;
-        }
+        return resolveSampleFilePath(shaderPath);
+    }
 
-        // Then try locations used by source-tree and build-tree launches.
-        const std::filesystem::path cwdPath = std::filesystem::current_path() / shaderPath;
-        if (std::filesystem::exists(cwdPath) && std::filesystem::is_regular_file(cwdPath))
-        {
-            return cwdPath.string();
-        }
+    std::string resolveSampleAssetPath(const std::string& assetPath)
+    {
+        return resolveSampleFilePath(assetPath);
+    }
 
-        const std::filesystem::path parentPath = std::filesystem::current_path().parent_path() / shaderPath;
-        if (std::filesystem::exists(parentPath) && std::filesystem::is_regular_file(parentPath))
-        {
-            return parentPath.string();
-        }
+    const std::array<FullscreenTriangleVertex, 3>& fullscreenTriangleVertices()
+    {
+        static const std::array<FullscreenTriangleVertex, 3> vertices = {
+            FullscreenTriangleVertex{{-1.0f, -1.0f}, {0.0f, 1.0f}},
+            FullscreenTriangleVertex{{3.0f, -1.0f}, {2.0f, 1.0f}},
+            FullscreenTriangleVertex{{-1.0f, 3.0f}, {0.0f, -1.0f}},
+        };
+        return vertices;
+    }
 
-        const std::filesystem::path buildPath = std::filesystem::current_path() / "samples" / shaderPath;
-        if (std::filesystem::exists(buildPath) && std::filesystem::is_regular_file(buildPath))
-        {
-            return buildPath.string();
-        }
-
-        return shaderPath;
+    const std::array<uint16_t, 3>& fullscreenTriangleIndices()
+    {
+        static constexpr std::array<uint16_t, 3> indices = {0, 1, 2};
+        return indices;
     }
 
 }  // namespace kera

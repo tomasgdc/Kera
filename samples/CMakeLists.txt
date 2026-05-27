@@ -27,6 +27,12 @@ add_executable(kera_samples
 target_link_libraries(kera_samples PRIVATE kera)
 kera_configure_no_exceptions(kera_samples)
 
+add_executable(kera_ppm_metrics
+    ppm_metrics.cpp
+)
+target_link_libraries(kera_ppm_metrics PRIVATE kera)
+kera_configure_no_exceptions(kera_ppm_metrics)
+
 if(WIN32)
     if(KERA_BUILD_SHARED OR KERA_SLANG_TARGET)
         add_custom_command(TARGET kera_samples POST_BUILD
@@ -68,52 +74,98 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
     )
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    add_custom_command(TARGET kera_samples POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "${CMAKE_BINARY_DIR}/samples/assets"
+    )
+endif()
+
 if(BUILD_TESTING)
-    add_test(NAME kera_samples_validation_smoke
-        COMMAND ${CMAKE_COMMAND}
-            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
-            -D KERA_SAMPLE_LABEL=Kera_validation_sample_smoke
-            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;1"
-            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_validation_smoke.log
-            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
-    )
-    set_tests_properties(kera_samples_validation_smoke PROPERTIES
-        LABELS "vulkan;validation;render"
-        ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+    function(kera_add_sample_smoke test_name)
+        set(options VALIDATION_LAYER)
+        set(one_value_args LABEL LOG SCREENSHOT_FRAMES SCREENSHOT_DIR)
+        set(multi_value_args ARGS LABELS METRICS_ARGS)
+        cmake_parse_arguments(SMOKE "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+
+        list(JOIN SMOKE_ARGS "\\;" sample_args)
+        list(JOIN SMOKE_METRICS_ARGS "\\;" sample_metrics_args)
+        set(sample_smoke_args
+            "-DKERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>"
+            "-DKERA_SAMPLE_LABEL=${SMOKE_LABEL}"
+            "-DKERA_SAMPLE_ARGS=${sample_args}"
+            "-DKERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/${SMOKE_LOG}"
+        )
+        if(SMOKE_SCREENSHOT_FRAMES)
+            list(APPEND sample_smoke_args "-DKERA_SAMPLE_SCREENSHOT_FRAMES=${SMOKE_SCREENSHOT_FRAMES}")
+        endif()
+        if(SMOKE_SCREENSHOT_DIR)
+            list(APPEND sample_smoke_args
+                "-DKERA_SAMPLE_SCREENSHOT_DIR=$<TARGET_FILE_DIR:kera_samples>/${SMOKE_SCREENSHOT_DIR}"
+                "-DKERA_SAMPLE_SCREENSHOT_METRICS_EXE=$<TARGET_FILE:kera_ppm_metrics>"
+                "-DKERA_SAMPLE_SCREENSHOT_METRICS_ARGS=${sample_metrics_args}"
+            )
+        endif()
+
+        add_test(NAME ${test_name}
+            COMMAND ${CMAKE_COMMAND}
+                ${sample_smoke_args}
+                -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
+        )
+        set_tests_properties(${test_name} PROPERTIES LABELS "${SMOKE_LABELS}")
+        if(SMOKE_VALIDATION_LAYER)
+            set_tests_properties(${test_name} PROPERTIES
+                ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+            )
+        endif()
+    endfunction()
+
+    kera_add_sample_smoke(kera_samples_validation_smoke
+        LABEL Kera_validation_sample_smoke
+        ARGS --smoke-test --smoke-frames 1
+        LOG kera_validation_smoke.log
+        LABELS vulkan validation render
+        VALIDATION_LAYER
     )
 
-    add_test(NAME kera_samples_resize_smoke
-        COMMAND ${CMAKE_COMMAND}
-            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
-            -D KERA_SAMPLE_LABEL=Kera_resize_sample_smoke
-            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;2;--resize-smoke"
-            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_resize_smoke.log
-            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
-    )
-    set_tests_properties(kera_samples_resize_smoke PROPERTIES
-        LABELS "vulkan;render;resize"
+    kera_add_sample_smoke(kera_samples_resize_smoke
+        LABEL Kera_resize_sample_smoke
+        ARGS --smoke-test --smoke-frames 2 --resize-smoke
+        LOG kera_resize_smoke.log
+        LABELS vulkan render resize
     )
 
-    add_test(NAME kera_samples_many_lights_smoke
-        COMMAND ${CMAKE_COMMAND}
-            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
-            -D KERA_SAMPLE_LABEL=Kera_many_lights_sample_smoke
-            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;2;--sample-index;2"
-            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_many_lights_smoke.log
-            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
-    )
-    set_tests_properties(kera_samples_many_lights_smoke PROPERTIES
-        LABELS "vulkan;validation;render;descriptor;render_target"
-        ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+    kera_add_sample_smoke(kera_samples_many_lights_smoke
+        LABEL Kera_many_lights_sample_smoke
+        ARGS --smoke-test --smoke-frames 2 --sample-index 2
+        LOG kera_many_lights_smoke.log
+        LABELS vulkan validation render descriptor render_target
+        VALIDATION_LAYER
     )
 
-    add_test(NAME kera_samples_depth_smoke
-        COMMAND ${CMAKE_COMMAND}
-            -D KERA_SAMPLE_EXE=$<TARGET_FILE:kera_samples>
-            -D KERA_SAMPLE_LABEL=Kera_depth_sample_smoke
-            "-D KERA_SAMPLE_ARGS=--smoke-test;--smoke-frames;2;--sample-index;2"
-            -D KERA_SAMPLE_LOG=$<TARGET_FILE_DIR:kera_samples>/kera_depth_smoke.log
-            -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
+    kera_add_sample_smoke(kera_samples_depth_smoke
+        LABEL Kera_depth_sample_smoke
+        ARGS --smoke-test --smoke-frames 2 --sample-index 2
+        LOG kera_depth_smoke.log
+        LABELS vulkan validation render render_target depth
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_many_lights_resize_smoke
+        LABEL Kera_many_lights_resize_smoke
+        ARGS --smoke-test --smoke-frames 3 --resize-smoke --sample-index 2
+        LOG kera_many_lights_resize_smoke.log
+        LABELS vulkan validation render resize render_target descriptor depth
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_instanced_resize_smoke
+        LABEL Kera_instanced_resize_smoke
+        ARGS --smoke-test --smoke-frames 3 --resize-smoke --sample-index 1
+        LOG kera_instanced_resize_smoke.log
+        LABELS vulkan validation render resize descriptor
+        VALIDATION_LAYER
     )
     set_tests_properties(kera_samples_depth_smoke PROPERTIES
         LABELS "vulkan;validation;render;render_target;depth"
