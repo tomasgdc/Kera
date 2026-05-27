@@ -5,6 +5,7 @@
 #include "kera/renderer/pipeline.h"
 #include "kera/renderer/resource_registry.h"
 #include "kera/renderer/shader.h"
+#include "kera/renderer/slang_reflection.h"
 
 #include <vulkan/vulkan.h>
 
@@ -33,6 +34,7 @@ namespace kera
     struct VulkanShaderProgramResource
     {
         std::vector<Shader> m_shaders;
+        SlangReflectionMetadata m_reflection;
     };
 
     struct VulkanBufferResource
@@ -188,6 +190,7 @@ namespace kera
     {
         Pipeline m_pipeline;
         GraphicsPipelineDesc m_desc;
+        PipelineReflectionContract m_reflectionContract;
         ShaderProgramHandle m_program;
     };
 
@@ -298,6 +301,14 @@ namespace kera
         bool destroyShaderModule(ShaderModuleHandle module) override;
 
         ShaderProgramHandle createShaderProgram(const ShaderProgramDesc& desc) override;
+        ShaderProgramHandle createGraphicsShaderProgram(const GraphicsShaderProgramDesc& desc) override;
+        const SlangReflectionMetadata* getShaderProgramReflection(ShaderProgramHandle program) const override;
+        std::vector<SlangReflectionEntryPoint> getShaderProgramEntryPoints(
+            ShaderProgramHandle program) const override;
+        std::vector<SlangReflectionBinding> getShaderProgramDescriptorBindings(
+            ShaderProgramHandle program) const override;
+        std::vector<SlangReflectionInput> getShaderProgramVertexInputs(
+            ShaderProgramHandle program, const std::string& entryPoint) const override;
         bool destroyShaderProgram(ShaderProgramHandle program) override;
 
         BufferHandle createBuffer(const BufferDesc& desc) override;
@@ -320,12 +331,26 @@ namespace kera
 
         GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                       ShaderProgramHandle program) override;
+        GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineCreateDesc& desc) override;
+        std::vector<DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
+            GraphicsPipelineHandle pipeline) const override;
+        VertexLayoutDesc getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipeline) const override;
+        PipelineReflectionContract getGraphicsPipelineReflectionContract(GraphicsPipelineHandle pipeline) const override;
         bool destroyGraphicsPipeline(GraphicsPipelineHandle pipeline) override;
+        DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline) override;
         DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline, uint32_t set) override;
         bool updateDescriptorSet(DescriptorSetHandle set, uint32_t binding, BufferHandle buffer, std::size_t offset = 0,
                                  std::size_t range = 0) override;
         bool updateDescriptorSet(DescriptorSetHandle set, uint32_t binding, TextureHandle texture) override;
         bool updateDescriptorSet(DescriptorSetHandle set, uint32_t binding, SamplerHandle sampler) override;
+        bool updateDescriptorSet(DescriptorSetHandle set, const std::string& name, BufferHandle buffer,
+                                 std::size_t offset = 0, std::size_t range = 0) override;
+        bool updateDescriptorSet(DescriptorSetHandle set, const std::string& name, TextureHandle texture) override;
+        bool updateDescriptorSet(DescriptorSetHandle set, const std::string& name, SamplerHandle sampler) override;
+        bool validateDescriptorSet(DescriptorSetHandle set) const override;
+        bool validateGraphicsPipelineDescriptorSets(GraphicsPipelineHandle pipeline) const override;
+        RendererValidationReport validateDescriptorSetDetailed(DescriptorSetHandle set) const override;
+        RendererValidationReport validateGraphicsPipelineDescriptorSetsDetailed(
         bool destroyDescriptorSet(DescriptorSetHandle set) override;
 
         FrameHandle beginFrame() override;
@@ -336,6 +361,8 @@ namespace kera
         void bindVertexBuffer(FrameHandle frame, uint32_t slot, BufferHandle buffer, std::size_t offset = 0) override;
         void bindIndexBuffer(FrameHandle frame, BufferHandle buffer, IndexFormat format,
                              std::size_t offset = 0) override;
+        void bindDescriptorSet(FrameHandle frame, GraphicsPipelineHandle pipeline,
+                               DescriptorSetHandle descriptorSet) override;
         void bindDescriptorSet(FrameHandle frame, GraphicsPipelineHandle pipeline, uint32_t set,
                                DescriptorSetHandle descriptorSet) override;
         void drawIndexed(FrameHandle frame, uint32_t indexCount, uint32_t instanceCount = 1) override;
@@ -379,6 +406,7 @@ namespace kera
                                                                   uint32_t set) const;
         bool validateDescriptorBinding(const VulkanDescriptorSetResource& descriptorSet, uint32_t binding,
                                        DescriptorType type) const;
+        RendererValidationReport validateDescriptorSetResource(const VulkanDescriptorSetResource& descriptorSet) const;
         bool resolvePipelineRenderingFormats(RenderTargetHandle renderTarget, VkFormat& colorFormat,
                                              VkFormat& depthFormat) const;
         void transitionSwapchainImageLayout(VkCommandBuffer commandBuffer, uint32_t imageIndex,

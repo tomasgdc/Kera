@@ -1,16 +1,21 @@
 #include "kera/renderer/backend/vulkan/vulkan_renderer.h"
 
 #include "kera/core/window.h"
+#include "kera/renderer/backend/vulkan/layout_utils.h"
 #include "kera/renderer/command_buffer.h"
 #include "kera/renderer/descriptor_contracts.h"
 #include "kera/renderer/device.h"
 #include "kera/renderer/instance.h"
 #include "kera/renderer/physical_device.h"
+#include "kera/renderer/reflection_contracts.h"
+#include "kera/renderer/slang_compiler.h"
 #include "kera/renderer/surface.h"
 #include "kera/renderer/swapchain.h"
 #include "kera/utilities/logger.h"
 
+#include <algorithm>
 #include <array>
+#include <limits>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -294,7 +299,138 @@ namespace kera
             };
         }
 
-        bool initializeVulkanShaderFromDesc(const Device& device, const ShaderModuleDesc& desc, Shader& shader)
+        bool descriptorTypeFromReflectionKind(SlangReflectionBindingKind kind, DescriptorType& outType)
+        {
+            switch (kind)
+            {
+                case SlangReflectionBindingKind::ParameterBlock:
+                case SlangReflectionBindingKind::ConstantBuffer:
+                    outType = DescriptorType::UniformBuffer;
+                    return true;
+                case SlangReflectionBindingKind::Resource:
+                    outType = DescriptorType::SampledImage;
+                    return true;
+                case SlangReflectionBindingKind::SamplerState:
+                    outType = DescriptorType::Sampler;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        bool appendReflectedDescriptorBinding(DescriptorSetLayoutDesc& layout, const SlangReflectionBinding& binding)
+        {
+            DescriptorType descriptorType = DescriptorType::UniformBuffer;
+            if (!descriptorTypeFromReflectionKind(binding.kind, descriptorType))
+            {
+                Logger::getInstance().error("Shader reflection descriptor binding '" + binding.name +
+                                            "' has an unsupported descriptor kind.");
+                return false;
+            }
+
+            const auto duplicate =
+                std::find_if(layout.bindings.begin(), layout.bindings.end(),
+                             [&binding](const DescriptorBindingDesc& existing)
+                             { return existing.binding == binding.binding; });
+            if (duplicate != layout.bindings.end())
+            {
+                Logger::getInstance().error("Shader reflection descriptor binding '" + binding.name +
+                                            "' duplicates an existing descriptor binding.");
+                return false;
+            }
+
+            layout.bindings.push_back({
+                .name = binding.name,
+                .binding = binding.binding,
+                .type = descriptorType,
+                .stage = ShaderStage::AllGraphics,
+                .count = binding.count,
+            });
+            return true;
+        }
+
+        bool deriveDescriptorSetLayoutsFromReflection(const SlangReflectionMetadata& reflection,
+                                                      std::vector<DescriptorSetLayoutDesc>& outLayouts)
+        {
+            outLayouts.clear();
+            uint32_t maxSet = 0;
+            bool hasBindings = false;
+            for (const SlangReflectionBinding& binding : reflection.bindings)
+            {
+                DescriptorType ignoredType = DescriptorType::UniformBuffer;
+                if (descriptorTypeFromReflectionKind(binding.kind, ignoredType))
+                {
+                    maxSet = std::max(maxSet, binding.space);
+                    hasBindings = true;
+                }
+            }
+
+            if (!hasBindings)
+            {
+                return true;
+            }
+
+            outLayouts.reserve(maxSet + 1);
+            for (uint32_t set = 0; set <= maxSet; ++set)
+            {
+                outLayouts.push_back({.set = set});
+            }
+
+            for (const SlangReflectionBinding& binding : reflection.bindings)
+            {
+                DescriptorType ignoredType = DescriptorType::UniformBuffer;
+                if (!descriptorTypeFromReflectionKind(binding.kind, ignoredType))
+                {
+                    continue;
+                }
+
+                if (!appendReflectedDescriptorBinding(outLayouts[binding.space], binding))
+                {
+                    return false;
+                }
+            }
+
+            for (DescriptorSetLayoutDesc& layout : outLayouts)
+            {
+                std::sort(layout.bindings.begin(), layout.bindings.end(),
+                          [](const DescriptorBindingDesc& lhs, const DescriptorBindingDesc& rhs)
+                          { return lhs.binding < rhs.binding; });
+            }
+            return true;
+        }
+
+        void mergeSlangReflection(SlangReflectionMetadata& destination, const SlangReflectionMetadata& source)
+        {
+            for (const SlangReflectionBinding& binding : source.bindings)
+            {
+                const auto duplicate = std::find_if(destination.bindings.begin(), destination.bindings.end(),
+                                                    [&binding](const SlangReflectionBinding& existing)
+                                                    {
+                                                        return existing.name == binding.name &&
+                                                               existing.binding == binding.binding &&
+                                                               existing.space == binding.space;
+                                                    });
+                if (duplicate == destination.bindings.end())
+                {
+                    destination.bindings.push_back(binding);
+                }
+            }
+
+            for (const SlangReflectionEntryPoint& entryPoint : source.entryPoints)
+            {
+                const auto duplicate =
+                    std::find_if(destination.entryPoints.begin(), destination.entryPoints.end(),
+                                 [&entryPoint](const SlangReflectionEntryPoint& existing)
+                                 { return existing.name == entryPoint.name && existing.stage == entryPoint.stage; });
+                if (duplicate == destination.entryPoints.end())
+                {
+                    destination.entryPoints.push_back(entryPoint);
+                }
+            }
+        }
+
+        bool initializeVulkanShaderFromDesc(const Device& device, const ShaderModuleDesc& desc, Shader& shader,
+                                            SlangReflectionMetadata* outReflection)
         {
             const ShaderType shaderType = toShaderType(desc.stage);
             bool initialized = false;
@@ -302,9 +438,28 @@ namespace kera
             switch (desc.source)
             {
                 case ShaderSourceKind::SlangFile:
-                    initialized = shader.initializeFromSlangFile(device, shaderType, desc.path, desc.entryPoint,
-                                                                 desc.searchPaths);
+                {
+                    std::vector<uint32_t> spirvCode;
+                    SlangReflectionMetadata reflection;
+                    SlangCompileRequest request{
+                        .shaderPath = desc.path,
+                        .entryPoint = desc.entryPoint,
+                        .shaderType = shaderType,
+                        .searchPaths = desc.searchPaths,
+                    };
+
+                    if (!SlangCompiler::compileToSpirvAndReflect(request, spirvCode, reflection))
+                    {
+                        return false;
+                    }
+
+                    initialized = shader.initialize(device, shaderType, spirvCode);
+                    if (initialized && outReflection)
+                    {
+                        mergeSlangReflection(*outReflection, reflection);
+                    }
                     break;
+                }
                 case ShaderSourceKind::SpirvFile:
                     initialized = shader.initializeFromFile(device, shaderType, desc.path);
                     break;
@@ -549,8 +704,7 @@ namespace kera
         initInfo.PipelineInfoMain.Subpass = 0;
         initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 #ifdef IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
-        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.sType =
-            VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
         initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &uiColorAttachmentFormat;
 #endif
@@ -709,12 +863,19 @@ namespace kera
 
         VulkanShaderModuleResource resource{};
         resource.m_stage = desc.stage;
-        if (!initializeVulkanShaderFromDesc(*m_device, desc, resource.m_shader))
+        if (!initializeVulkanShaderFromDesc(*m_device, desc, resource.m_shader, nullptr))
         {
             return {};
         }
 
-        return m_shaderModules.emplace(std::move(resource));
+        ShaderModuleHandle handle = m_shaderModules.emplace(std::move(resource));
+        if (VulkanShaderModuleResource* namedResource = m_shaderModules.get(handle))
+        {
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_SHADER_MODULE,
+                               (uint64_t)namedResource->m_shader.getVulkanShaderModule(),
+                               debugNameOrDefault(desc.debugName, "Kera Shader Module"));
+        }
+        return handle;
     }
 
     bool VulkanRenderer::destroyShaderModule(ShaderModuleHandle module)
@@ -764,14 +925,75 @@ namespace kera
             }
 
             Shader shader;
-            if (!initializeVulkanShaderFromDesc(*m_device, stageDesc, shader))
+            if (!initializeVulkanShaderFromDesc(*m_device, stageDesc, shader, &resource.m_reflection))
             {
                 return {};
             }
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_SHADER_MODULE,
+                               (uint64_t)shader.getVulkanShaderModule(),
+                               debugNameOrDefault(stageDesc.debugName, "Kera Shader Program Stage"));
             resource.m_shaders.push_back(std::move(shader));
         }
 
         return m_shaderPrograms.emplace(std::move(resource));
+    }
+
+    ShaderProgramHandle VulkanRenderer::createGraphicsShaderProgram(const GraphicsShaderProgramDesc& desc)
+    {
+        return createShaderProgram({
+            .stages =
+                {
+                    {
+                        .path = desc.path,
+                        .entryPoint = desc.vertexEntryPoint,
+                        .stage = ShaderStage::Vertex,
+                        .source = desc.source,
+                        .debugName = desc.debugName.empty() ? std::string{} : desc.debugName + " Vertex Shader",
+                    },
+                    {
+                        .path = desc.path,
+                        .entryPoint = desc.fragmentEntryPoint,
+                        .stage = ShaderStage::Fragment,
+                        .source = desc.source,
+                        .debugName = desc.debugName.empty() ? std::string{} : desc.debugName + " Fragment Shader",
+                    },
+                },
+            .debugName = desc.debugName,
+        });
+    }
+
+    const SlangReflectionMetadata* VulkanRenderer::getShaderProgramReflection(ShaderProgramHandle program) const
+    {
+        const VulkanShaderProgramResource* shaderProgram = m_shaderPrograms.get(program);
+        return shaderProgram ? &shaderProgram->m_reflection : nullptr;
+    }
+
+    std::vector<SlangReflectionEntryPoint> VulkanRenderer::getShaderProgramEntryPoints(
+        ShaderProgramHandle program) const
+    {
+        const VulkanShaderProgramResource* shaderProgram = m_shaderPrograms.get(program);
+        return shaderProgram ? shaderProgram->m_reflection.entryPoints : std::vector<SlangReflectionEntryPoint>{};
+    }
+
+    std::vector<SlangReflectionBinding> VulkanRenderer::getShaderProgramDescriptorBindings(
+        ShaderProgramHandle program) const
+    {
+        const VulkanShaderProgramResource* shaderProgram = m_shaderPrograms.get(program);
+        return shaderProgram ? shaderProgram->m_reflection.bindings : std::vector<SlangReflectionBinding>{};
+    }
+
+    std::vector<SlangReflectionInput> VulkanRenderer::getShaderProgramVertexInputs(
+        ShaderProgramHandle program, const std::string& entryPoint) const
+    {
+        const VulkanShaderProgramResource* shaderProgram = m_shaderPrograms.get(program);
+        if (!shaderProgram)
+        {
+            return {};
+        }
+
+        const SlangReflectionEntryPoint* reflectedEntryPoint =
+            shaderProgram->m_reflection.findEntryPoint(entryPoint);
+        return reflectedEntryPoint ? reflectedEntryPoint->inputs : std::vector<SlangReflectionInput>{};
     }
 
     bool VulkanRenderer::destroyShaderProgram(ShaderProgramHandle program)
@@ -902,9 +1124,9 @@ namespace kera
         }
 
         const uint32_t resolvedSlotCount =
-            slotCount == 0 ? static_cast<uint32_t>(m_frameSyncResources.empty() ? kMaxFramesInFlight
-                                                                                : m_frameSyncResources.size())
-                           : slotCount;
+            slotCount == 0
+                ? static_cast<uint32_t>(m_frameSyncResources.empty() ? kMaxFramesInFlight : m_frameSyncResources.size())
+                : slotCount;
         VulkanBufferResource resource{};
         resource.m_ringSlotSize = elementSize;
         resource.m_ringSlotCount = resolvedSlotCount;
@@ -1146,7 +1368,8 @@ namespace kera
     {
         if (descriptorSetsReference(texture))
         {
-            Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by a descriptor set.");
+            Logger::getInstance().error(
+                "Cannot destroy a Vulkan texture that is still referenced by a descriptor set.");
             return false;
         }
 
@@ -1328,12 +1551,19 @@ namespace kera
         }
 
         VulkanGraphicsPipelineResource resource{};
-        resource.m_desc = desc;
+        GraphicsPipelineDesc effectiveDesc = desc;
+        if (effectiveDesc.descriptorSets.empty() &&
+            !deriveDescriptorSetLayoutsFromReflection(shaderProgram->m_reflection, effectiveDesc.descriptorSets))
+        {
+            Logger::getInstance().error("Failed to derive graphics pipeline descriptor layouts from Slang reflection.");
+            return {};
+        }
+
+        resource.m_desc = effectiveDesc;
         resource.m_program = program;
-        if (!resource.m_pipeline.initialize(*m_device, m_pipelineCache, colorFormat, depthFormat,
-                                            std::span<const Shader* const>(graphicsShaders.data(),
-                                                                          graphicsShaders.size()),
-                                            desc))
+        if (!resource.m_pipeline.initialize(
+                *m_device, m_pipelineCache, colorFormat, depthFormat,
+                std::span<const Shader* const>(graphicsShaders.data(), graphicsShaders.size()), effectiveDesc))
         {
             Logger::getInstance().error("Failed to create Vulkan graphics pipeline.");
             return {};
@@ -1349,6 +1579,78 @@ namespace kera
         return handle;
     }
 
+    GraphicsPipelineHandle VulkanRenderer::createGraphicsPipeline(const GraphicsPipelineCreateDesc& desc)
+    {
+        GraphicsPipelineDesc pipelineDesc{};
+        pipelineDesc.topology = desc.topology;
+        pipelineDesc.cullMode = desc.cullMode;
+        pipelineDesc.frontFace = desc.frontFace;
+        pipelineDesc.blendMode = desc.blendMode;
+        pipelineDesc.renderTarget = desc.renderTarget;
+        pipelineDesc.vertexLayout = desc.vertexLayout;
+        pipelineDesc.descriptorSets = desc.descriptorSets;
+        pipelineDesc.depthTest = desc.depthTest;
+        pipelineDesc.depthWrite = desc.depthWrite;
+        pipelineDesc.debugName = desc.debugName;
+
+        if (!desc.reflectionContract.empty())
+        {
+            const SlangReflectionMetadata* reflection = getShaderProgramReflection(desc.shaderProgram);
+            if (!appendValidatedReflectedPipelineContract(pipelineDesc.vertexLayout, reflection,
+                                                         desc.reflectionContract.view()))
+            {
+                Logger::getInstance().error("Failed to apply graphics pipeline reflection contract.");
+                return {};
+            }
+        }
+
+        GraphicsPipelineHandle pipeline = createGraphicsPipeline(pipelineDesc, desc.shaderProgram);
+        if (VulkanGraphicsPipelineResource* resource = m_graphicsPipelines.get(pipeline))
+        {
+            resource->m_reflectionContract = desc.reflectionContract;
+        }
+        return pipeline;
+    }
+
+    std::vector<DescriptorSetLayoutDesc> VulkanRenderer::getGraphicsPipelineDescriptorSets(
+        GraphicsPipelineHandle pipelineHandle) const
+    {
+        const VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
+        if (!pipeline)
+        {
+            Logger::getInstance().error("Invalid graphics pipeline handle passed to getGraphicsPipelineDescriptorSets.");
+            return {};
+        }
+
+        return pipeline->m_desc.descriptorSets;
+    }
+
+    VertexLayoutDesc VulkanRenderer::getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipelineHandle) const
+    {
+        const VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
+        if (!pipeline)
+        {
+            Logger::getInstance().error("Invalid graphics pipeline handle passed to getGraphicsPipelineVertexLayout.");
+            return {};
+        }
+
+        return pipeline->m_desc.vertexLayout;
+    }
+
+    PipelineReflectionContract VulkanRenderer::getGraphicsPipelineReflectionContract(
+        GraphicsPipelineHandle pipelineHandle) const
+    {
+        const VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
+        if (!pipeline)
+        {
+            Logger::getInstance().error(
+                "Invalid graphics pipeline handle passed to getGraphicsPipelineReflectionContract.");
+            return {};
+        }
+
+        return pipeline->m_reflectionContract;
+    }
+
     bool VulkanRenderer::destroyGraphicsPipeline(GraphicsPipelineHandle pipeline)
     {
         std::optional<VulkanGraphicsPipelineResource> resource = m_graphicsPipelines.take(pipeline);
@@ -1362,6 +1664,31 @@ namespace kera
         deletion.m_graphicsPipelines.push_back(std::move(*resource));
         queueDeferredDeletion(std::move(deletion));
         return true;
+    }
+
+    DescriptorSetHandle VulkanRenderer::createDescriptorSet(GraphicsPipelineHandle pipelineHandle)
+    {
+        VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
+        if (!pipeline)
+        {
+            Logger::getInstance().error("Invalid graphics pipeline handle passed to createDescriptorSet.");
+            return {};
+        }
+
+        if (pipeline->m_desc.descriptorSets.empty())
+        {
+            Logger::getInstance().error("Graphics pipeline does not expose any descriptor set layouts.");
+            return {};
+        }
+
+        if (pipeline->m_desc.descriptorSets.size() != 1)
+        {
+            Logger::getInstance().error(
+                "Graphics pipeline exposes multiple descriptor set layouts; call createDescriptorSet with a set index.");
+            return {};
+        }
+
+        return createDescriptorSet(pipelineHandle, pipeline->m_desc.descriptorSets.front().set);
     }
 
     DescriptorSetHandle VulkanRenderer::createDescriptorSet(GraphicsPipelineHandle pipelineHandle, uint32_t set)
@@ -1471,7 +1798,8 @@ namespace kera
         }
         if (!updatedBinding)
         {
-            descriptorSet->m_buffers.push_back({binding, bufferHandle, offset, static_cast<std::size_t>(descriptorRange)});
+            descriptorSet->m_buffers.push_back(
+                {binding, bufferHandle, offset, static_cast<std::size_t>(descriptorRange)});
         }
         return true;
     }
@@ -1584,6 +1912,66 @@ namespace kera
         return true;
     }
 
+    bool VulkanRenderer::updateDescriptorSet(DescriptorSetHandle setHandle, const std::string& name,
+                                             BufferHandle bufferHandle, std::size_t offset, std::size_t range)
+    {
+        VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(setHandle);
+        if (!descriptorSet)
+        {
+            Logger::getInstance().error("Invalid descriptor set handle passed to named buffer updateDescriptorSet.");
+            return false;
+        }
+
+        const DescriptorBindingDesc* binding = findDescriptorBinding(descriptorSet->m_layout, name);
+        if (!binding || binding->type != DescriptorType::UniformBuffer)
+        {
+            Logger::getInstance().error("Descriptor binding name '" + name + "' does not accept a uniform buffer.");
+            return false;
+        }
+
+        return updateDescriptorSet(setHandle, binding->binding, bufferHandle, offset, range);
+    }
+
+    bool VulkanRenderer::updateDescriptorSet(DescriptorSetHandle setHandle, const std::string& name,
+                                             TextureHandle textureHandle)
+    {
+        VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(setHandle);
+        if (!descriptorSet)
+        {
+            Logger::getInstance().error("Invalid descriptor set handle passed to named texture updateDescriptorSet.");
+            return false;
+        }
+
+        const DescriptorBindingDesc* binding = findDescriptorBinding(descriptorSet->m_layout, name);
+        if (!binding || binding->type != DescriptorType::SampledImage)
+        {
+            Logger::getInstance().error("Descriptor binding name '" + name + "' does not accept a sampled image.");
+            return false;
+        }
+
+        return updateDescriptorSet(setHandle, binding->binding, textureHandle);
+    }
+
+    bool VulkanRenderer::updateDescriptorSet(DescriptorSetHandle setHandle, const std::string& name,
+                                             SamplerHandle samplerHandle)
+    {
+        VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(setHandle);
+        if (!descriptorSet)
+        {
+            Logger::getInstance().error("Invalid descriptor set handle passed to named sampler updateDescriptorSet.");
+            return false;
+        }
+
+        const DescriptorBindingDesc* binding = findDescriptorBinding(descriptorSet->m_layout, name);
+        if (!binding || binding->type != DescriptorType::Sampler)
+        {
+            Logger::getInstance().error("Descriptor binding name '" + name + "' does not accept a sampler.");
+            return false;
+        }
+
+        return updateDescriptorSet(setHandle, binding->binding, samplerHandle);
+    }
+
     bool VulkanRenderer::destroyDescriptorSet(DescriptorSetHandle setHandle)
     {
         VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(setHandle);
@@ -1603,6 +1991,81 @@ namespace kera
         deletion.m_descriptorSets.push_back(std::move(*resource));
         queueDeferredDeletion(std::move(deletion));
         return true;
+    }
+
+    bool VulkanRenderer::validateDescriptorSet(DescriptorSetHandle setHandle) const
+    {
+        const RendererValidationReport report = validateDescriptorSetDetailed(setHandle);
+        logValidationReport(report);
+        m_stats.validationIssuesThisFrame += static_cast<uint32_t>(report.issues.size());
+        return report.ok();
+    }
+
+    bool VulkanRenderer::validateGraphicsPipelineDescriptorSets(GraphicsPipelineHandle pipelineHandle) const
+    {
+        const RendererValidationReport report = validateGraphicsPipelineDescriptorSetsDetailed(pipelineHandle);
+        logValidationReport(report);
+        m_stats.validationIssuesThisFrame += static_cast<uint32_t>(report.issues.size());
+        return report.ok();
+    }
+
+    RendererValidationReport VulkanRenderer::validateDescriptorSetDetailed(DescriptorSetHandle setHandle) const
+    {
+        RendererValidationReport report;
+        const VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(setHandle);
+        if (!descriptorSet)
+        {
+            report.addIssue(RendererErrorCode::InvalidHandle, RendererValidationCategory::Descriptor,
+                            "Invalid descriptor set handle passed to validateDescriptorSetDetailed.");
+            return report;
+        }
+
+        return validateDescriptorSetResource(*descriptorSet);
+    }
+
+    RendererValidationReport VulkanRenderer::validateGraphicsPipelineDescriptorSetsDetailed(
+        GraphicsPipelineHandle pipelineHandle) const
+    {
+        RendererValidationReport report;
+        const VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
+        if (!pipeline)
+        {
+            report.addIssue(
+                RendererErrorCode::InvalidHandle, RendererValidationCategory::Descriptor,
+                "Invalid graphics pipeline handle passed to validateGraphicsPipelineDescriptorSetsDetailed.");
+            return report;
+        }
+
+        std::vector<uint32_t> allocatedSets;
+        m_descriptorSets.forEach(
+            [this, pipelineHandle, &allocatedSets, &report](DescriptorSetHandle,
+                                                            const VulkanDescriptorSetResource& descriptorSet)
+            {
+                if (descriptorSet.m_pipeline != pipelineHandle)
+                {
+                    return true;
+                }
+
+                allocatedSets.push_back(descriptorSet.m_set);
+                RendererValidationReport descriptorReport = validateDescriptorSetResource(descriptorSet);
+                report.issues.insert(report.issues.end(), descriptorReport.issues.begin(), descriptorReport.issues.end());
+                return true;
+            });
+
+        for (const DescriptorSetLayoutDesc& layout : pipeline->m_desc.descriptorSets)
+        {
+            const bool setAllocated =
+                std::find(allocatedSets.begin(), allocatedSets.end(), layout.set) != allocatedSets.end();
+            if (!setAllocated)
+            {
+                report.addIssue(RendererErrorCode::ValidationFailed, RendererValidationCategory::Descriptor,
+                                "Graphics pipeline is missing allocated descriptor set " +
+                                    std::to_string(layout.set) + ".",
+                                layout.set);
+            }
+        }
+
+        return report;
     }
 
     FrameHandle VulkanRenderer::beginFrame()
@@ -1735,6 +2198,11 @@ namespace kera
             Logger::getInstance().error("Cannot begin a Vulkan render pass while another render pass is active.");
             return;
         }
+        if (frame->m_extent.width == 0 || frame->m_extent.height == 0)
+        {
+            Logger::getInstance().error("Cannot begin a Vulkan backbuffer pass with a zero extent.");
+            return;
+        }
 
         transitionSwapchainImageLayout(frame->m_commandBuffer, frame->m_imageIndex,
                                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1825,8 +2293,8 @@ namespace kera
         colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachment.clearValue.color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b,
-                                             desc.clearColor.a}};
+        colorAttachment.clearValue.color = {
+            {desc.clearColor.r, desc.clearColor.g, desc.clearColor.b, desc.clearColor.a}};
 
         VkRenderingAttachmentInfo depthAttachment{};
         if (depthTexture)
@@ -1848,7 +2316,8 @@ namespace kera
         renderingInfo.pColorAttachments = &colorAttachment;
         renderingInfo.pDepthAttachment = depthTexture ? &depthAttachment : nullptr;
 
-        beginDebugLabel(m_device->getVulkanDevice(), frame->m_commandBuffer, "Kera Render Target Pass", 0.4f, 0.8f, 0.4f);
+        beginDebugLabel(m_device->getVulkanDevice(), frame->m_commandBuffer, "Kera Render Target Pass", 0.4f, 0.8f,
+                        0.4f);
         vkCmdBeginRendering(frame->m_commandBuffer, &renderingInfo);
         frame->m_renderPassActive = true;
         frame->m_activeRenderTargetTexture = renderTarget->m_colorTexture;
@@ -1974,6 +2443,19 @@ namespace kera
                              static_cast<VkDeviceSize>(offset), indexType);
     }
 
+    void VulkanRenderer::bindDescriptorSet(FrameHandle frameHandle, GraphicsPipelineHandle pipelineHandle,
+                                           DescriptorSetHandle descriptorSetHandle)
+    {
+        VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(descriptorSetHandle);
+        if (!descriptorSet)
+        {
+            Logger::getInstance().error("Invalid descriptor set handle passed to bindDescriptorSet.");
+            return;
+        }
+
+        bindDescriptorSet(frameHandle, pipelineHandle, descriptorSet->m_set, descriptorSetHandle);
+    }
+
     void VulkanRenderer::bindDescriptorSet(FrameHandle frameHandle, GraphicsPipelineHandle pipelineHandle, uint32_t set,
                                            DescriptorSetHandle descriptorSetHandle)
     {
@@ -2008,6 +2490,7 @@ namespace kera
                                 pipeline->m_pipeline.getPipelineLayout(), set, 1, &descriptorSet->m_descriptorSet, 0,
                                 nullptr);
         recordDescriptorSetUse(frame->m_syncIndex, descriptorSetHandle, *descriptorSet);
+        ++m_stats.descriptorSetsBoundThisFrame;
     }
 
     void VulkanRenderer::drawIndexed(FrameHandle frameHandle, uint32_t indexCount, uint32_t instanceCount)
@@ -2186,11 +2669,7 @@ namespace kera
         }
         m_commandBuffers.clear();
 
-        if (m_swapchain)
-        {
-            m_swapchain->shutdown();
-        }
-        else
+        if (!m_swapchain)
         {
             m_swapchain = std::make_shared<SwapChain>();
         }
@@ -2645,7 +3124,6 @@ namespace kera
         }
         m_deferredDeletions.clear();
         m_uploadContext.m_availableStagingBuffers.clear();
-
     }
 
     void VulkanRenderer::transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
@@ -2981,6 +3459,83 @@ namespace kera
                                                    DescriptorType type) const
     {
         return descriptorBindingAccepts(descriptorSet.m_layout, binding, type);
+    }
+
+    RendererValidationReport VulkanRenderer::validateDescriptorSetResource(
+        const VulkanDescriptorSetResource& descriptorSet) const
+    {
+        RendererValidationReport report;
+        for (const DescriptorBindingDesc& binding : descriptorSet.m_layout.bindings)
+        {
+            switch (binding.type)
+            {
+                case DescriptorType::UniformBuffer:
+                {
+                    const auto reference =
+                        std::find_if(descriptorSet.m_buffers.begin(), descriptorSet.m_buffers.end(),
+                                     [&binding](const auto& item) { return item.m_binding == binding.binding; });
+                    if (reference == descriptorSet.m_buffers.end())
+                    {
+                        report.addIssue(RendererErrorCode::ValidationFailed, RendererValidationCategory::Descriptor,
+                                        "Descriptor set " + std::to_string(descriptorSet.m_set) +
+                                            " is missing uniform buffer binding '" + binding.name + "'.",
+                                        descriptorSet.m_set, binding.binding, binding.name);
+                    }
+                    else if (!m_buffers.get(reference->m_handle))
+                    {
+                        report.addIssue(RendererErrorCode::InvalidHandle, RendererValidationCategory::Descriptor,
+                                        "Descriptor set " + std::to_string(descriptorSet.m_set) +
+                                            " references an invalid uniform buffer for binding '" + binding.name + "'.",
+                                        descriptorSet.m_set, binding.binding, binding.name);
+                    }
+                    break;
+                }
+                case DescriptorType::SampledImage:
+                {
+                    const auto reference =
+                        std::find_if(descriptorSet.m_textures.begin(), descriptorSet.m_textures.end(),
+                                     [&binding](const auto& item) { return item.m_binding == binding.binding; });
+                    if (reference == descriptorSet.m_textures.end())
+                    {
+                        report.addIssue(RendererErrorCode::ValidationFailed, RendererValidationCategory::Descriptor,
+                                        "Descriptor set " + std::to_string(descriptorSet.m_set) +
+                                            " is missing sampled image binding '" + binding.name + "'.",
+                                        descriptorSet.m_set, binding.binding, binding.name);
+                    }
+                    else if (!m_textures.get(reference->m_handle))
+                    {
+                        report.addIssue(RendererErrorCode::InvalidHandle, RendererValidationCategory::Descriptor,
+                                        "Descriptor set " + std::to_string(descriptorSet.m_set) +
+                                            " references an invalid texture for binding '" + binding.name + "'.",
+                                        descriptorSet.m_set, binding.binding, binding.name);
+                    }
+                    break;
+                }
+                case DescriptorType::Sampler:
+                {
+                    const auto reference =
+                        std::find_if(descriptorSet.m_samplers.begin(), descriptorSet.m_samplers.end(),
+                                     [&binding](const auto& item) { return item.m_binding == binding.binding; });
+                    if (reference == descriptorSet.m_samplers.end())
+                    {
+                        report.addIssue(RendererErrorCode::ValidationFailed, RendererValidationCategory::Descriptor,
+                                        "Descriptor set " + std::to_string(descriptorSet.m_set) +
+                                            " is missing sampler binding '" + binding.name + "'.",
+                                        descriptorSet.m_set, binding.binding, binding.name);
+                    }
+                    else if (!m_samplers.get(reference->m_handle))
+                    {
+                        report.addIssue(RendererErrorCode::InvalidHandle, RendererValidationCategory::Descriptor,
+                                        "Descriptor set " + std::to_string(descriptorSet.m_set) +
+                                            " references an invalid sampler for binding '" + binding.name + "'.",
+                                        descriptorSet.m_set, binding.binding, binding.name);
+                    }
+                    break;
+                }
+            }
+        }
+
+        return report;
     }
 
     bool VulkanRenderer::resolvePipelineRenderingFormats(RenderTargetHandle renderTarget, VkFormat& colorFormat,

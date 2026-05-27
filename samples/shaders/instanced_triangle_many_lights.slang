@@ -12,7 +12,7 @@ struct GeometryUniforms {
     float4x4 view;
 };
 
-ConstantBuffer<GeometryUniforms> geometryParams : register(b0, space0);
+ConstantBuffer<GeometryUniforms> geometryParams;
 
 struct GeometryVertexOutput {
     float4 sv_position : SV_Position;
@@ -63,11 +63,11 @@ struct LightingUniforms {
     LightData lights[64];
 };
 
-Texture2D<float4> sceneTexture : register(t1, space0);
+Texture2D<float4> sceneTexture;
 
-SamplerState sceneSampler : register(s2, space0);
+SamplerState sceneSampler;
 
-ConstantBuffer<LightingUniforms> lightingParams : register(b3, space0);
+ConstantBuffer<LightingUniforms> lightingParams;
 
 [shader("fragment")]
 float4 lightingFragmentMain(float2 uv : TEXCOORD0) : SV_Target {

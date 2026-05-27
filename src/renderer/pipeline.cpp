@@ -100,6 +100,8 @@ namespace kera
                     return VK_SHADER_STAGE_FRAGMENT_BIT;
                 case ShaderStage::Compute:
                     return VK_SHADER_STAGE_COMPUTE_BIT;
+                case ShaderStage::AllGraphics:
+                    return VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
                 default:
                     return VK_SHADER_STAGE_VERTEX_BIT;
             }
