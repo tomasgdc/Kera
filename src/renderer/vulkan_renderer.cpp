@@ -34,6 +34,15 @@ namespace kera
     {
         constexpr uint32_t kMaxFramesInFlight = 2;
 
+        bool surfaceWouldUseZeroExtent(const SwapChainSupportDetails& support, uint32_t width, uint32_t height)
+        {
+            if (support.capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+            {
+                return support.capabilities.currentExtent.width == 0 || support.capabilities.currentExtent.height == 0;
+            }
+            return width == 0 || height == 0;
+        }
+
         ShaderType toShaderType(ShaderStage stage)
         {
             switch (stage)
@@ -85,6 +94,8 @@ namespace kera
             {
                 case TextureFormat::Depth32:
                     return VK_FORMAT_D32_SFLOAT;
+                case TextureFormat::RGBA8Srgb:
+                    return VK_FORMAT_R8G8B8A8_SRGB;
                 case TextureFormat::RGBA8:
                 default:
                     return VK_FORMAT_R8G8B8A8_UNORM;
@@ -103,12 +114,26 @@ namespace kera
             }
         }
 
+        VkSamplerMipmapMode toVkMipFilter(SamplerMipFilter filter)
+        {
+            switch (filter)
+            {
+                case SamplerMipFilter::Nearest:
+                    return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+                case SamplerMipFilter::Linear:
+                default:
+                    return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            }
+        }
+
         VkSamplerAddressMode toVkAddressMode(SamplerAddressMode mode)
         {
             switch (mode)
             {
                 case SamplerAddressMode::Repeat:
                     return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                case SamplerAddressMode::MirroredRepeat:
+                    return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
                 case SamplerAddressMode::ClampToEdge:
                 default:
                     return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -215,9 +240,8 @@ namespace kera
                 return;
             }
 
-            auto endLabel =
-                reinterpret_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(vkGetDeviceProcAddr(device,
-                                                                                     "vkCmdEndDebugUtilsLabelEXT"));
+            auto endLabel = reinterpret_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(
+                vkGetDeviceProcAddr(device, "vkCmdEndDebugUtilsLabelEXT"));
             if (endLabel)
             {
                 endLabel(commandBuffer);
@@ -455,6 +479,8 @@ namespace kera
         , m_nextFrameTimelineValue(1)
         , m_pipelineCache(VK_NULL_HANDLE)
         , m_uiInitialized(false)
+        , m_swapchainRecreateRequested(false)
+        , m_resizePending(false)
     {
     }
 
@@ -774,14 +800,30 @@ namespace kera
         if (newExtent.width == 0 || newExtent.height == 0)
         {
             m_swapchainRecreateRequested = true;
+            m_resizePending = false;
             return true;
         }
 
         if (hasActiveFrames())
         {
             Logger::getInstance().info("Deferring Vulkan resize until the active frame completes.");
+            m_pendingResizeExtent = newExtent;
+            m_resizePending = true;
             m_swapchainRecreateRequested = true;
+            return true;
+        }
+
+        if (!refreshSwapchainSupport())
+        {
             return false;
+        }
+        if (surfaceWouldUseZeroExtent(m_physicalDevice->getSwapChainSupport(), newExtent.width, newExtent.height))
+        {
+            Logger::getInstance().debug("Deferring Vulkan resize while the surface reports a zero extent.");
+            m_pendingResizeExtent = newExtent;
+            m_resizePending = true;
+            m_swapchainRecreateRequested = true;
+            return true;
         }
 
         const bool restoreUi = m_uiInitialized;
@@ -810,6 +852,7 @@ namespace kera
         }
 
         m_swapchainRecreateRequested = false;
+        m_resizePending = false;
         return true;
     }
 
@@ -1157,15 +1200,44 @@ namespace kera
             Logger::getInstance().error("Texture dimensions must be non-zero.");
             return {};
         }
+        if (desc.mipLevels == 0)
+        {
+            Logger::getInstance().error("Texture mip level count must be non-zero.");
+            return {};
+        }
+
+        const uint32_t fullMipLevels = textureFullMipLevelCount(desc.width, desc.height);
+        const uint32_t requestedMipLevels =
+            desc.generateMipmaps && desc.mipLevels == 1 ? fullMipLevels : desc.mipLevels;
+        if (requestedMipLevels > fullMipLevels)
+        {
+            Logger::getInstance().error("Texture mip level count exceeds the texture extent.");
+            return {};
+        }
+        if (requestedMipLevels > 1 && (desc.depthStencil || desc.renderTarget))
+        {
+            Logger::getInstance().error("Mipmapped render-target or depth textures are not supported.");
+            return {};
+        }
+        if (desc.generateMipmaps && !desc.sampled)
+        {
+            Logger::getInstance().error("Generated mipmaps require a sampled texture.");
+            return {};
+        }
 
         VkImageUsageFlags usage = 0;
         if (desc.renderTarget)
         {
-            usage |= desc.depthStencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            usage |=
+                desc.depthStencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         }
         if (desc.sampled)
         {
             usage |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            if (requestedMipLevels > 1)
+            {
+                usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            }
         }
         if (usage == 0)
         {
@@ -1176,13 +1248,31 @@ namespace kera
         VulkanTextureResource resource{};
         resource.m_device = m_device->getVulkanDevice();
         resource.m_format = toVkTextureFormat(desc.format);
+        if (desc.generateMipmaps && requestedMipLevels > 1)
+        {
+            VkFormatProperties formatProperties{};
+            vkGetPhysicalDeviceFormatProperties(m_device->getVulkanPhysicalDevice(), resource.m_format,
+                                                &formatProperties);
+            const VkFormatFeatureFlags requiredFeatures = VK_FORMAT_FEATURE_BLIT_SRC_BIT |
+                                                          VK_FORMAT_FEATURE_BLIT_DST_BIT |
+                                                          VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+            if ((formatProperties.optimalTilingFeatures & requiredFeatures) != requiredFeatures)
+            {
+                Logger::getInstance().error("Texture format does not support generated mipmaps.");
+                return {};
+            }
+        }
+        resource.m_textureFormat = desc.format;
         resource.m_extent = {desc.width, desc.height};
+        resource.m_mipLevels = requestedMipLevels;
+        resource.m_generateMipmaps = desc.generateMipmaps && requestedMipLevels > 1;
         resource.m_aspectMask = desc.depthStencil ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
         resource.m_sampled = desc.sampled;
         resource.m_renderTarget = desc.renderTarget;
         resource.m_depthStencil = desc.depthStencil;
         resource.m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        resource.m_descriptorLayout = desc.sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+        resource.m_descriptorLayout =
+            desc.sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
         resource.m_renderTargetFinalLayout = desc.renderTarget
                                                  ? (desc.depthStencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
                                                                       : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
@@ -1192,7 +1282,7 @@ namespace kera
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.extent = {desc.width, desc.height, 1};
-        imageInfo.mipLevels = 1;
+        imageInfo.mipLevels = resource.m_mipLevels;
         imageInfo.arrayLayers = 1;
         imageInfo.format = resource.m_format;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -1238,7 +1328,7 @@ namespace kera
         viewInfo.format = resource.m_format;
         viewInfo.subresourceRange.aspectMask = resource.m_aspectMask;
         viewInfo.subresourceRange.baseMipLevel = 0;
-        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.levelCount = resource.m_mipLevels;
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
@@ -1289,9 +1379,22 @@ namespace kera
             Logger::getInstance().error("Depth texture upload is not supported by uploadTexture.");
             return false;
         }
+        if (texture->m_mipLevels > 1 && !texture->m_generateMipmaps)
+        {
+            Logger::getInstance().error(
+                "Texture upload cannot populate multiple mip levels unless generateMipmaps is enabled.");
+            return false;
+        }
 
-        const std::size_t expectedSize =
-            static_cast<std::size_t>(texture->m_extent.width) * static_cast<std::size_t>(texture->m_extent.height) * 4u;
+        const std::size_t bytesPerPixel = textureFormatBytesPerPixel(texture->m_textureFormat);
+        if (bytesPerPixel == 0)
+        {
+            Logger::getInstance().error("Texture upload uses an unsupported texture format.");
+            return false;
+        }
+
+        const std::size_t expectedSize = static_cast<std::size_t>(texture->m_extent.width) *
+                                         static_cast<std::size_t>(texture->m_extent.height) * bytesPerPixel;
         if (size < expectedSize)
         {
             Logger::getInstance().error("Texture upload data is smaller than the texture extent requires.");
@@ -1365,14 +1468,18 @@ namespace kera
         samplerInfo.addressModeU = toVkAddressMode(desc.addressModeU);
         samplerInfo.addressModeV = toVkAddressMode(desc.addressModeV);
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 1.0f;
+        VkPhysicalDeviceProperties physicalDeviceProperties{};
+        vkGetPhysicalDeviceProperties(m_device->getVulkanPhysicalDevice(), &physicalDeviceProperties);
+        const float requestedAnisotropy = std::max(desc.maxAnisotropy, 1.0f);
+        const float maxAnisotropy = std::min(requestedAnisotropy, physicalDeviceProperties.limits.maxSamplerAnisotropy);
+        samplerInfo.anisotropyEnable = maxAnisotropy > 1.0f ? VK_TRUE : VK_FALSE;
+        samplerInfo.maxAnisotropy = maxAnisotropy;
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
         samplerInfo.unnormalizedCoordinates = VK_FALSE;
         samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
+        samplerInfo.mipmapMode = toVkMipFilter(desc.mipFilter);
+        samplerInfo.minLod = std::max(desc.minLod, 0.0f);
+        samplerInfo.maxLod = std::max(desc.maxLod, samplerInfo.minLod);
 
         if (vkCreateSampler(resource.m_device, &samplerInfo, nullptr, &resource.m_sampler) != VK_SUCCESS)
         {
@@ -2030,6 +2137,16 @@ namespace kera
             Logger::getInstance().error("Renderer frame resources are not initialized.");
             return {};
         }
+        if (m_swapchainRecreateRequested && m_window && (m_window->getWidth() <= 0 || m_window->getHeight() <= 0))
+        {
+            return {};
+        }
+        const VkExtent2D currentSwapchainExtent = m_swapchain->getExtent();
+        if (currentSwapchainExtent.width == 0 || currentSwapchainExtent.height == 0)
+        {
+            m_swapchainRecreateRequested = true;
+            return {};
+        }
 
         const uint32_t syncIndex = m_currentFrameSyncIndex;
         VulkanFrameSyncResource& frameSync = m_frameSyncResources[syncIndex];
@@ -2168,8 +2285,8 @@ namespace kera
         colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachment.clearValue.color = {{desc.clearColor.r, desc.clearColor.g, desc.clearColor.b,
-                                             desc.clearColor.a}};
+        colorAttachment.clearValue.color = {
+            {desc.clearColor.r, desc.clearColor.g, desc.clearColor.b, desc.clearColor.a}};
 
         VkRenderingInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -2239,7 +2356,8 @@ namespace kera
         }
         if (depthTexture)
         {
-            transitionTextureLayout(frame->m_commandBuffer, *depthTexture, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            transitionTextureLayout(frame->m_commandBuffer, *depthTexture,
+                                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         }
 
         VkRenderingAttachmentInfo colorAttachment{};
@@ -2550,8 +2668,7 @@ namespace kera
         submitInfo.pCommandBufferInfos = &commandBufferInfo;
         submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphoreInfos.size());
         submitInfo.pSignalSemaphoreInfos = signalSemaphoreInfos.data();
-        VkResult submitResult =
-            vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+        VkResult submitResult = vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 
         if (submitResult != VK_SUCCESS)
         {
@@ -2583,9 +2700,27 @@ namespace kera
         if (shouldRecreateSwapchain)
         {
             Logger::getInstance().info("Vulkan swapchain needs recreation after present.");
-            if (!recreateSwapchainFromWindow())
+            const bool hasPendingResize = m_resizePending;
+            const Extent2D pendingResizeExtent = m_pendingResizeExtent;
+            bool recreateSucceeded = false;
+            if (hasPendingResize && pendingResizeExtent.width > 0 && pendingResizeExtent.height > 0)
+            {
+                recreateSucceeded = resize(pendingResizeExtent);
+            }
+            else
+            {
+                recreateSucceeded = recreateSwapchainFromWindow();
+            }
+
+            if (!recreateSucceeded)
             {
                 Logger::getInstance().error("Failed to recreate Vulkan swapchain after present.");
+                if (hasPendingResize)
+                {
+                    m_pendingResizeExtent = pendingResizeExtent;
+                    m_resizePending = true;
+                    m_swapchainRecreateRequested = true;
+                }
                 return false;
             }
         }
@@ -2603,6 +2738,16 @@ namespace kera
         if (hasActiveFrames())
         {
             Logger::getInstance().error("Cannot recreate Vulkan swapchain while a frame is active.");
+            return false;
+        }
+
+        if (!refreshSwapchainSupport())
+        {
+            return false;
+        }
+        if (surfaceWouldUseZeroExtent(m_physicalDevice->getSwapChainSupport(), width, height))
+        {
+            m_swapchainRecreateRequested = true;
             return false;
         }
 
@@ -2627,11 +2772,6 @@ namespace kera
         if (!m_swapchain)
         {
             m_swapchain = std::make_shared<SwapChain>();
-        }
-
-        if (!m_physicalDevice->initialize(m_instance->getVulkanInstance(), m_surface->getVulkanSurface()))
-        {
-            return false;
         }
 
         if (!m_swapchain->initialize(*m_physicalDevice, *m_device, m_surface->getVulkanSurface(), width, height))
@@ -2693,10 +2833,10 @@ namespace kera
                     return false;
                 }
 
-                if (!resource.m_pipeline.initialize(*m_device, m_pipelineCache, colorFormat, depthFormat,
-                                                    std::span<const Shader* const>(graphicsShaders.data(),
-                                                                                  graphicsShaders.size()),
-                                                    resource.m_desc))
+                if (!resource.m_pipeline.initialize(
+                        *m_device, m_pipelineCache, colorFormat, depthFormat,
+                        std::span<const Shader* const>(graphicsShaders.data(), graphicsShaders.size()),
+                        resource.m_desc))
                 {
                     Logger::getInstance().error("Failed to recreate live graphics pipeline.");
                     return false;
@@ -2732,6 +2872,15 @@ namespace kera
             static_cast<uint32_t>(width),
             static_cast<uint32_t>(height),
         });
+    }
+
+    bool VulkanRenderer::refreshSwapchainSupport()
+    {
+        if (!m_instance || !m_surface || !m_physicalDevice)
+        {
+            return false;
+        }
+        return m_physicalDevice->initialize(m_instance->getVulkanInstance(), m_surface->getVulkanSurface());
     }
 
     bool VulkanRenderer::hasActiveFrames() const
@@ -3084,17 +3233,18 @@ namespace kera
     void VulkanRenderer::transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
                                                  VkImageLayout newLayout)
     {
-        if (commandBuffer == VK_NULL_HANDLE || texture.m_image == VK_NULL_HANDLE || texture.m_currentLayout == newLayout)
+        if (commandBuffer == VK_NULL_HANDLE || texture.m_image == VK_NULL_HANDLE ||
+            texture.m_currentLayout == newLayout)
         {
             return;
         }
 
         VkImageMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        barrier.srcStageMask = stageMask2ForLayout(texture.m_currentLayout);
-        barrier.srcAccessMask = accessMask2ForLayout(texture.m_currentLayout);
-        barrier.dstStageMask = stageMask2ForLayout(newLayout);
-        barrier.dstAccessMask = accessMask2ForLayout(newLayout);
+        barrier.srcStageMask = vulkanStageMaskForImageLayout(texture.m_currentLayout);
+        barrier.srcAccessMask = vulkanAccessMaskForImageLayout(texture.m_currentLayout);
+        barrier.dstStageMask = vulkanStageMaskForImageLayout(newLayout);
+        barrier.dstAccessMask = vulkanAccessMaskForImageLayout(newLayout);
         barrier.oldLayout = texture.m_currentLayout;
         barrier.newLayout = newLayout;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -3102,7 +3252,7 @@ namespace kera
         barrier.image = texture.m_image;
         barrier.subresourceRange.aspectMask = texture.m_aspectMask;
         barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.levelCount = texture.m_mipLevels;
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.layerCount = 1;
 
@@ -3113,6 +3263,117 @@ namespace kera
         vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
 
         texture.m_currentLayout = newLayout;
+    }
+
+    bool VulkanRenderer::generateTextureMipmaps(VkCommandBuffer commandBuffer, VulkanTextureResource& texture)
+    {
+        if (texture.m_mipLevels <= 1)
+        {
+            return true;
+        }
+        if (texture.m_currentLayout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        {
+            Logger::getInstance().error("Texture mipmap generation requires transfer-dst layout.");
+            return false;
+        }
+
+        int32_t mipWidth = static_cast<int32_t>(texture.m_extent.width);
+        int32_t mipHeight = static_cast<int32_t>(texture.m_extent.height);
+
+        for (uint32_t mipLevel = 1; mipLevel < texture.m_mipLevels; ++mipLevel)
+        {
+            VkImageMemoryBarrier2 sourceBarrier{};
+            sourceBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            sourceBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            sourceBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            sourceBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            sourceBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            sourceBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            sourceBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            sourceBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            sourceBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            sourceBarrier.image = texture.m_image;
+            sourceBarrier.subresourceRange.aspectMask = texture.m_aspectMask;
+            sourceBarrier.subresourceRange.baseMipLevel = mipLevel - 1;
+            sourceBarrier.subresourceRange.levelCount = 1;
+            sourceBarrier.subresourceRange.baseArrayLayer = 0;
+            sourceBarrier.subresourceRange.layerCount = 1;
+
+            VkDependencyInfo sourceDependency{};
+            sourceDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            sourceDependency.imageMemoryBarrierCount = 1;
+            sourceDependency.pImageMemoryBarriers = &sourceBarrier;
+            vkCmdPipelineBarrier2(commandBuffer, &sourceDependency);
+
+            VkImageBlit blit{};
+            blit.srcOffsets[0] = {0, 0, 0};
+            blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
+            blit.srcSubresource.aspectMask = texture.m_aspectMask;
+            blit.srcSubresource.mipLevel = mipLevel - 1;
+            blit.srcSubresource.baseArrayLayer = 0;
+            blit.srcSubresource.layerCount = 1;
+            blit.dstOffsets[0] = {0, 0, 0};
+            blit.dstOffsets[1] = {mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1};
+            blit.dstSubresource.aspectMask = texture.m_aspectMask;
+            blit.dstSubresource.mipLevel = mipLevel;
+            blit.dstSubresource.baseArrayLayer = 0;
+            blit.dstSubresource.layerCount = 1;
+
+            vkCmdBlitImage(commandBuffer, texture.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture.m_image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+            VkImageMemoryBarrier2 readBarrier{};
+            readBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            readBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            readBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            readBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            readBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            readBarrier.newLayout = texture.m_descriptorLayout;
+            readBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            readBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            readBarrier.image = texture.m_image;
+            readBarrier.subresourceRange.aspectMask = texture.m_aspectMask;
+            readBarrier.subresourceRange.baseMipLevel = mipLevel - 1;
+            readBarrier.subresourceRange.levelCount = 1;
+            readBarrier.subresourceRange.baseArrayLayer = 0;
+            readBarrier.subresourceRange.layerCount = 1;
+
+            VkDependencyInfo readDependency{};
+            readDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            readDependency.imageMemoryBarrierCount = 1;
+            readDependency.pImageMemoryBarriers = &readBarrier;
+            vkCmdPipelineBarrier2(commandBuffer, &readDependency);
+
+            mipWidth = mipWidth > 1 ? mipWidth / 2 : 1;
+            mipHeight = mipHeight > 1 ? mipHeight / 2 : 1;
+        }
+
+        VkImageMemoryBarrier2 lastBarrier{};
+        lastBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        lastBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        lastBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        lastBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        lastBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        lastBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        lastBarrier.newLayout = texture.m_descriptorLayout;
+        lastBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        lastBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        lastBarrier.image = texture.m_image;
+        lastBarrier.subresourceRange.aspectMask = texture.m_aspectMask;
+        lastBarrier.subresourceRange.baseMipLevel = texture.m_mipLevels - 1;
+        lastBarrier.subresourceRange.levelCount = 1;
+        lastBarrier.subresourceRange.baseArrayLayer = 0;
+        lastBarrier.subresourceRange.layerCount = 1;
+
+        VkDependencyInfo lastDependency{};
+        lastDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        lastDependency.imageMemoryBarrierCount = 1;
+        lastDependency.pImageMemoryBarriers = &lastBarrier;
+        vkCmdPipelineBarrier2(commandBuffer, &lastDependency);
+
+        texture.m_currentLayout = texture.m_descriptorLayout;
+        return true;
     }
 
     bool VulkanRenderer::copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture)
@@ -3152,7 +3413,21 @@ namespace kera
         vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.getVulkanBuffer(), texture.m_image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-        transitionTextureLayout(commandBuffer, texture, texture.m_descriptorLayout);
+        if (texture.m_generateMipmaps)
+        {
+            if (!generateTextureMipmaps(commandBuffer, texture))
+            {
+                endDebugLabel(m_device->getVulkanDevice(), commandBuffer);
+                vkEndCommandBuffer(commandBuffer);
+                vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+                Logger::getInstance().error("Failed to generate Vulkan texture mipmaps.");
+                return false;
+            }
+        }
+        else
+        {
+            transitionTextureLayout(commandBuffer, texture, texture.m_descriptorLayout);
+        }
         endDebugLabel(m_device->getVulkanDevice(), commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
@@ -3544,10 +3819,10 @@ namespace kera
 
         VkImageMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        barrier.srcStageMask = stageMask2ForLayout(m_swapchainImageLayouts[imageIndex]);
-        barrier.srcAccessMask = accessMask2ForLayout(m_swapchainImageLayouts[imageIndex]);
-        barrier.dstStageMask = stageMask2ForLayout(newLayout);
-        barrier.dstAccessMask = accessMask2ForLayout(newLayout);
+        barrier.srcStageMask = vulkanStageMaskForImageLayout(m_swapchainImageLayouts[imageIndex]);
+        barrier.srcAccessMask = vulkanAccessMaskForImageLayout(m_swapchainImageLayouts[imageIndex]);
+        barrier.dstStageMask = vulkanStageMaskForImageLayout(newLayout);
+        barrier.dstAccessMask = vulkanAccessMaskForImageLayout(newLayout);
         barrier.oldLayout = m_swapchainImageLayouts[imageIndex];
         barrier.newLayout = newLayout;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

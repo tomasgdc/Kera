@@ -51,7 +51,10 @@ namespace kera
         VkDeviceMemory m_memory = VK_NULL_HANDLE;
         VkImageView m_imageView = VK_NULL_HANDLE;
         VkFormat m_format = VK_FORMAT_R8G8B8A8_UNORM;
+        TextureFormat m_textureFormat = TextureFormat::RGBA8;
         VkExtent2D m_extent{};
+        uint32_t m_mipLevels = 1;
+        bool m_generateMipmaps = false;
         VkImageAspectFlags m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         VkImageLayout m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -75,7 +78,10 @@ namespace kera
             , m_memory(std::exchange(other.m_memory, VK_NULL_HANDLE))
             , m_imageView(std::exchange(other.m_imageView, VK_NULL_HANDLE))
             , m_format(other.m_format)
+            , m_textureFormat(other.m_textureFormat)
             , m_extent(other.m_extent)
+            , m_mipLevels(other.m_mipLevels)
+            , m_generateMipmaps(other.m_generateMipmaps)
             , m_aspectMask(other.m_aspectMask)
             , m_currentLayout(other.m_currentLayout)
             , m_descriptorLayout(other.m_descriptorLayout)
@@ -96,7 +102,10 @@ namespace kera
                 m_memory = std::exchange(other.m_memory, VK_NULL_HANDLE);
                 m_imageView = std::exchange(other.m_imageView, VK_NULL_HANDLE);
                 m_format = other.m_format;
+                m_textureFormat = other.m_textureFormat;
                 m_extent = other.m_extent;
+                m_mipLevels = other.m_mipLevels;
+                m_generateMipmaps = other.m_generateMipmaps;
                 m_aspectMask = other.m_aspectMask;
                 m_currentLayout = other.m_currentLayout;
                 m_descriptorLayout = other.m_descriptorLayout;
@@ -126,7 +135,10 @@ namespace kera
                 m_memory = VK_NULL_HANDLE;
             }
             m_device = VK_NULL_HANDLE;
+            m_textureFormat = TextureFormat::RGBA8;
             m_extent = {};
+            m_mipLevels = 1;
+            m_generateMipmaps = false;
             m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -373,6 +385,7 @@ namespace kera
         bool recreateSwapchainResources(uint32_t width, uint32_t height);
         bool recreateLiveGraphicsPipelines();
         bool recreateSwapchainFromWindow();
+        bool refreshSwapchainSupport();
         bool hasActiveFrames() const;
         void releaseFrame(FrameHandle frame, uint32_t syncIndex);
         bool waitForTimelineValue(uint64_t timelineValue);
@@ -392,6 +405,7 @@ namespace kera
         void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
                                      VkImageLayout newLayout);
         bool copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture);
+        bool generateTextureMipmaps(VkCommandBuffer commandBuffer, VulkanTextureResource& texture);
         void clearCompletedFrameResourceUse(uint32_t syncIndex);
         void recordDescriptorSetUse(uint32_t syncIndex, DescriptorSetHandle descriptorSetHandle,
                                     const VulkanDescriptorSetResource& descriptorSet);
@@ -447,9 +461,11 @@ namespace kera
         ResourceRegistry<VulkanGraphicsPipelineResource, GraphicsPipelineHandle> m_graphicsPipelines;
         ResourceRegistry<VulkanDescriptorSetResource, DescriptorSetHandle> m_descriptorSets;
         ResourceRegistry<VulkanFrameResource, FrameHandle> m_frames;
-        RendererStats m_stats;
+        mutable RendererStats m_stats;
+        Extent2D m_pendingResizeExtent{};
         bool m_uiInitialized = false;
         bool m_swapchainRecreateRequested = false;
+        bool m_resizePending = false;
     };
 
 }  // namespace kera

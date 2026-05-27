@@ -19,7 +19,8 @@ namespace kera
     {
         Vertex,
         Fragment,
-        Compute
+        Compute,
+        AllGraphics
     };
 
     enum class ShaderSourceKind
@@ -80,6 +81,12 @@ namespace kera
         CounterClockwise
     };
 
+    enum class BlendModeKind
+    {
+        Opaque,
+        Alpha
+    };
+
     enum class DescriptorType
     {
         UniformBuffer,
@@ -90,10 +97,48 @@ namespace kera
     enum class TextureFormat
     {
         RGBA8,
+        RGBA8Srgb,
         Depth32
     };
 
+    inline std::size_t textureFormatBytesPerPixel(TextureFormat format) noexcept
+    {
+        switch (format)
+        {
+            case TextureFormat::RGBA8:
+            case TextureFormat::RGBA8Srgb:
+                return 4;
+            case TextureFormat::Depth32:
+                return 4;
+            default:
+                return 0;
+        }
+    }
+
+    inline uint32_t textureFullMipLevelCount(uint32_t width, uint32_t height) noexcept
+    {
+        if (width == 0 || height == 0)
+        {
+            return 0;
+        }
+
+        uint32_t levels = 1;
+        while (width > 1 || height > 1)
+        {
+            width = width > 1 ? width / 2 : 1;
+            height = height > 1 ? height / 2 : 1;
+            ++levels;
+        }
+        return levels;
+    }
+
     enum class SamplerFilter
+    {
+        Nearest,
+        Linear
+    };
+
+    enum class SamplerMipFilter
     {
         Nearest,
         Linear
@@ -102,7 +147,8 @@ namespace kera
     enum class SamplerAddressMode
     {
         ClampToEdge,
-        Repeat
+        Repeat,
+        MirroredRepeat
     };
 
     template <typename Tag>
@@ -139,6 +185,7 @@ namespace kera
         ShaderSourceKind source = ShaderSourceKind::SlangFile;
         std::vector<std::string> searchPaths;
         std::vector<uint32_t> spirvCode;
+        std::string debugName;
     };
 
     struct ShaderProgramDesc
@@ -165,6 +212,10 @@ namespace kera
         uint32_t width = 0;
         uint32_t height = 0;
         TextureFormat format = TextureFormat::RGBA8;
+        // A value of 1 with generateMipmaps=true requests the full mip chain.
+        uint32_t mipLevels = 1;
+        // uploadTexture() uploads level 0 and generates the remaining levels when enabled.
+        bool generateMipmaps = false;
         bool renderTarget = false;
         bool sampled = true;
         bool depthStencil = false;
@@ -174,8 +225,13 @@ namespace kera
     {
         SamplerFilter minFilter = SamplerFilter::Linear;
         SamplerFilter magFilter = SamplerFilter::Linear;
+        SamplerMipFilter mipFilter = SamplerMipFilter::Linear;
         SamplerAddressMode addressModeU = SamplerAddressMode::ClampToEdge;
         SamplerAddressMode addressModeV = SamplerAddressMode::ClampToEdge;
+        float minLod = 0.0f;
+        float maxLod = 0.0f;
+        // Values above one request anisotropic filtering, clamped to device limits by the backend.
+        float maxAnisotropy = 1.0f;
     };
 
     struct RenderTargetDesc
@@ -234,6 +290,7 @@ namespace kera
         RenderTargetHandle renderTarget;
         VertexLayoutDesc vertexLayout;
         std::vector<DescriptorSetLayoutDesc> descriptorSets;
+        BlendModeKind blendMode = BlendModeKind::Opaque;
         bool depthTest = false;
         bool depthWrite = false;
     };
