@@ -191,6 +191,9 @@ namespace kera
     struct ShaderProgramDesc
     {
         std::vector<ShaderModuleDesc> stages;
+        std::string debugName;
+    };
+
     struct GraphicsShaderProgramDesc
     {
         std::string path;
@@ -205,6 +208,7 @@ namespace kera
         std::size_t size = 0;
         BufferUsageKind usage = BufferUsageKind::Vertex;
         MemoryAccess memoryAccess = MemoryAccess::GpuOnly;
+        std::string debugName;
     };
 
     struct TextureDesc
@@ -219,6 +223,7 @@ namespace kera
         bool renderTarget = false;
         bool sampled = true;
         bool depthStencil = false;
+        std::string debugName;
     };
 
     struct SamplerDesc
@@ -232,12 +237,14 @@ namespace kera
         float maxLod = 0.0f;
         // Values above one request anisotropic filtering, clamped to device limits by the backend.
         float maxAnisotropy = 1.0f;
+        std::string debugName;
     };
 
     struct RenderTargetDesc
     {
         TextureHandle colorTexture;
         TextureHandle depthTexture;
+        std::string debugName;
     };
 
     struct InstanceBufferDesc
@@ -270,6 +277,7 @@ namespace kera
 
     struct DescriptorBindingDesc
     {
+        std::string name;
         uint32_t binding = 0;
         DescriptorType type = DescriptorType::UniformBuffer;
         ShaderStage stage = ShaderStage::Vertex;
@@ -293,6 +301,7 @@ namespace kera
         BlendModeKind blendMode = BlendModeKind::Opaque;
         bool depthTest = false;
         bool depthWrite = false;
+        std::string debugName;
     };
 
     struct ClearColorValue

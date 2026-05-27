@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -222,6 +223,7 @@ namespace kera
         GraphicsPipelineHandle m_pipeline;
         uint32_t m_set = 0;
         DescriptorSetLayoutDesc m_layout;
+        std::string m_debugName;
         std::vector<VulkanDescriptorBindingReference<BufferHandle>> m_buffers;
         std::vector<VulkanDescriptorBindingReference<TextureHandle>> m_textures;
         std::vector<VulkanDescriptorBindingReference<SamplerHandle>> m_samplers;
@@ -365,6 +367,12 @@ namespace kera
         RendererValidationReport validateGraphicsPipelineDescriptorSetsDetailed(
             GraphicsPipelineHandle pipeline) const override;
         bool destroyDescriptorSet(DescriptorSetHandle set) override;
+
+        bool setDebugName(BufferHandle buffer, const std::string& name) override;
+        bool setDebugName(TextureHandle texture, const std::string& name) override;
+        bool setDebugName(SamplerHandle sampler, const std::string& name) override;
+        bool setDebugName(GraphicsPipelineHandle pipeline, const std::string& name) override;
+        bool setDebugName(DescriptorSetHandle descriptorSet, const std::string& name) override;
 
         FrameHandle beginFrame() override;
         void beginRenderPass(FrameHandle frame, const RenderPassDesc& desc) override;

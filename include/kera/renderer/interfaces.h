@@ -121,6 +121,12 @@ namespace kera
             GraphicsPipelineHandle pipeline) const;
         virtual bool destroyDescriptorSet(DescriptorSetHandle set) = 0;
 
+        virtual bool setDebugName(BufferHandle buffer, const std::string& name);
+        virtual bool setDebugName(TextureHandle texture, const std::string& name);
+        virtual bool setDebugName(SamplerHandle sampler, const std::string& name);
+        virtual bool setDebugName(GraphicsPipelineHandle pipeline, const std::string& name);
+        virtual bool setDebugName(DescriptorSetHandle descriptorSet, const std::string& name);
+
         virtual FrameHandle beginFrame() = 0;
         virtual void beginRenderPass(FrameHandle frame, const RenderPassDesc& desc) = 0;
         virtual void beginRenderPass(FrameHandle frame, RenderTargetHandle target, const RenderPassDesc& desc) = 0;
@@ -285,6 +291,32 @@ namespace kera
                         "Detailed graphics-pipeline descriptor validation is not supported by this renderer backend.");
         return report;
     }
+
+    inline bool IRenderer::setDebugName(BufferHandle, const std::string&)
+    {
+        return false;
+    }
+
+    inline bool IRenderer::setDebugName(TextureHandle, const std::string&)
+    {
+        return false;
+    }
+
+    inline bool IRenderer::setDebugName(SamplerHandle, const std::string&)
+    {
+        return false;
+    }
+
+    inline bool IRenderer::setDebugName(GraphicsPipelineHandle, const std::string&)
+    {
+        return false;
+    }
+
+    inline bool IRenderer::setDebugName(DescriptorSetHandle, const std::string&)
+    {
+        return false;
+    }
+
     inline RendererResult<ShaderProgramHandle> IRenderer::tryCreateGraphicsShaderProgram(
         const GraphicsShaderProgramDesc& desc)
     {

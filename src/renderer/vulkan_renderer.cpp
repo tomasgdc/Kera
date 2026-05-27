@@ -186,16 +186,16 @@ namespace kera
             return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
         }
 
-        void setDebugObjectName(VkDevice device, VkObjectType objectType, uint64_t objectHandle, const std::string& name)
+        void setDebugObjectName(VkDevice device, VkObjectType objectType, uint64_t objectHandle,
+                                const std::string& name)
         {
             if (device == VK_NULL_HANDLE || objectHandle == 0 || name.empty())
             {
                 return;
             }
 
-            auto setName =
-                reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(vkGetDeviceProcAddr(device,
-                                                                                       "vkSetDebugUtilsObjectNameEXT"));
+            auto setName = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(
+                vkGetDeviceProcAddr(device, "vkSetDebugUtilsObjectNameEXT"));
             if (!setName)
             {
                 return;
@@ -209,7 +209,35 @@ namespace kera
             setName(device, &nameInfo);
         }
 
-        void beginDebugLabel(VkDevice device, VkCommandBuffer commandBuffer, const char* name, float r, float g, float b)
+        std::string debugNameOrDefault(const std::string& debugName, const std::string& fallback)
+        {
+            return debugName.empty() ? fallback : debugName;
+        }
+
+        void logValidationReport(const RendererValidationReport& report)
+        {
+            for (const RendererValidationIssue& issue : report.issues)
+            {
+                Logger::getInstance().error(std::string("[") + rendererValidationCategoryName(issue.category) + "] " +
+                                            issue.message);
+            }
+        }
+
+        void logVulkanCapabilities(const PhysicalDevice& physicalDevice, const SwapChain& swapchain)
+        {
+            const VkPhysicalDeviceProperties& properties = physicalDevice.getProperties();
+            Logger::getInstance().info(
+                "Vulkan capabilities: device '" + physicalDevice.getDeviceName() + "', API " +
+                std::to_string(VK_API_VERSION_MAJOR(properties.apiVersion)) + "." +
+                std::to_string(VK_API_VERSION_MINOR(properties.apiVersion)) + "." +
+                std::to_string(VK_API_VERSION_PATCH(properties.apiVersion)) +
+                ", required features: synchronization2, dynamic rendering, timeline semaphore, swapchain " +
+                std::to_string(swapchain.getImageCount()) + " images " + swapchainFormatName(swapchain.getImageFormat()) +
+                ", max frames in flight " + std::to_string(kMaxFramesInFlight) + ".");
+        }
+
+        void beginDebugLabel(VkDevice device, VkCommandBuffer commandBuffer, const char* name, float r, float g,
+                             float b)
         {
             if (device == VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE || !name)
             {
@@ -531,8 +559,8 @@ namespace kera
             Logger::getInstance().error("Failed to create Vulkan pipeline cache");
             return false;
         }
-        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_PIPELINE_CACHE,
-                           (uint64_t)m_pipelineCache, "Kera Pipeline Cache");
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_PIPELINE_CACHE, (uint64_t)m_pipelineCache,
+                           "Kera Pipeline Cache");
 
         if (!createDescriptorPool())
         {
@@ -553,6 +581,7 @@ namespace kera
             return false;
         }
 
+        logVulkanCapabilities(*m_physicalDevice, *m_swapchain);
         return true;
     }
 
@@ -1042,7 +1071,8 @@ namespace kera
         if (VulkanBufferResource* namedResource = m_buffers.get(handle))
         {
             setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_BUFFER,
-                               (uint64_t)namedResource->m_buffer.getVulkanBuffer(), "Kera Buffer");
+                               (uint64_t)namedResource->m_buffer.getVulkanBuffer(),
+                               debugNameOrDefault(desc.debugName, "Kera Buffer"));
         }
         return handle;
     }
@@ -1115,6 +1145,7 @@ namespace kera
             return false;
         }
 
+        ++m_stats.bufferUploadsThisFrame;
         return true;
     }
 
@@ -1144,8 +1175,7 @@ namespace kera
         if (VulkanBufferResource* namedResource = m_buffers.get(handle))
         {
             setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_BUFFER,
-                               (uint64_t)namedResource->m_buffer.getVulkanBuffer(),
-                               "Kera Uniform Ring Buffer");
+                               (uint64_t)namedResource->m_buffer.getVulkanBuffer(), "Kera Uniform Ring Buffer");
         }
         return handle;
     }
@@ -1342,10 +1372,11 @@ namespace kera
         TextureHandle handle = m_textures.emplace(std::move(resource));
         if (VulkanTextureResource* namedResource = m_textures.get(handle))
         {
-            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_IMAGE,
-                               (uint64_t)namedResource->m_image, "Kera Texture Image");
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_IMAGE, (uint64_t)namedResource->m_image,
+                               debugNameOrDefault(desc.debugName, "Kera Texture Image"));
             setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_IMAGE_VIEW,
-                               (uint64_t)namedResource->m_imageView, "Kera Texture View");
+                               (uint64_t)namedResource->m_imageView,
+                               desc.debugName.empty() ? std::string("Kera Texture View") : desc.debugName + " View");
         }
         return handle;
     }
@@ -1419,6 +1450,7 @@ namespace kera
             return false;
         }
 
+        ++m_stats.textureUploadsThisFrame;
         return true;
     }
 
@@ -1490,8 +1522,8 @@ namespace kera
         SamplerHandle handle = m_samplers.emplace(std::move(resource));
         if (VulkanSamplerResource* namedResource = m_samplers.get(handle))
         {
-            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_SAMPLER,
-                               (uint64_t)namedResource->m_sampler, "Kera Sampler");
+            setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_SAMPLER, (uint64_t)namedResource->m_sampler,
+                               debugNameOrDefault(desc.debugName, "Kera Sampler"));
         }
         return handle;
     }
@@ -1636,7 +1668,7 @@ namespace kera
         {
             setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_PIPELINE,
                                (uint64_t)namedResource->m_pipeline.getVulkanPipeline(),
-                               "Kera Graphics Pipeline");
+                               debugNameOrDefault(effectiveDesc.debugName, "Kera Graphics Pipeline"));
         }
         return handle;
     }
@@ -1789,9 +1821,12 @@ namespace kera
             return {};
         }
         resource.m_layout = *layoutDesc;
+        resource.m_debugName = pipeline->m_desc.debugName.empty()
+                                   ? "Kera Descriptor Set"
+                                   : pipeline->m_desc.debugName + " Descriptor Set " + std::to_string(set);
         DescriptorSetHandle descriptorSetHandle = m_descriptorSets.emplace(resource);
-        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_SET,
-                           (uint64_t)descriptorSet, "Kera Descriptor Set");
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptorSet,
+                           resource.m_debugName);
         return descriptorSetHandle;
     }
 
@@ -2130,6 +2165,73 @@ namespace kera
         return report;
     }
 
+    bool VulkanRenderer::setDebugName(BufferHandle bufferHandle, const std::string& name)
+    {
+        VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
+        if (!m_device || !buffer || name.empty())
+        {
+            return false;
+        }
+
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_BUFFER,
+                           (uint64_t)buffer->m_buffer.getVulkanBuffer(), name);
+        return true;
+    }
+
+    bool VulkanRenderer::setDebugName(TextureHandle textureHandle, const std::string& name)
+    {
+        VulkanTextureResource* texture = m_textures.get(textureHandle);
+        if (!m_device || !texture || name.empty())
+        {
+            return false;
+        }
+
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_IMAGE, (uint64_t)texture->m_image, name);
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)texture->m_imageView,
+                           name + " View");
+        return true;
+    }
+
+    bool VulkanRenderer::setDebugName(SamplerHandle samplerHandle, const std::string& name)
+    {
+        VulkanSamplerResource* sampler = m_samplers.get(samplerHandle);
+        if (!m_device || !sampler || name.empty())
+        {
+            return false;
+        }
+
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_SAMPLER, (uint64_t)sampler->m_sampler, name);
+        return true;
+    }
+
+    bool VulkanRenderer::setDebugName(GraphicsPipelineHandle pipelineHandle, const std::string& name)
+    {
+        VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
+        if (!m_device || !pipeline || name.empty())
+        {
+            return false;
+        }
+
+        pipeline->m_desc.debugName = name;
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_PIPELINE,
+                           (uint64_t)pipeline->m_pipeline.getVulkanPipeline(), name);
+        return true;
+    }
+
+    bool VulkanRenderer::setDebugName(DescriptorSetHandle descriptorSetHandle, const std::string& name)
+    {
+        VulkanDescriptorSetResource* descriptorSet = m_descriptorSets.get(descriptorSetHandle);
+        if (!m_device || !descriptorSet || name.empty())
+        {
+            return false;
+        }
+
+        descriptorSet->m_debugName = name;
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                           (uint64_t)descriptorSet->m_descriptorSet, name);
+        return true;
+    }
+
     FrameHandle VulkanRenderer::beginFrame()
     {
         if (!m_device || !m_swapchain || m_commandBuffers.empty() || m_frameSyncResources.empty())
@@ -2251,6 +2353,13 @@ namespace kera
         frame.m_imageIndex = imageIndex;
         frame.m_syncIndex = syncIndex;
         m_stats.drawCallsThisFrame = 0;
+        m_stats.pipelinesBoundThisFrame = 0;
+        m_stats.descriptorSetsBoundThisFrame = 0;
+        m_stats.vertexBuffersBoundThisFrame = 0;
+        m_stats.indexBuffersBoundThisFrame = 0;
+        m_stats.bufferUploadsThisFrame = 0;
+        m_stats.textureUploadsThisFrame = 0;
+        m_stats.validationIssuesThisFrame = 0;
         ++m_stats.frameIndex;
         FrameHandle frameHandle = m_frames.emplace(frame);
         activeFrameHandle = frameHandle;
@@ -2472,6 +2581,7 @@ namespace kera
 
         vkCmdBindPipeline(frame->m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline->m_pipeline.getVulkanPipeline());
+        ++m_stats.pipelinesBoundThisFrame;
     }
 
     void VulkanRenderer::bindVertexBuffer(FrameHandle frameHandle, uint32_t slot, BufferHandle bufferHandle,
@@ -2493,6 +2603,7 @@ namespace kera
         VkBuffer vertexBuffers[] = {buffer->m_buffer.getVulkanBuffer()};
         VkDeviceSize offsets[] = {static_cast<VkDeviceSize>(offset)};
         vkCmdBindVertexBuffers(frame->m_commandBuffer, slot, 1, vertexBuffers, offsets);
+        ++m_stats.vertexBuffersBoundThisFrame;
     }
 
     void VulkanRenderer::bindIndexBuffer(FrameHandle frameHandle, BufferHandle bufferHandle, IndexFormat format,
@@ -2514,6 +2625,7 @@ namespace kera
         const VkIndexType indexType = format == IndexFormat::UInt32 ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
         vkCmdBindIndexBuffer(frame->m_commandBuffer, buffer->m_buffer.getVulkanBuffer(),
                              static_cast<VkDeviceSize>(offset), indexType);
+        ++m_stats.indexBuffersBoundThisFrame;
     }
 
     void VulkanRenderer::bindDescriptorSet(FrameHandle frameHandle, GraphicsPipelineHandle pipelineHandle,
@@ -2734,6 +2846,11 @@ namespace kera
         {
             return false;
         }
+        if (width == 0 || height == 0)
+        {
+            m_swapchainRecreateRequested = true;
+            return false;
+        }
 
         if (hasActiveFrames())
         {
@@ -2841,6 +2958,9 @@ namespace kera
                     Logger::getInstance().error("Failed to recreate live graphics pipeline.");
                     return false;
                 }
+                setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_PIPELINE,
+                                   (uint64_t)resource.m_pipeline.getVulkanPipeline(),
+                                   debugNameOrDefault(resource.m_desc.debugName, "Kera Graphics Pipeline"));
 
                 if (!reallocateDescriptorSetsForPipeline(pipelineHandle, resource))
                 {
@@ -3092,7 +3212,8 @@ namespace kera
                 descriptorSet.m_textures.clear();
                 descriptorSet.m_samplers.clear();
                 setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_SET,
-                                   (uint64_t)newDescriptorSet, "Kera Descriptor Set");
+                                   (uint64_t)newDescriptorSet,
+                                   debugNameOrDefault(descriptorSet.m_debugName, "Kera Descriptor Set"));
 
                 for (const auto& reference : buffers)
                 {
@@ -3939,8 +4060,7 @@ namespace kera
             return false;
         }
 
-        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_POOL,
-                           (uint64_t)pool.m_pool,
+        setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_POOL, (uint64_t)pool.m_pool,
                            "Kera Descriptor Pool " + std::to_string(m_descriptorPools.size()));
         m_descriptorPools.push_back(pool);
         return true;
