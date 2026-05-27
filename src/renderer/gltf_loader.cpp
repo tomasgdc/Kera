@@ -23,9 +23,9 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
-#include <cmath>
 #include <string>
 #include <vector>
 
@@ -33,8 +33,8 @@ namespace kera
 {
     namespace
     {
-        RendererResult<GltfLoadedModel> failLoad(IRenderer& renderer, GltfLoadedModel& model,
-                                                 RendererErrorCode code, std::string message)
+        RendererResult<GltfLoadedModel> failLoad(IRenderer& renderer, GltfLoadedModel& model, RendererErrorCode code,
+                                                 std::string message)
         {
             destroyGltfModel(renderer, model);
             return RendererResult<GltfLoadedModel>::failure(code, std::move(message));
@@ -58,8 +58,8 @@ namespace kera
 
         glm::vec3 fallbackTangentForNormal(const glm::vec3& normal)
         {
-            const glm::vec3 axis = std::abs(normal.y) < 0.95f ? glm::vec3(0.0f, 1.0f, 0.0f)
-                                                              : glm::vec3(1.0f, 0.0f, 0.0f);
+            const glm::vec3 axis =
+                std::abs(normal.y) < 0.95f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
             return normalizeOr(glm::cross(axis, normal), glm::vec3(1.0f, 0.0f, 0.0f));
         }
 
@@ -347,9 +347,8 @@ namespace kera
         }
 
         bool createMaterialTexture(IRenderer& renderer, const tinygltf::Model& tinyModel, int textureIndex,
-                                   TextureFormat format, const std::string& debugName,
-                                   TextureHandle& textureHandle, std::string& textureName,
-                                   uint32_t& textureMipLevels)
+                                   TextureFormat format, const std::string& debugName, TextureHandle& textureHandle,
+                                   std::string& textureName, uint32_t& textureMipLevels)
         {
             const tinygltf::Image* image = nullptr;
             if (!getTextureSourceImage(tinyModel, textureIndex, image, textureName))
@@ -363,8 +362,8 @@ namespace kera
                 return false;
             }
 
-            textureMipLevels = textureFullMipLevelCount(static_cast<uint32_t>(image->width),
-                                                        static_cast<uint32_t>(image->height));
+            textureMipLevels =
+                textureFullMipLevelCount(static_cast<uint32_t>(image->width), static_cast<uint32_t>(image->height));
             textureHandle = renderer.createTexture({
                 .width = static_cast<uint32_t>(image->width),
                 .height = static_cast<uint32_t>(image->height),
@@ -549,14 +548,13 @@ namespace kera
         GltfMaterialFactors readMaterialFactors(const tinygltf::Material& material)
         {
             GltfMaterialFactors factors;
-            factors.baseColor = glm::vec4(
-                readFactor(material.pbrMetallicRoughness.baseColorFactor, 0, 1.0f),
-                readFactor(material.pbrMetallicRoughness.baseColorFactor, 1, 1.0f),
-                readFactor(material.pbrMetallicRoughness.baseColorFactor, 2, 1.0f),
-                readFactor(material.pbrMetallicRoughness.baseColorFactor, 3, 1.0f));
-            factors.emissive = glm::vec3(readFactor(material.emissiveFactor, 0, 0.0f),
-                                         readFactor(material.emissiveFactor, 1, 0.0f),
-                                         readFactor(material.emissiveFactor, 2, 0.0f));
+            factors.baseColor = glm::vec4(readFactor(material.pbrMetallicRoughness.baseColorFactor, 0, 1.0f),
+                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 1, 1.0f),
+                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 2, 1.0f),
+                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 3, 1.0f));
+            factors.emissive =
+                glm::vec3(readFactor(material.emissiveFactor, 0, 0.0f), readFactor(material.emissiveFactor, 1, 0.0f),
+                          readFactor(material.emissiveFactor, 2, 0.0f));
             factors.metallic = static_cast<float>(material.pbrMetallicRoughness.metallicFactor);
             factors.roughness = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor);
             factors.normalScale = static_cast<float>(material.normalTexture.scale);
@@ -585,8 +583,7 @@ namespace kera
         GltfLoadedModel loadedModel;
         if (desc.path.empty())
         {
-            return RendererResult<GltfLoadedModel>::failure(RendererErrorCode::ValidationFailed,
-                                                            "glTF path is empty.");
+            return RendererResult<GltfLoadedModel>::failure(RendererErrorCode::ValidationFailed, "glTF path is empty.");
         }
 
         tinygltf::TinyGLTF loader;
@@ -599,8 +596,8 @@ namespace kera
             {
                 Logger::getInstance().warning("glTF loader warning: " + warning);
             }
-            const std::string message = error.empty() ? "Failed to load glTF file: " + desc.path
-                                                      : "Failed to load glTF file: " + error;
+            const std::string message =
+                error.empty() ? "Failed to load glTF file: " + desc.path : "Failed to load glTF file: " + error;
             return failLoad(renderer, loadedModel, RendererErrorCode::ValidationFailed, message);
         }
         if (!warning.empty())
@@ -712,15 +709,14 @@ namespace kera
                                   baseColorMipLevels) &&
             createMaterialTexture(renderer, tinyModel, material.pbrMetallicRoughness.metallicRoughnessTexture.index,
                                   TextureFormat::RGBA8, makeDebugName(desc, "Metal Roughness"),
-                                  loadedModel.materialTextures.metalRoughness,
-                                  loadedModel.textureNames.metalRoughness, metalRoughnessMipLevels) &&
+                                  loadedModel.materialTextures.metalRoughness, loadedModel.textureNames.metalRoughness,
+                                  metalRoughnessMipLevels) &&
             createMaterialTexture(renderer, tinyModel, material.emissiveTexture.index, TextureFormat::RGBA8Srgb,
                                   makeDebugName(desc, "Emissive"), loadedModel.materialTextures.emissive,
                                   loadedModel.textureNames.emissive, emissiveMipLevels) &&
-            createMaterialTexture(renderer, tinyModel, material.occlusionTexture.index,
-                                  TextureFormat::RGBA8, makeDebugName(desc, "Occlusion"),
-                                  loadedModel.materialTextures.occlusion, loadedModel.textureNames.occlusion,
-                                  occlusionMipLevels) &&
+            createMaterialTexture(renderer, tinyModel, material.occlusionTexture.index, TextureFormat::RGBA8,
+                                  makeDebugName(desc, "Occlusion"), loadedModel.materialTextures.occlusion,
+                                  loadedModel.textureNames.occlusion, occlusionMipLevels) &&
             createMaterialTexture(renderer, tinyModel, material.normalTexture.index, TextureFormat::RGBA8,
                                   makeDebugName(desc, "Normal"), loadedModel.materialTextures.normal,
                                   loadedModel.textureNames.normal, normalMipLevels);
@@ -729,14 +725,12 @@ namespace kera
             return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
                             "glTF material is missing a required PBR texture or uses an unsupported image format.");
         }
-        maxMaterialMipLevels =
-            std::max({baseColorMipLevels, metalRoughnessMipLevels, emissiveMipLevels, occlusionMipLevels,
-                      normalMipLevels});
+        maxMaterialMipLevels = std::max(
+            {baseColorMipLevels, metalRoughnessMipLevels, emissiveMipLevels, occlusionMipLevels, normalMipLevels});
 
-        loadedModel.materialSampler =
-            renderer.createSampler(createMaterialSamplerDesc(tinyModel, material.pbrMetallicRoughness.baseColorTexture.index,
-                                                            maxMaterialMipLevels,
-                                                            makeDebugName(desc, "Material Sampler")));
+        loadedModel.materialSampler = renderer.createSampler(
+            createMaterialSamplerDesc(tinyModel, material.pbrMetallicRoughness.baseColorTexture.index,
+                                      maxMaterialMipLevels, makeDebugName(desc, "Material Sampler")));
         if (!loadedModel.materialSampler.isValid())
         {
             return failLoad(renderer, loadedModel, RendererErrorCode::BackendFailure,

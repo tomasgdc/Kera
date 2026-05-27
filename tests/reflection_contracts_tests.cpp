@@ -223,8 +223,8 @@ namespace
         {
             return false;
         }
-        bool updateDescriptorSet(kera::DescriptorSetHandle, const std::string& name, kera::BufferHandle,
-                                 std::size_t, std::size_t) override
+        bool updateDescriptorSet(kera::DescriptorSetHandle, const std::string& name, kera::BufferHandle, std::size_t,
+                                 std::size_t) override
         {
             return name == "globalParams";
         }
@@ -279,29 +279,27 @@ int main()
     assert(layout.attributes.size() == 2);
 
     kera::VertexLayoutDesc unusedLayout{};
-    const auto unusedContract = kera::PipelineReflectionBuilder{}
-                                    .debugName("Unused Semantic Test")
-                                    .vertexEntry("vertexMain")
-                                    .vertexBinding<Vertex>("meshVertex", 0)
-                                    .semantic("POSITION", "meshVertex", offsetof(Vertex, position),
-                                              kera::VertexFormat::Float3)
-                                    .semantic("COLOR", "meshVertex", offsetof(Vertex, color),
-                                              kera::VertexFormat::Float3)
-                                    .semantic("TEXCOORD0", "meshVertex", 0, kera::VertexFormat::Float2)
-                                    .uniform<Uniforms>("globalParams")
-                                    .build();
+    const auto unusedContract =
+        kera::PipelineReflectionBuilder{}
+            .debugName("Unused Semantic Test")
+            .vertexEntry("vertexMain")
+            .vertexBinding<Vertex>("meshVertex", 0)
+            .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+            .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+            .semantic("TEXCOORD0", "meshVertex", 0, kera::VertexFormat::Float2)
+            .uniform<Uniforms>("globalParams")
+            .build();
     assert(!kera::appendValidatedReflectedPipelineContract(unusedLayout, &reflection, unusedContract));
 
     kera::VertexLayoutDesc duplicateLayout{};
-    const auto duplicateContract = kera::PipelineReflectionBuilder{}
-                                       .vertexEntry("vertexMain")
-                                       .vertexBinding<Vertex>("meshVertex", 0)
-                                       .semantic("POSITION", "meshVertex", offsetof(Vertex, position),
-                                                 kera::VertexFormat::Float3)
-                                       .semantic("POSITION", "meshVertex", offsetof(Vertex, color),
-                                                 kera::VertexFormat::Float3)
-                                       .uniform<Uniforms>("globalParams")
-                                       .build();
+    const auto duplicateContract =
+        kera::PipelineReflectionBuilder{}
+            .vertexEntry("vertexMain")
+            .vertexBinding<Vertex>("meshVertex", 0)
+            .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+            .semantic("POSITION", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+            .uniform<Uniforms>("globalParams")
+            .build();
     assert(!kera::appendValidatedReflectedPipelineContract(duplicateLayout, &reflection, duplicateContract));
 
     FakeRenderer renderer;
@@ -310,9 +308,9 @@ int main()
     const kera::TextureHandle texture{0, 1};
     const kera::SamplerHandle sampler{0, 1};
     const kera::DescriptorSetUpdate update = renderer.updateDescriptors(descriptorSet)
-               .uniform<Uniforms>("globalParams", buffer)
-               .sampledImage("sceneTexture", texture)
-               .sampler("sceneSampler", sampler);
+                                                 .uniform<Uniforms>("globalParams", buffer)
+                                                 .sampledImage("sceneTexture", texture)
+                                                 .sampler("sceneSampler", sampler);
     assert(update.ok());
     const kera::DescriptorSetUpdate failedUpdate =
         renderer.updateDescriptors(descriptorSet).sampledImage("globalParams", texture);

@@ -232,8 +232,9 @@ namespace kera
                 std::to_string(VK_API_VERSION_MINOR(properties.apiVersion)) + "." +
                 std::to_string(VK_API_VERSION_PATCH(properties.apiVersion)) +
                 ", required features: synchronization2, dynamic rendering, timeline semaphore, swapchain " +
-                std::to_string(swapchain.getImageCount()) + " images " + swapchainFormatName(swapchain.getImageFormat()) +
-                ", max frames in flight " + std::to_string(kMaxFramesInFlight) + ".");
+                std::to_string(swapchain.getImageCount()) + " images " +
+                swapchainFormatName(swapchain.getImageFormat()) + ", max frames in flight " +
+                std::to_string(kMaxFramesInFlight) + ".");
         }
 
         void beginDebugLabel(VkDevice device, VkCommandBuffer commandBuffer, const char* name, float r, float g,
@@ -340,10 +341,9 @@ namespace kera
                 return false;
             }
 
-            const auto duplicate =
-                std::find_if(layout.bindings.begin(), layout.bindings.end(),
-                             [&binding](const DescriptorBindingDesc& existing)
-                             { return existing.binding == binding.binding; });
+            const auto duplicate = std::find_if(layout.bindings.begin(), layout.bindings.end(),
+                                                [&binding](const DescriptorBindingDesc& existing)
+                                                { return existing.binding == binding.binding; });
             if (duplicate != layout.bindings.end())
             {
                 Logger::getInstance().error("Shader reflection descriptor binding '" + binding.name +
@@ -1014,8 +1014,8 @@ namespace kera
         return shaderProgram ? shaderProgram->m_reflection.bindings : std::vector<SlangReflectionBinding>{};
     }
 
-    std::vector<SlangReflectionInput> VulkanRenderer::getShaderProgramVertexInputs(
-        ShaderProgramHandle program, const std::string& entryPoint) const
+    std::vector<SlangReflectionInput> VulkanRenderer::getShaderProgramVertexInputs(ShaderProgramHandle program,
+                                                                                   const std::string& entryPoint) const
     {
         const VulkanShaderProgramResource* shaderProgram = m_shaderPrograms.get(program);
         if (!shaderProgram)
@@ -1023,8 +1023,7 @@ namespace kera
             return {};
         }
 
-        const SlangReflectionEntryPoint* reflectedEntryPoint =
-            shaderProgram->m_reflection.findEntryPoint(entryPoint);
+        const SlangReflectionEntryPoint* reflectedEntryPoint = shaderProgram->m_reflection.findEntryPoint(entryPoint);
         return reflectedEntryPoint ? reflectedEntryPoint->inputs : std::vector<SlangReflectionInput>{};
     }
 
@@ -1691,7 +1690,7 @@ namespace kera
         {
             const SlangReflectionMetadata* reflection = getShaderProgramReflection(desc.shaderProgram);
             if (!appendValidatedReflectedPipelineContract(pipelineDesc.vertexLayout, reflection,
-                                                         desc.reflectionContract.view()))
+                                                          desc.reflectionContract.view()))
             {
                 Logger::getInstance().error("Failed to apply graphics pipeline reflection contract.");
                 return {};
@@ -1712,7 +1711,8 @@ namespace kera
         const VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
         if (!pipeline)
         {
-            Logger::getInstance().error("Invalid graphics pipeline handle passed to getGraphicsPipelineDescriptorSets.");
+            Logger::getInstance().error(
+                "Invalid graphics pipeline handle passed to getGraphicsPipelineDescriptorSets.");
             return {};
         }
 
@@ -1778,7 +1778,8 @@ namespace kera
         if (pipeline->m_desc.descriptorSets.size() != 1)
         {
             Logger::getInstance().error(
-                "Graphics pipeline exposes multiple descriptor set layouts; call createDescriptorSet with a set index.");
+                "Graphics pipeline exposes multiple descriptor set layouts; call createDescriptorSet with a set "
+                "index.");
             return {};
         }
 
@@ -2145,7 +2146,8 @@ namespace kera
 
                 allocatedSets.push_back(descriptorSet.m_set);
                 RendererValidationReport descriptorReport = validateDescriptorSetResource(descriptorSet);
-                report.issues.insert(report.issues.end(), descriptorReport.issues.begin(), descriptorReport.issues.end());
+                report.issues.insert(report.issues.end(), descriptorReport.issues.begin(),
+                                     descriptorReport.issues.end());
                 return true;
             });
 
@@ -2155,10 +2157,10 @@ namespace kera
                 std::find(allocatedSets.begin(), allocatedSets.end(), layout.set) != allocatedSets.end();
             if (!setAllocated)
             {
-                report.addIssue(RendererErrorCode::ValidationFailed, RendererValidationCategory::Descriptor,
-                                "Graphics pipeline is missing allocated descriptor set " +
-                                    std::to_string(layout.set) + ".",
-                                layout.set);
+                report.addIssue(
+                    RendererErrorCode::ValidationFailed, RendererValidationCategory::Descriptor,
+                    "Graphics pipeline is missing allocated descriptor set " + std::to_string(layout.set) + ".",
+                    layout.set);
             }
         }
 

@@ -4,8 +4,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <utility>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace kera
@@ -59,15 +59,15 @@ namespace kera
         const ReflectedVertexBindingDesc* findVertexBinding(std::span<const ReflectedVertexBindingDesc> bindings,
                                                             const std::string& name)
         {
-            const auto found = std::find_if(bindings.begin(), bindings.end(),
-                                            [&name](const ReflectedVertexBindingDesc& binding)
-                                            { return binding.name == name; });
+            const auto found =
+                std::find_if(bindings.begin(), bindings.end(),
+                             [&name](const ReflectedVertexBindingDesc& binding) { return binding.name == name; });
             return found != bindings.end() ? &(*found) : nullptr;
         }
 
         const ReflectedVertexSemanticDesc* findUniqueSemantic(std::span<const ReflectedVertexSemanticDesc> semantics,
-                                                              const std::string& semanticName,
-                                                              std::size_t& outIndex, const std::string& prefix)
+                                                              const std::string& semanticName, std::size_t& outIndex,
+                                                              const std::string& prefix)
         {
             const ReflectedVertexSemanticDesc* match = nullptr;
             std::size_t matchCount = 0;
@@ -87,7 +87,8 @@ namespace kera
             }
             if (matchCount > 1)
             {
-                Logger::getInstance().error(prefix + "Multiple C++ vertex semantic mappings matched reflected semantic '" +
+                Logger::getInstance().error(prefix +
+                                            "Multiple C++ vertex semantic mappings matched reflected semantic '" +
                                             semanticName + "'.");
                 return nullptr;
             }
@@ -109,13 +110,14 @@ namespace kera
             }
             if (matchCount > 1)
             {
-                Logger::getInstance().error(prefix + "Multiple C++ vertex semantic mappings matched reflected semantic base '" +
+                Logger::getInstance().error(prefix +
+                                            "Multiple C++ vertex semantic mappings matched reflected semantic base '" +
                                             reflectedBaseName + "'.");
                 return nullptr;
             }
 
-            Logger::getInstance().error(prefix + "No C++ vertex semantic mapping was provided for reflected semantic '" +
-                                        semanticName + "'.");
+            Logger::getInstance().error(
+                prefix + "No C++ vertex semantic mapping was provided for reflected semantic '" + semanticName + "'.");
             return nullptr;
         }
 
@@ -126,17 +128,16 @@ namespace kera
             {
                 if (binding.name.empty())
                 {
-                    Logger::getInstance().error(prefix + "Reflected vertex binding contract contains an unnamed binding.");
+                    Logger::getInstance().error(prefix +
+                                                "Reflected vertex binding contract contains an unnamed binding.");
                     return false;
                 }
 
                 const auto duplicateName =
-                    std::count_if(bindings.begin(), bindings.end(),
-                                  [&binding](const ReflectedVertexBindingDesc& other)
+                    std::count_if(bindings.begin(), bindings.end(), [&binding](const ReflectedVertexBindingDesc& other)
                                   { return other.name == binding.name; });
                 const auto duplicateSlot =
-                    std::count_if(bindings.begin(), bindings.end(),
-                                  [&binding](const ReflectedVertexBindingDesc& other)
+                    std::count_if(bindings.begin(), bindings.end(), [&binding](const ReflectedVertexBindingDesc& other)
                                   { return other.binding == binding.binding; });
                 if (duplicateName != 1 || duplicateSlot != 1)
                 {
@@ -164,11 +165,10 @@ namespace kera
         }
     }  // namespace
 
-    PipelineReflectionContract::PipelineReflectionContract(
-        std::string debugName, std::string vertexEntryPoint,
-        std::vector<ReflectedVertexBindingDesc> vertexBindings,
-        std::vector<ReflectedVertexSemanticDesc> vertexSemantics,
-        std::vector<ReflectedDescriptorBindingDesc> descriptors)
+    PipelineReflectionContract::PipelineReflectionContract(std::string debugName, std::string vertexEntryPoint,
+                                                           std::vector<ReflectedVertexBindingDesc> vertexBindings,
+                                                           std::vector<ReflectedVertexSemanticDesc> vertexSemantics,
+                                                           std::vector<ReflectedDescriptorBindingDesc> descriptors)
         : m_debugName(std::move(debugName))
         , m_vertexEntryPoint(std::move(vertexEntryPoint))
         , m_vertexBindings(std::move(vertexBindings))
@@ -200,8 +200,9 @@ namespace kera
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::vertexBinding(
-        std::string name, uint32_t binding, uint32_t stride, VertexInputRate inputRate)
+    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::vertexBinding(std::string name,
+                                                                                      uint32_t binding, uint32_t stride,
+                                                                                      VertexInputRate inputRate)
     {
         m_vertexBindings.push_back({
             .name = std::move(name),
@@ -212,8 +213,9 @@ namespace kera
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::semantic(
-        std::string semanticName, std::string bindingName, uint32_t offset, VertexFormat format)
+    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::semantic(std::string semanticName,
+                                                                                 std::string bindingName,
+                                                                                 uint32_t offset, VertexFormat format)
     {
         m_vertexSemantics.push_back({
             .semanticName = std::move(semanticName),
@@ -224,8 +226,9 @@ namespace kera
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::descriptor(
-        std::string name, DescriptorType type, std::size_t uniformSize)
+    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::descriptor(std::string name,
+                                                                                   DescriptorType type,
+                                                                                   std::size_t uniformSize)
     {
         m_descriptors.push_back({
             .name = std::move(name),
@@ -267,8 +270,7 @@ namespace kera
     }
 
     const SlangReflectionBinding* requireReflectedDescriptorBinding(const SlangReflectionMetadata* reflection,
-                                                                    const std::string& bindingName,
-                                                                    DescriptorType type)
+                                                                    const std::string& bindingName, DescriptorType type)
     {
         if (!reflection)
         {
@@ -314,7 +316,7 @@ namespace kera
     }
 
     bool appendValidatedReflectedPipelineContract(VertexLayoutDesc& layout, const SlangReflectionMetadata* reflection,
-                                                 const ReflectedPipelineContract& contract)
+                                                  const ReflectedPipelineContract& contract)
     {
         const std::string prefix = diagnosticPrefix(contract);
         if (!reflection)
@@ -333,7 +335,8 @@ namespace kera
         const SlangReflectionEntryPoint* entryPoint = reflection->findEntryPoint(entryPointName);
         if (!entryPoint)
         {
-            Logger::getInstance().error(prefix + "Shader reflection did not expose entry point '" + entryPointName + "'.");
+            Logger::getInstance().error(prefix + "Shader reflection did not expose entry point '" + entryPointName +
+                                        "'.");
             return false;
         }
 

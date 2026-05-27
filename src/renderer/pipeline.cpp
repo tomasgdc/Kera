@@ -147,8 +147,8 @@ namespace kera
     }
 
     bool Pipeline::initialize(const Device& device, VkPipelineCache pipelineCache, VkFormat colorFormat,
-                              VkFormat depthFormat,
-                              std::span<const Shader* const> shaders, const GraphicsPipelineDesc& desc)
+                              VkFormat depthFormat, std::span<const Shader* const> shaders,
+                              const GraphicsPipelineDesc& desc)
     {
         if (pipeline_ || pipeline_layout_ || !descriptor_set_layouts_.empty())
         {

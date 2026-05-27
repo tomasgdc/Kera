@@ -11,7 +11,9 @@ namespace kera
 {
 
     CommandBuffer::CommandBuffer()
-        : device_(VK_NULL_HANDLE), command_pool_(VK_NULL_HANDLE), command_buffer_(VK_NULL_HANDLE)
+        : device_(VK_NULL_HANDLE)
+        , command_pool_(VK_NULL_HANDLE)
+        , command_buffer_(VK_NULL_HANDLE)
         , state_(State::Uninitialized)
     {
     }
@@ -22,7 +24,9 @@ namespace kera
     }
 
     CommandBuffer::CommandBuffer(CommandBuffer&& other) noexcept
-        : device_(other.device_), command_pool_(other.command_pool_), command_buffer_(other.command_buffer_)
+        : device_(other.device_)
+        , command_pool_(other.command_pool_)
+        , command_buffer_(other.command_buffer_)
         , state_(other.state_)
     {
         other.device_ = VK_NULL_HANDLE;

@@ -238,7 +238,6 @@ namespace kera
         {
             Logger::getInstance().error("Failed to map instance buffer for update.");
         }
-
     }
 
     void InstancedTriangleSample::render(RenderContext& context)
@@ -250,47 +249,41 @@ namespace kera
             return;
         }
 
-        context.renderToBackbuffer(getClearColor(),
-                                   [this](FrameHandle frame)
-                                   {
-                                       const float angleRadians = glm::radians(m_rotationAngle);
-                                       const float timeFactor = std::sin(angleRadians * 0.5f) * 0.05f;
-                                       Uniforms uniforms{};
-                                       uniforms.view = glm::lookAt(glm::vec3(0.0f, 0.0f, -7.0f),
-                                                                   glm::vec3(0.0f, 0.0f, 0.0f),
-                                                                   glm::vec3(0.0f, 1.0f, 0.0f));
-                                       uniforms.projection =
-                                           glm::perspective(glm::radians(45.0f), 16.0f / 9.0f, 0.1f, 100.0f) *
-                                           glm::scale(glm::mat4(1.0f), glm::vec3(1.0f + timeFactor, 1.0f, 1.0f));
-                                       if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms,
-                                                                               sizeof(Uniforms)))
-                                       {
-                                           Logger::getInstance().error("Failed to upload instanced triangle uniforms.");
-                                           return;
-                                       }
+        context.renderToBackbuffer(
+            getClearColor(),
+            [this](FrameHandle frame)
+            {
+                const float angleRadians = glm::radians(m_rotationAngle);
+                const float timeFactor = std::sin(angleRadians * 0.5f) * 0.05f;
+                Uniforms uniforms{};
+                uniforms.view =
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, -7.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                uniforms.projection = glm::perspective(glm::radians(45.0f), 16.0f / 9.0f, 0.1f, 100.0f) *
+                                      glm::scale(glm::mat4(1.0f), glm::vec3(1.0f + timeFactor, 1.0f, 1.0f));
+                if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(Uniforms)))
+                {
+                    Logger::getInstance().error("Failed to upload instanced triangle uniforms.");
+                    return;
+                }
 
-                                       const std::size_t uniformOffset =
-                                           m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
-                                       const std::size_t descriptorIndex =
-                                           (uniformOffset / sizeof(Uniforms)) % m_uniformDescriptorSets.size();
-                                       DescriptorSetHandle uniformDescriptorSet =
-                                           m_uniformDescriptorSets[descriptorIndex];
-                                       if (!m_renderer.updateDescriptors(uniformDescriptorSet)
-                                                .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name,
-                                                                   m_uniformBuffer, uniformOffset)
-                                                .ok())
-                                       {
-                                           Logger::getInstance().error("Failed to update instanced triangle uniform descriptor.");
-                                           return;
-                                       }
+                const std::size_t uniformOffset = m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
+                const std::size_t descriptorIndex = (uniformOffset / sizeof(Uniforms)) % m_uniformDescriptorSets.size();
+                DescriptorSetHandle uniformDescriptorSet = m_uniformDescriptorSets[descriptorIndex];
+                if (!m_renderer.updateDescriptors(uniformDescriptorSet)
+                         .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name, m_uniformBuffer, uniformOffset)
+                         .ok())
+                {
+                    Logger::getInstance().error("Failed to update instanced triangle uniform descriptor.");
+                    return;
+                }
 
-                                       m_renderer.bindPipeline(frame, m_pipeline);
-                                       m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
-                                       m_renderer.bindVertexBuffer(frame, 1, m_instanceBuffer);
-                                       m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
-                                       m_renderer.bindDescriptorSet(frame, m_pipeline, uniformDescriptorSet);
-                                       m_renderer.drawIndexed(frame, m_indexCount, m_instanceCount);
-                                   });
+                m_renderer.bindPipeline(frame, m_pipeline);
+                m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
+                m_renderer.bindVertexBuffer(frame, 1, m_instanceBuffer);
+                m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
+                m_renderer.bindDescriptorSet(frame, m_pipeline, uniformDescriptorSet);
+                m_renderer.drawIndexed(frame, m_indexCount, m_instanceCount);
+            });
     }
 
     void InstancedTriangleSample::cleanup()

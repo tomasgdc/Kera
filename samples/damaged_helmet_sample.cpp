@@ -72,18 +72,18 @@ namespace kera
     }
 
     DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer, uint32_t debugView)
-        : Sample("DamagedHelmet Texture Loading"),
-          m_renderer(renderer),
-          m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
+        : Sample("DamagedHelmet Texture Loading")
+        , m_renderer(renderer)
+        , m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
     {
     }
 
     DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer, uint32_t debugView, bool fixedYaw, float yawRadians)
-        : Sample("DamagedHelmet Texture Loading"),
-          m_renderer(renderer),
-          m_initialYawRadians(fixedYaw ? yawRadians : 2.2f),
-          m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0),
-          m_fixedYaw(fixedYaw)
+        : Sample("DamagedHelmet Texture Loading")
+        , m_renderer(renderer)
+        , m_initialYawRadians(fixedYaw ? yawRadians : 2.2f)
+        , m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
+        , m_fixedYaw(fixedYaw)
     {
     }
 
@@ -282,8 +282,7 @@ namespace kera
             if (!m_renderer.updateDescriptors(descriptorSet)
                      .uniform<HelmetUniforms>(DamagedHelmetShader::HelmetParams, m_uniformBuffer, uniformOffset)
                      .sampledImage(DamagedHelmetShader::BaseColorTexture, m_model.materialTextures.baseColor)
-                     .sampledImage(DamagedHelmetShader::MetalRoughnessTexture,
-                                   m_model.materialTextures.metalRoughness)
+                     .sampledImage(DamagedHelmetShader::MetalRoughnessTexture, m_model.materialTextures.metalRoughness)
                      .sampledImage(DamagedHelmetShader::EmissiveTexture, m_model.materialTextures.emissive)
                      .sampledImage(DamagedHelmetShader::OcclusionTexture, m_model.materialTextures.occlusion)
                      .sampledImage(DamagedHelmetShader::NormalTexture, m_model.materialTextures.normal)
@@ -361,64 +360,50 @@ namespace kera
             return;
         }
 
-        context.renderToTexture(m_sceneRenderTarget, getClearColor(),
-                                [this](FrameHandle frame)
-                                {
-                                    HelmetUniforms uniforms{};
-                                    const float aspect =
-                                        m_renderExtent.height == 0
-                                            ? 16.0f / 9.0f
-                                            : static_cast<float>(m_renderExtent.width) /
-                                                  static_cast<float>(m_renderExtent.height);
-                                    const glm::vec3 cameraPosition(0.36f, 0.08f, -3.0f);
-                                    const float yawRadians =
-                                        m_fixedYaw ? m_initialYawRadians : m_initialYawRadians + m_elapsedTime * 0.25f;
-                                    uniforms.model =
-                                        glm::rotate(glm::mat4(1.0f), yawRadians, glm::vec3(0.0f, 1.0f, 0.0f)) *
-                                        m_model.transform;
-                                    uniforms.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, -0.05f, 0.0f),
-                                                                glm::vec3(0.0f, 1.0f, 0.0f));
-                                    uniforms.projection =
-                                        glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
-                                    uniforms.cameraPosition = glm::vec4(cameraPosition, 1.0f);
-                                    uniforms.lightDirectionAmbient =
-                                        glm::vec4(glm::normalize(glm::vec3(-0.42f, -0.72f, -0.48f)), 0.08f);
-                                    uniforms.baseColorFactor = m_model.materialFactors.baseColor;
-                                    uniforms.emissiveFactorNormalScale =
-                                        glm::vec4(m_model.materialFactors.emissive,
-                                                  m_model.materialFactors.normalScale);
-                                    uniforms.metallicRoughnessOcclusion =
-                                        glm::vec4(m_model.materialFactors.metallic,
-                                                  m_model.materialFactors.roughness,
-                                                  m_model.materialFactors.occlusionStrength, 0.0f);
-                                    uniforms.alphaModeCutoffReflectionExposure =
-                                        glm::vec4(toShaderAlphaMode(m_model.materialFactors.alphaMode),
-                                                  m_model.materialFactors.alphaCutoff, 1.22f, 0.86f);
-                                    uniforms.debugViewGamma =
-                                        glm::vec4(static_cast<float>(m_debugView), 2.2f, 1.0f / 2.2f, 0.0f);
-                                    uniforms.padding2 =
-                                        glm::vec4(m_model.materialFactors.doubleSided ? 1.0f : 0.0f, 0.0f, 0.0f,
-                                                  0.0f);
+        context.renderToTexture(
+            m_sceneRenderTarget, getClearColor(),
+            [this](FrameHandle frame)
+            {
+                HelmetUniforms uniforms{};
+                const float aspect = m_renderExtent.height == 0 ? 16.0f / 9.0f
+                                                                : static_cast<float>(m_renderExtent.width) /
+                                                                      static_cast<float>(m_renderExtent.height);
+                const glm::vec3 cameraPosition(0.36f, 0.08f, -3.0f);
+                const float yawRadians = m_fixedYaw ? m_initialYawRadians : m_initialYawRadians + m_elapsedTime * 0.25f;
+                uniforms.model =
+                    glm::rotate(glm::mat4(1.0f), yawRadians, glm::vec3(0.0f, 1.0f, 0.0f)) * m_model.transform;
+                uniforms.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, -0.05f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                uniforms.projection = glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
+                uniforms.cameraPosition = glm::vec4(cameraPosition, 1.0f);
+                uniforms.lightDirectionAmbient = glm::vec4(glm::normalize(glm::vec3(-0.42f, -0.72f, -0.48f)), 0.08f);
+                uniforms.baseColorFactor = m_model.materialFactors.baseColor;
+                uniforms.emissiveFactorNormalScale =
+                    glm::vec4(m_model.materialFactors.emissive, m_model.materialFactors.normalScale);
+                uniforms.metallicRoughnessOcclusion =
+                    glm::vec4(m_model.materialFactors.metallic, m_model.materialFactors.roughness,
+                              m_model.materialFactors.occlusionStrength, 0.0f);
+                uniforms.alphaModeCutoffReflectionExposure =
+                    glm::vec4(toShaderAlphaMode(m_model.materialFactors.alphaMode), m_model.materialFactors.alphaCutoff,
+                              1.22f, 0.86f);
+                uniforms.debugViewGamma = glm::vec4(static_cast<float>(m_debugView), 2.2f, 1.0f / 2.2f, 0.0f);
+                uniforms.padding2 = glm::vec4(m_model.materialFactors.doubleSided ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
 
-                                    if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms,
-                                                                            sizeof(uniforms)))
-                                    {
-                                        Logger::getInstance().error("Failed to upload DamagedHelmet uniforms.");
-                                        return;
-                                    }
+                if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(uniforms)))
+                {
+                    Logger::getInstance().error("Failed to upload DamagedHelmet uniforms.");
+                    return;
+                }
 
-                                    const std::size_t uniformOffset =
-                                        m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
-                                    const std::size_t descriptorIndex =
-                                        (uniformOffset / sizeof(HelmetUniforms)) % m_meshDescriptorSets.size();
+                const std::size_t uniformOffset = m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
+                const std::size_t descriptorIndex =
+                    (uniformOffset / sizeof(HelmetUniforms)) % m_meshDescriptorSets.size();
 
-                                    m_renderer.bindPipeline(frame, m_meshPipeline);
-                                    m_renderer.bindVertexBuffer(frame, 0, m_model.vertexBuffer);
-                                    m_renderer.bindIndexBuffer(frame, m_model.indexBuffer, m_model.indexFormat);
-                                    m_renderer.bindDescriptorSet(frame, m_meshPipeline,
-                                                                 m_meshDescriptorSets[descriptorIndex]);
-                                    m_renderer.drawIndexed(frame, m_model.indexCount);
-                                });
+                m_renderer.bindPipeline(frame, m_meshPipeline);
+                m_renderer.bindVertexBuffer(frame, 0, m_model.vertexBuffer);
+                m_renderer.bindIndexBuffer(frame, m_model.indexBuffer, m_model.indexFormat);
+                m_renderer.bindDescriptorSet(frame, m_meshPipeline, m_meshDescriptorSets[descriptorIndex]);
+                m_renderer.drawIndexed(frame, m_model.indexCount);
+            });
 
         context.renderToBackbuffer(getClearColor(),
                                    [this](FrameHandle frame)

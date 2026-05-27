@@ -93,11 +93,10 @@ namespace kera
             addIssue(code, RendererValidationCategory::General, std::move(message), set, binding, std::move(name));
         }
 
-        void addIssue(RendererValidationCategory category, std::string message, uint32_t set = 0,
-                      uint32_t binding = 0, std::string name = {})
+        void addIssue(RendererValidationCategory category, std::string message, uint32_t set = 0, uint32_t binding = 0,
+                      std::string name = {})
         {
-            addIssue(RendererErrorCode::ValidationFailed, category, std::move(message), set, binding,
-                     std::move(name));
+            addIssue(RendererErrorCode::ValidationFailed, category, std::move(message), set, binding, std::move(name));
         }
 
         void addIssue(RendererErrorCode code, RendererValidationCategory category, std::string message,

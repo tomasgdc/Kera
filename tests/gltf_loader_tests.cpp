@@ -2,10 +2,10 @@
 #include "kera/renderer/interfaces.h"
 
 #include <cassert>
-#include <cstddef>
 #include <cmath>
-#include <cstring>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -106,8 +106,7 @@ namespace
             {
                 return false;
             }
-            if (size >= sizeof(kera::GltfVertex) && size % sizeof(kera::GltfVertex) == 0 &&
-                uploadedVertices.empty())
+            if (size >= sizeof(kera::GltfVertex) && size % sizeof(kera::GltfVertex) == 0 && uploadedVertices.empty())
             {
                 uploadedVertices.resize(size / sizeof(kera::GltfVertex));
                 std::memcpy(uploadedVertices.data(), data, size);
@@ -273,24 +272,16 @@ namespace
         std::vector<uint8_t> bytes;
 
         const float positions[] = {
-            0.0f, 0.0f, 0.0f,
-            1.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
         };
         const float normals[] = {
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
-            0.0f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
         };
         const float uvs[] = {
-            0.0f, 0.0f,
-            1.0f, 0.0f,
-            0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
         };
         const float tangents[] = {
-            0.0f, 2.0f, 0.0f, -1.0f,
-            0.0f, 2.0f, 0.0f, -1.0f,
-            0.0f, 2.0f, 0.0f, -1.0f,
+            0.0f, 2.0f, 0.0f, -1.0f, 0.0f, 2.0f, 0.0f, -1.0f, 0.0f, 2.0f, 0.0f, -1.0f,
         };
         const uint16_t indices[] = {0, 1, 2};
 
@@ -342,8 +333,7 @@ namespace
 
         gltf << "{\n"
              << "  \"asset\": {\"version\": \"2.0\"},\n"
-             << "  \"buffers\": [{\"uri\": \"" << basePath << ".bin\", \"byteLength\": " << bytes.size()
-             << "}],\n"
+             << "  \"buffers\": [{\"uri\": \"" << basePath << ".bin\", \"byteLength\": " << bytes.size() << "}],\n"
              << "  \"bufferViews\": [\n"
              << "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36, \"target\": 34962},\n"
              << "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36, \"target\": 34962},\n"
@@ -354,8 +344,7 @@ namespace
                  << "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 48, \"target\": 34962}";
         }
         gltf << ",\n"
-             << "    {\"buffer\": 0, \"byteOffset\": " << indexByteOffset
-             << ", \"byteLength\": 6, \"target\": 34963}\n"
+             << "    {\"buffer\": 0, \"byteOffset\": " << indexByteOffset << ", \"byteLength\": 6, \"target\": 34963}\n"
              << "  ],\n"
              << "  \"accessors\": [\n"
              << "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
@@ -471,10 +460,10 @@ int main()
     NullRenderer authoredRenderer(true);
     kera::RendererResult<kera::GltfLoadedModel> authoredModel =
         kera::loadGltfModel(authoredRenderer, {
-                                                 .path = authoredBasePath + ".gltf",
-                                                 .debugName = "Authored Tangent Material",
-                                                 .requireMaterialTextures = false,
-                                             });
+                                                  .path = authoredBasePath + ".gltf",
+                                                  .debugName = "Authored Tangent Material",
+                                                  .requireMaterialTextures = false,
+                                              });
     assert(authoredModel.ok());
     assert(authoredModel.value().indexCount == 3);
     assert(authoredModel.value().materialFactors.baseColor == glm::vec4(0.2f, 0.3f, 0.4f, 0.6f));
@@ -502,10 +491,10 @@ int main()
     NullRenderer generatedRenderer(true);
     kera::RendererResult<kera::GltfLoadedModel> generatedModel =
         kera::loadGltfModel(generatedRenderer, {
-                                                  .path = generatedBasePath + ".gltf",
-                                                  .debugName = "Generated Tangent Material",
-                                                  .requireMaterialTextures = false,
-                                              });
+                                                   .path = generatedBasePath + ".gltf",
+                                                   .debugName = "Generated Tangent Material",
+                                                   .requireMaterialTextures = false,
+                                               });
     assert(generatedModel.ok());
     assert(!generatedRenderer.uploadedVertices.empty());
     for (const kera::GltfVertex& vertex : generatedRenderer.uploadedVertices)

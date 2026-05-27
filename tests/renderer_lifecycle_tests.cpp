@@ -1,5 +1,5 @@
-#include "kera/renderer/command_buffer.h"
 #include "kera/renderer/backend/vulkan/layout_utils.h"
+#include "kera/renderer/command_buffer.h"
 #include "kera/renderer/descriptor_contracts.h"
 #include "kera/renderer/descriptors.h"
 #include "kera/renderer/resource_registry.h"
@@ -141,11 +141,10 @@ int main()
     expect(kera::textureFormatBytesPerPixel(kera::TextureFormat::Depth32) == 4,
            "Depth32 texture format should report four bytes per pixel");
 
-    expect(kera::vulkanStageMaskForImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) ==
-               VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-           "texture upload transfer-dst layout should map to transfer stage");
-    expect(kera::vulkanAccessMaskForImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) ==
-               VK_ACCESS_2_TRANSFER_WRITE_BIT,
+    expect(
+        kera::vulkanStageMaskForImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) == VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        "texture upload transfer-dst layout should map to transfer stage");
+    expect(kera::vulkanAccessMaskForImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) == VK_ACCESS_2_TRANSFER_WRITE_BIT,
            "texture upload transfer-dst layout should map to transfer write access");
     expect(kera::vulkanStageMaskForImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ==
                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,

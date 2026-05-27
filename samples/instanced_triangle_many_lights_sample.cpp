@@ -290,8 +290,8 @@ namespace kera
                 .vertexBinding<Vertex>(ManyLightsShader::MeshVertexBinding, 0)
                 .vertexBinding<InstanceData>(ManyLightsShader::InstanceVertexBinding, 1, VertexInputRate::Instance)
                 .semantic("POSITION", ManyLightsShader::MeshVertexBinding, 0, VertexFormat::Float3)
-                .semantic("COLOR", ManyLightsShader::MeshVertexBinding,
-                          static_cast<uint32_t>(offsetof(Vertex, color)), VertexFormat::Float3)
+                .semantic("COLOR", ManyLightsShader::MeshVertexBinding, static_cast<uint32_t>(offsetof(Vertex, color)),
+                          VertexFormat::Float3)
                 .semantic("TRANSFORM", ManyLightsShader::InstanceVertexBinding, 0, VertexFormat::Float4)
                 .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams.name)
                 .build();

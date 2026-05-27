@@ -113,8 +113,8 @@ namespace kera
         {
             return vertexBinding(std::move(name), binding, static_cast<uint32_t>(sizeof(VertexT)), inputRate);
         }
-        ReflectedPipelineContractBuilder& semantic(std::string semanticName, std::string bindingName,
-                                                   uint32_t offset, VertexFormat format);
+        ReflectedPipelineContractBuilder& semantic(std::string semanticName, std::string bindingName, uint32_t offset,
+                                                   VertexFormat format);
         ReflectedPipelineContractBuilder& descriptor(std::string name, DescriptorType type,
                                                      std::size_t uniformSize = 0);
 
@@ -144,6 +144,6 @@ namespace kera
                                                                     const std::string& name, DescriptorType type);
     bool validateReflectedUniformSize(const SlangReflectionBinding& binding, std::size_t expectedSize);
     bool appendValidatedReflectedPipelineContract(VertexLayoutDesc& layout, const SlangReflectionMetadata* reflection,
-                                                 const ReflectedPipelineContract& contract);
+                                                  const ReflectedPipelineContract& contract);
 
 }  // namespace kera

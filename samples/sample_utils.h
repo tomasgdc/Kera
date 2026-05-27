@@ -1,10 +1,9 @@
 #pragma once
 
-#include <array>
-#include <cstdint>
-
 #include <glm/glm.hpp>
 
+#include <array>
+#include <cstdint>
 #include <string>
 
 namespace kera

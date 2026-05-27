@@ -317,12 +317,11 @@ namespace kera
         ShaderProgramHandle createShaderProgram(const ShaderProgramDesc& desc) override;
         ShaderProgramHandle createGraphicsShaderProgram(const GraphicsShaderProgramDesc& desc) override;
         const SlangReflectionMetadata* getShaderProgramReflection(ShaderProgramHandle program) const override;
-        std::vector<SlangReflectionEntryPoint> getShaderProgramEntryPoints(
-            ShaderProgramHandle program) const override;
+        std::vector<SlangReflectionEntryPoint> getShaderProgramEntryPoints(ShaderProgramHandle program) const override;
         std::vector<SlangReflectionBinding> getShaderProgramDescriptorBindings(
             ShaderProgramHandle program) const override;
-        std::vector<SlangReflectionInput> getShaderProgramVertexInputs(
-            ShaderProgramHandle program, const std::string& entryPoint) const override;
+        std::vector<SlangReflectionInput> getShaderProgramVertexInputs(ShaderProgramHandle program,
+                                                                       const std::string& entryPoint) const override;
         bool destroyShaderProgram(ShaderProgramHandle program) override;
 
         BufferHandle createBuffer(const BufferDesc& desc) override;
@@ -349,7 +348,8 @@ namespace kera
         std::vector<DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
             GraphicsPipelineHandle pipeline) const override;
         VertexLayoutDesc getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipeline) const override;
-        PipelineReflectionContract getGraphicsPipelineReflectionContract(GraphicsPipelineHandle pipeline) const override;
+        PipelineReflectionContract getGraphicsPipelineReflectionContract(
+            GraphicsPipelineHandle pipeline) const override;
         bool destroyGraphicsPipeline(GraphicsPipelineHandle pipeline) override;
         DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline) override;
         DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline, uint32_t set) override;

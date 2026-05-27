@@ -163,7 +163,8 @@ int main()
 
     bool assertHandlerCalled = false;
     kera::Validation::setAssertHandler(
-        [&assertHandlerCalled](const std::string& condition, const std::string& message, const char*, int) {
+        [&assertHandlerCalled](const std::string& condition, const std::string& message, const char*, int)
+        {
             assertHandlerCalled = true;
             require(condition == "false", "assert handler should receive condition");
             require(message == "handler-before-fatal", "assert handler should receive message");

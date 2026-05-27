@@ -1,7 +1,6 @@
 #include "kera/core/window.h"
 
 #include "kera/utilities/logger.h"
-
 #include "sdl_input_utils.h"
 
 #include <SDL3/SDL.h>

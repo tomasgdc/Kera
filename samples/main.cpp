@@ -1,6 +1,5 @@
-#include "samples.h"
-
 #include "kera/utilities/logger.h"
+#include "samples.h"
 
 #include <cstdlib>
 #include <iostream>

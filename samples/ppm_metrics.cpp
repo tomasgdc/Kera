@@ -104,8 +104,7 @@ namespace
 
     double luma(uint8_t r, uint8_t g, uint8_t b)
     {
-        return (0.2126 * static_cast<double>(r) + 0.7152 * static_cast<double>(g) +
-                0.0722 * static_cast<double>(b)) /
+        return (0.2126 * static_cast<double>(r) + 0.7152 * static_cast<double>(g) + 0.0722 * static_cast<double>(b)) /
                255.0;
     }
 }
@@ -223,9 +222,8 @@ int main(int argc, char** argv)
     const double coverage = static_cast<double>(covered) / static_cast<double>(pixelCount);
     const double darkCoverage = static_cast<double>(dark) / static_cast<double>(pixelCount);
     const double lumaRange = maxLuma - minLuma;
-    kera::Logger::getInstance().info("PPM metrics coverage=" + std::to_string(coverage) +
-                                     " dark=" + std::to_string(darkCoverage) +
-                                     " luma_range=" + std::to_string(lumaRange));
+    kera::Logger::getInstance().info("PPM metrics coverage=" + std::to_string(coverage) + " dark=" +
+                                     std::to_string(darkCoverage) + " luma_range=" + std::to_string(lumaRange));
 
     if (coverage < options.minCoverage || coverage > options.maxCoverage || lumaRange < options.minLumaRange ||
         darkCoverage < options.minDarkCoverage)

@@ -70,8 +70,7 @@ namespace kera
         virtual ShaderProgramHandle createShaderProgram(const ShaderProgramDesc& desc) = 0;
         virtual ShaderProgramHandle createGraphicsShaderProgram(const GraphicsShaderProgramDesc& desc) = 0;
         virtual const SlangReflectionMetadata* getShaderProgramReflection(ShaderProgramHandle program) const = 0;
-        virtual std::vector<SlangReflectionEntryPoint> getShaderProgramEntryPoints(
-            ShaderProgramHandle program) const;
+        virtual std::vector<SlangReflectionEntryPoint> getShaderProgramEntryPoints(ShaderProgramHandle program) const;
         virtual std::vector<SlangReflectionBinding> getShaderProgramDescriptorBindings(
             ShaderProgramHandle program) const;
         virtual std::vector<SlangReflectionInput> getShaderProgramVertexInputs(ShaderProgramHandle program,
@@ -259,8 +258,7 @@ namespace kera
         return {};
     }
 
-    inline PipelineReflectionContract IRenderer::getGraphicsPipelineReflectionContract(
-        GraphicsPipelineHandle) const
+    inline PipelineReflectionContract IRenderer::getGraphicsPipelineReflectionContract(GraphicsPipelineHandle) const
     {
         return {};
     }

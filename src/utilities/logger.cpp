@@ -1,5 +1,10 @@
 #include "kera/utilities/logger.h"
 
+#include <spdlog/pattern_formatter.h>
+#include <spdlog/sinks/base_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -7,11 +12,6 @@
 #include <mutex>
 #include <string_view>
 #include <vector>
-
-#include <spdlog/pattern_formatter.h>
-#include <spdlog/sinks/base_sink.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
 
 namespace kera
 {
@@ -48,8 +48,7 @@ namespace kera
                 outLevel = LogLevel::Info;
                 return true;
             }
-            if (value == "warn" || value == "WARN" || value == "warning" || value == "WARNING" ||
-                value == "Warning")
+            if (value == "warn" || value == "WARN" || value == "warning" || value == "WARNING" || value == "Warning")
             {
                 outLevel = LogLevel::Warning;
                 return true;
@@ -59,8 +58,7 @@ namespace kera
                 outLevel = LogLevel::Error;
                 return true;
             }
-            if (value == "fatal" || value == "FATAL" || value == "Fatal" || value == "critical" ||
-                value == "CRITICAL")
+            if (value == "fatal" || value == "FATAL" || value == "Fatal" || value == "critical" || value == "CRITICAL")
             {
                 outLevel = LogLevel::Fatal;
                 return true;
@@ -215,7 +213,8 @@ namespace kera
 
         std::shared_ptr<spdlog::logger> getSpdlogLoggerPtr()
         {
-            static auto logger = [] {
+            static auto logger = []
+            {
                 auto consoleSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
                 auto createdLogger = std::make_shared<spdlog::logger>("kera", consoleSink);
                 createdLogger->set_level(spdlog::level::trace);
