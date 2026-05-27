@@ -1,10 +1,10 @@
 #include "kera/renderer/device.h"
 
 #include "kera/renderer/physical_device.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
 
-#include <iostream>
 #include <set>
 
 namespace kera
@@ -40,17 +40,17 @@ namespace kera
         {
             if (policy.synchronization2.synchronization2 != VK_TRUE)
             {
-                std::cerr << "Kera requires Vulkan 1.3 synchronization2 support." << std::endl;
+                Logger::getInstance().error("Kera requires Vulkan 1.3 synchronization2 support.");
                 return false;
             }
             if (policy.dynamicRendering.dynamicRendering != VK_TRUE)
             {
-                std::cerr << "Kera requires Vulkan 1.3 dynamic rendering support." << std::endl;
+                Logger::getInstance().error("Kera requires Vulkan 1.3 dynamic rendering support.");
                 return false;
             }
             if (policy.timelineSemaphore.timelineSemaphore != VK_TRUE)
             {
-                std::cerr << "Kera requires Vulkan 1.3 timeline semaphore support." << std::endl;
+                Logger::getInstance().error("Kera requires Vulkan 1.3 timeline semaphore support.");
                 return false;
             }
             return true;
@@ -127,7 +127,7 @@ namespace kera
         vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
         if (physicalDeviceProperties.apiVersion < VK_API_VERSION_1_3)
         {
-            std::cerr << "Kera requires a Vulkan 1.3 physical device." << std::endl;
+            Logger::getInstance().error("Kera requires a Vulkan 1.3 physical device.");
             return false;
         }
 
@@ -173,7 +173,7 @@ namespace kera
         VkResult result = vkCreateDevice(vkPhysicalDevice, &createInfo, nullptr, &device_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create logical device: " << result << std::endl;
+            Logger::getInstance().error("Failed to create logical device: " + std::to_string(result));
             return false;
         }
 
@@ -184,12 +184,12 @@ namespace kera
         // Create command pool
         if (!createCommandPool())
         {
-            std::cerr << "Failed to create command pool" << std::endl;
+            Logger::getInstance().error("Failed to create command pool");
             shutdown();
             return false;
         }
 
-        std::cout << "Logical device created successfully" << std::endl;
+        Logger::getInstance().debug("Logical device created successfully");
         return true;
     }
 
@@ -205,7 +205,7 @@ namespace kera
             graphics_queue_ = VK_NULL_HANDLE;
             present_queue_ = VK_NULL_HANDLE;
             graphics_queue_family_index_ = 0;
-            std::cout << "Logical device destroyed" << std::endl;
+            Logger::getInstance().debug("Logical device destroyed");
         }
     }
 
@@ -224,7 +224,7 @@ namespace kera
         VkResult result = vkCreateCommandPool(device_, &poolInfo, nullptr, &command_pool_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create command pool: " << result << std::endl;
+            Logger::getInstance().error("Failed to create command pool: " + std::to_string(result));
             return false;
         }
 

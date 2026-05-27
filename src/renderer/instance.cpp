@@ -190,7 +190,7 @@ namespace kera
             return false;
         }
 
-        Logger::getInstance().info("Vulkan instance created successfully.");
+        Logger::getInstance().debug("Vulkan instance created successfully.");
         if (validation_enabled_)
         {
             Logger::getInstance().info("Vulkan validation layers enabled.");
@@ -210,7 +210,7 @@ namespace kera
         {
             vkDestroyInstance(instance_, nullptr);
             instance_ = VK_NULL_HANDLE;
-            Logger::getInstance().info("Vulkan instance destroyed.");
+            Logger::getInstance().debug("Vulkan instance destroyed.");
         }
         validation_enabled_ = false;
     }

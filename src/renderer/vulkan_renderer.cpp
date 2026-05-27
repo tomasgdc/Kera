@@ -358,9 +358,8 @@ namespace kera
             Logger::getInstance().error("Failed to create Vulkan instance");
             return false;
         }
-        Logger::getInstance().info(m_instance->isDebugMessengerActive()
-                                       ? "Vulkan debug messenger is active."
-                                       : "Vulkan debug messenger is not active.");
+        Logger::getInstance().info(m_instance->isDebugMessengerActive() ? "Vulkan debug messenger is active."
+                                                                        : "Vulkan debug messenger is not active.");
 
         m_surface = std::make_shared<Surface>();
         if (!m_surface->create(m_instance->getVulkanInstance(), window))
@@ -1216,7 +1215,8 @@ namespace kera
     {
         if (descriptorSetsReference(sampler))
         {
-            Logger::getInstance().error("Cannot destroy a Vulkan sampler that is still referenced by a descriptor set.");
+            Logger::getInstance().error(
+                "Cannot destroy a Vulkan sampler that is still referenced by a descriptor set.");
             return false;
         }
 
@@ -1249,7 +1249,8 @@ namespace kera
         }
         if (!texture->m_renderTarget)
         {
-            Logger::getInstance().error("Texture passed to createRenderTarget was not created for render-target usage.");
+            Logger::getInstance().error(
+                "Texture passed to createRenderTarget was not created for render-target usage.");
             return {};
         }
         if (texture->m_depthStencil)
@@ -1269,7 +1270,8 @@ namespace kera
             }
             if (!depthTexture->m_renderTarget || !depthTexture->m_depthStencil)
             {
-                Logger::getInstance().error("Depth texture passed to createRenderTarget is not depth render-target usage.");
+                Logger::getInstance().error(
+                    "Depth texture passed to createRenderTarget is not depth render-target usage.");
                 return {};
             }
             if (depthTexture->m_extent.width != texture->m_extent.width ||
@@ -1788,13 +1790,19 @@ namespace kera
         }
         if (frame->m_renderPassActive)
         {
-            Logger::getInstance().error("Cannot begin a Vulkan render target pass while another render pass is active.");
+            Logger::getInstance().error(
+                "Cannot begin a Vulkan render target pass while another render pass is active.");
             return;
         }
         VulkanTextureResource* texture = m_textures.get(renderTarget->m_colorTexture);
         if (!texture)
         {
             Logger::getInstance().error("Render target color texture is invalid.");
+            return;
+        }
+        if (renderTarget->m_extent.width == 0 || renderTarget->m_extent.height == 0)
+        {
+            Logger::getInstance().error("Cannot begin a Vulkan render target pass with a zero extent.");
             return;
         }
 

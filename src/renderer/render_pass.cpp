@@ -2,10 +2,10 @@
 
 #include "kera/renderer/device.h"
 #include "kera/renderer/swapchain.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
 
-#include <iostream>
 #include <vector>
 
 namespace kera
@@ -86,11 +86,11 @@ namespace kera
         VkResult result = vkCreateRenderPass(vkDevice, &renderPassInfo, nullptr, &render_pass_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create render pass: " << result << std::endl;
+            Logger::getInstance().error("Failed to create render pass: " + std::to_string(result));
             return false;
         }
 
-        std::cout << "Render pass created successfully" << std::endl;
+        Logger::getInstance().debug("Render pass created successfully");
         return true;
     }
 
@@ -177,11 +177,11 @@ namespace kera
         VkResult result = vkCreateRenderPass(vkDevice, &renderPassInfo, nullptr, &render_pass_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create color target render pass: " << result << std::endl;
+            Logger::getInstance().error("Failed to create color target render pass: " + std::to_string(result));
             return false;
         }
 
-        std::cout << "Color target render pass created successfully" << std::endl;
+        Logger::getInstance().debug("Color target render pass created successfully");
         return true;
     }
 

@@ -3,10 +3,9 @@
 #include "kera/renderer/device.h"
 #include "kera/renderer/render_pass.h"
 #include "kera/renderer/swapchain.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
-
-#include <iostream>
 
 namespace kera
 {
@@ -63,13 +62,15 @@ namespace kera
             VkResult result = vkCreateFramebuffer(vkDevice, &framebufferInfo, nullptr, &framebuffers_[i]);
             if (result != VK_SUCCESS)
             {
-                std::cerr << "Failed to create framebuffer " << i << ": " << result << std::endl;
+                Logger::getInstance().error("Failed to create framebuffer " + std::to_string(i) + ": " +
+                                            std::to_string(result));
                 shutdown();
                 return false;
             }
         }
 
-        std::cout << "Framebuffers created successfully (" << framebuffers_.size() << " framebuffers)" << std::endl;
+        Logger::getInstance().debug("Framebuffers created successfully (" + std::to_string(framebuffers_.size()) +
+                                    " framebuffers)");
         return true;
     }
 
@@ -103,12 +104,12 @@ namespace kera
         VkResult result = vkCreateFramebuffer(vkDevice, &framebufferInfo, nullptr, &framebuffer);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create color target framebuffer: " << result << std::endl;
+            Logger::getInstance().error("Failed to create color target framebuffer: " + std::to_string(result));
             return false;
         }
 
         framebuffers_.push_back(framebuffer);
-        std::cout << "Color target framebuffer created successfully" << std::endl;
+        Logger::getInstance().debug("Color target framebuffer created successfully");
         return true;
     }
 

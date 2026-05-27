@@ -41,6 +41,17 @@ if(NOT TARGET ${KERA_SDL_TARGET})
     message(FATAL_ERROR "Expected SDL target ${KERA_SDL_TARGET} was not created")
 endif()
 
+# Add spdlog submodule
+set(SPDLOG_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_EXAMPLE_HO OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_TESTS_HO OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_BENCH OFF CACHE BOOL "" FORCE)
+set(SPDLOG_INSTALL OFF CACHE BOOL "" FORCE)
+set(SPDLOG_NO_EXCEPTIONS ON CACHE BOOL "" FORCE)
+add_subdirectory(third_party/spdlog EXCLUDE_FROM_ALL)
+
 if(KERA_ENABLE_IMGUI)
     set(IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui")
     if(NOT EXISTS "${IMGUI_DIR}/imgui.cpp")
@@ -234,6 +245,8 @@ target_link_libraries(kera
         Vulkan::Vulkan
         ${KERA_SDL_TARGET}
         glm::glm
+    PRIVATE
+        spdlog::spdlog
 )
 
 if(KERA_SLANG_TARGET)

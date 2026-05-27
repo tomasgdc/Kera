@@ -1,8 +1,9 @@
 #include "kera/renderer/physical_device.h"
 
+#include "kera/utilities/logger.h"
+
 #include <vulkan/vulkan.h>
 
-#include <iostream>
 #include <set>
 #include <string>
 
@@ -143,7 +144,7 @@ namespace kera
 
         if (deviceCount == 0)
         {
-            std::cerr << "Failed to find GPUs with Vulkan support" << std::endl;
+            Logger::getInstance().error("Failed to find GPUs with Vulkan support");
             return;
         }
 
@@ -165,11 +166,11 @@ namespace kera
 
         if (physical_device_ == VK_NULL_HANDLE)
         {
-            std::cerr << "Failed to find a suitable GPU" << std::endl;
+            Logger::getInstance().error("Failed to find a suitable GPU");
         }
         else
         {
-            std::cout << "Selected physical device: " << getDeviceName() << std::endl;
+            Logger::getInstance().info("Selected physical device: " + getDeviceName());
         }
     }
 

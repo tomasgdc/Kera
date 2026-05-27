@@ -1,7 +1,8 @@
 #include "kera/utilities/file_utils.h"
 
+#include "kera/utilities/logger.h"
+
 #include <fstream>
-#include <iostream>
 #include <sstream>
 
 namespace kera
@@ -21,7 +22,7 @@ namespace kera
         std::ifstream file(path);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open file: " << path << std::endl;
+            Logger::getInstance().error("Failed to open file: " + path);
             return "";
         }
 
@@ -35,7 +36,7 @@ namespace kera
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open file: " << path << std::endl;
+            Logger::getInstance().error("Failed to open file: " + path);
             return {};
         }
 
@@ -45,7 +46,7 @@ namespace kera
         std::vector<uint8_t> buffer(size);
         if (!file.read(reinterpret_cast<char*>(buffer.data()), size))
         {
-            std::cerr << "Failed to read file: " << path << std::endl;
+            Logger::getInstance().error("Failed to read file: " + path);
             return {};
         }
 
@@ -57,7 +58,7 @@ namespace kera
         std::ofstream file(path);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open file for writing: " << path << std::endl;
+            Logger::getInstance().error("Failed to open file for writing: " + path);
             return false;
         }
 
@@ -70,7 +71,7 @@ namespace kera
         std::ofstream file(path, std::ios::binary);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open file for writing: " << path << std::endl;
+            Logger::getInstance().error("Failed to open file for writing: " + path);
             return false;
         }
 

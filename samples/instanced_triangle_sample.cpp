@@ -46,23 +46,23 @@ namespace kera
 
         if (!createShaderProgram())
         {
-            Logger::getInstance().error("Failed to create shader program");
+            Logger::getInstance().error("Failed to create Instanced Triangle shader program");
             return;
         }
 
         if (!createGeometry())
         {
-            Logger::getInstance().error("Failed to create geometry");
+            Logger::getInstance().error("Failed to create Instanced Triangle geometry");
             return;
         }
 
         if (!createPipeline())
         {
-            Logger::getInstance().error("Failed to create pipeline");
+            Logger::getInstance().error("Failed to create Instanced Triangle pipeline");
             return;
         }
 
-        Logger::getInstance().info("Triangle sample initialized successfully");
+        Logger::getInstance().info("Instanced Triangle sample initialized successfully");
     }
 
     bool InstancedTriangleSample::createShaderProgram()
@@ -296,7 +296,7 @@ namespace kera
         if (!m_pipeline.isValid() || !m_vertexBuffer.isValid() || !m_indexBuffer.isValid() ||
             !m_instanceBuffer.isValid() || !m_uniformBuffer.isValid() || m_uniformDescriptorSets.empty())
         {
-            Logger::getInstance().warning("Render called before sample resources were initialized");
+            Logger::getInstance().warning("Render called before Instanced Triangle resources were initialized");
             return;
         }
 

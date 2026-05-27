@@ -1,12 +1,11 @@
 #include "kera/renderer/buffer.h"
 
 #include "kera/renderer/device.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
 
 #include <cstring>
-#include <iostream>
-#include <stdexcept>
 
 namespace kera
 {
@@ -14,7 +13,8 @@ namespace kera
     namespace
     {
 
-        uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties)
+        bool findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties,
+                            uint32_t& outMemoryType)
         {
             VkPhysicalDeviceMemoryProperties memProperties;
             vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
@@ -23,11 +23,12 @@ namespace kera
             {
                 if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
                 {
-                    return i;
+                    outMemoryType = i;
+                    return true;
                 }
             }
 
-            throw std::runtime_error("Failed to find suitable memory type");
+            return false;
         }
 
     }  // anonymous namespace
@@ -139,7 +140,7 @@ namespace kera
         VkResult result = vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create buffer: " << result << std::endl;
+            Logger::getInstance().error("Failed to create buffer: " + std::to_string(result));
             return false;
         }
 
@@ -149,12 +150,18 @@ namespace kera
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(vkPhysicalDevice, memRequirements.memoryTypeBits, properties);
+        if (!findMemoryType(vkPhysicalDevice, memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex))
+        {
+            Logger::getInstance().error("Failed to find suitable buffer memory type");
+            vkDestroyBuffer(vkDevice, buffer_, nullptr);
+            buffer_ = VK_NULL_HANDLE;
+            return false;
+        }
 
         result = vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to allocate buffer memory: " << result << std::endl;
+            Logger::getInstance().error("Failed to allocate buffer memory: " + std::to_string(result));
             vkDestroyBuffer(vkDevice, buffer_, nullptr);
             buffer_ = VK_NULL_HANDLE;
             return false;
@@ -162,7 +169,7 @@ namespace kera
 
         vkBindBufferMemory(vkDevice, buffer_, memory_, 0);
 
-        std::cout << "Buffer created successfully (size: " << size << " bytes)" << std::endl;
+        Logger::getInstance().debug("Buffer created successfully (size: " + std::to_string(size) + " bytes)");
         return true;
     }
 

@@ -1,13 +1,12 @@
 #include "kera/renderer/surface.h"
 
 #include "kera/core/window.h"
+#include "kera/utilities/logger.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
 #include <vulkan/vulkan.h>
-
-#include <iostream>
 
 namespace kera
 {
@@ -50,11 +49,11 @@ namespace kera
         // Create Vulkan surface from SDL window
         if (!SDL_Vulkan_CreateSurface(window.getSDLWindow(), instance, nullptr, &surface_))
         {
-            std::cerr << "Failed to create Vulkan surface: " << SDL_GetError() << std::endl;
+            Logger::getInstance().error("Failed to create Vulkan surface: " + std::string(SDL_GetError()));
             return false;
         }
 
-        std::cout << "Vulkan surface created successfully" << std::endl;
+        Logger::getInstance().debug("Vulkan surface created successfully");
         return true;
     }
 
@@ -65,7 +64,7 @@ namespace kera
             vkDestroySurfaceKHR(instance_, surface_, nullptr);
             surface_ = VK_NULL_HANDLE;
             instance_ = VK_NULL_HANDLE;
-            std::cout << "Vulkan surface destroyed" << std::endl;
+            Logger::getInstance().debug("Vulkan surface destroyed");
         }
     }
 }  // namespace kera

@@ -1,9 +1,11 @@
 #include "kera/core/audio.h"
 
+#include "kera/utilities/logger.h"
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
-#include <iostream>
+#include <cmath>
 
 namespace kera
 {
@@ -20,7 +22,7 @@ namespace kera
     {
         // TODO: Implement audio file loading (WAV, OGG, etc.)
         // For now, just create a simple test tone
-        std::cout << "Loading audio from file: " << filename << std::endl;
+        Logger::getInstance().info("Loading audio from file: " + filename);
 
         // Generate a simple sine wave for testing
         frequency_ = 44100;
@@ -34,7 +36,7 @@ namespace kera
         for (size_t i = 0; i < sampleCount; ++i)
         {
             float t = static_cast<float>(i) / frequency_;
-            data_[i] = std::sin(2.0f * 3.14159f * frequency * t) * 0.1f;  // Low volume
+            data_[i] = static_cast<float>(std::sin(2.0f * 3.14159f * frequency * t) * 0.1f);  // Low volume
         }
 
         return true;
@@ -43,8 +45,8 @@ namespace kera
     bool AudioBuffer::loadFromMemory(const void* data, size_t size, int frequency, int channels)
     {
         // TODO: Implement loading from memory buffer
-        std::cout << "Loading audio from memory: " << size << " bytes, " << frequency << "Hz, " << channels
-                  << " channels" << std::endl;
+        Logger::getInstance().info("Loading audio from memory: " + std::to_string(size) + " bytes, " +
+                                   std::to_string(frequency) + "Hz, " + std::to_string(channels) + " channels");
 
         frequency_ = frequency;
         channels_ = channels;
@@ -89,7 +91,7 @@ namespace kera
         {
             playing_ = true;
             paused_ = false;
-            std::cout << "Audio source started playing" << std::endl;
+            Logger::getInstance().info("Audio source started playing");
         }
     }
 
@@ -98,7 +100,7 @@ namespace kera
         if (playing_ && !paused_)
         {
             paused_ = true;
-            std::cout << "Audio source paused" << std::endl;
+            Logger::getInstance().info("Audio source paused");
         }
     }
 
@@ -107,7 +109,7 @@ namespace kera
         playing_ = false;
         paused_ = false;
         position_ = 0;
-        std::cout << "Audio source stopped" << std::endl;
+        Logger::getInstance().info("Audio source stopped");
     }
 
     void AudioSource::setLoop(bool loop)
@@ -157,14 +159,14 @@ namespace kera
         // Initialize SDL audio
         if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
         {
-            std::cerr << "Failed to initialize SDL audio: " << SDL_GetError() << std::endl;
+            Logger::getInstance().error("Failed to initialize SDL audio: " + std::string(SDL_GetError()));
             return false;
         }
 
         // TODO: Set up audio device and mixer
 
         initialized_ = true;
-        std::cout << "Audio system initialized" << std::endl;
+        Logger::getInstance().info("Audio system initialized");
         return true;
     }
 
@@ -177,7 +179,7 @@ namespace kera
 
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         initialized_ = false;
-        std::cout << "Audio system shutdown" << std::endl;
+        Logger::getInstance().info("Audio system shutdown");
     }
 
     void Audio::update()

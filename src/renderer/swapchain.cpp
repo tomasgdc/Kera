@@ -2,6 +2,7 @@
 
 #include "kera/renderer/device.h"
 #include "kera/renderer/physical_device.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
 
@@ -68,6 +69,11 @@ namespace kera
         VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
         VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, width, height);
+        if (extent.width == 0 || extent.height == 0)
+        {
+            Logger::getInstance().debug("Skipping swap chain creation while the surface extent is zero.");
+            return false;
+        }
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
         if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
@@ -108,7 +114,7 @@ namespace kera
         VkResult result = vkCreateSwapchainKHR(vkDevice, &createInfo, nullptr, &swap_chain_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create swap chain: " << result << std::endl;
+            Logger::getInstance().error("Failed to create swap chain: " + std::to_string(result));
             return false;
         }
 
@@ -122,12 +128,12 @@ namespace kera
 
         if (!createImageViews())
         {
-            std::cerr << "Failed to create image views" << std::endl;
+            Logger::getInstance().error("Failed to create image views");
             shutdown();
             return false;
         }
 
-        std::cout << "Swap chain created with " << images_.size() << " images" << std::endl;
+        Logger::getInstance().debug("Swap chain created with " + std::to_string(images_.size()) + " images");
         return true;
     }
 
@@ -148,9 +154,11 @@ namespace kera
         {
             vkDestroySwapchainKHR(device_, swap_chain_, nullptr);
             swap_chain_ = VK_NULL_HANDLE;
-            std::cout << "Swap chain destroyed" << std::endl;
+            Logger::getInstance().debug("Swap chain destroyed");
         }
         device_ = VK_NULL_HANDLE;
+        image_format_ = VK_FORMAT_UNDEFINED;
+        extent_ = {0, 0};
     }
 
     VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const
@@ -219,7 +227,8 @@ namespace kera
             VkResult result = vkCreateImageView(device_, &createInfo, nullptr, &image_views_[i]);
             if (result != VK_SUCCESS)
             {
-                std::cerr << "Failed to create image view " << i << ": " << result << std::endl;
+                Logger::getInstance().error("Failed to create image view " + std::to_string(i) + ": " +
+                                            std::to_string(result));
                 return false;
             }
         }

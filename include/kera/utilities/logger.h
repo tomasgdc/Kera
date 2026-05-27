@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <string>
 
 namespace kera
@@ -20,6 +19,11 @@ namespace kera
     public:
         static Logger& getInstance();
 
+        void configureFromEnvironment();
+        bool setLogFilePath(const std::string& path);
+        void clearLogFile();
+        void flush();
+
         void setLogLevel(LogLevel level)
         {
             log_level_ = level;
@@ -27,6 +31,14 @@ namespace kera
         LogLevel getLogLevel() const
         {
             return log_level_;
+        }
+        void setAbortOnFatal(bool enabled)
+        {
+            abort_on_fatal_ = enabled;
+        }
+        bool getAbortOnFatal() const
+        {
+            return abort_on_fatal_;
         }
 
         void log(LogLevel level, const std::string& message);
@@ -52,13 +64,14 @@ namespace kera
         }
 
     private:
-        Logger() = default;
+        Logger();
         ~Logger() = default;
 
         Logger(const Logger&) = delete;
         Logger& operator=(const Logger&) = delete;
 
         LogLevel log_level_ = LogLevel::Info;
+        bool abort_on_fatal_ = true;
     };
 
 }  // namespace kera

@@ -1,10 +1,9 @@
 #include "kera/renderer/image.h"
 
 #include "kera/renderer/device.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
-
-#include <iostream>
 
 namespace kera
 {
@@ -133,7 +132,7 @@ namespace kera
         VkResult result = vkCreateImage(vkDevice, &imageInfo, nullptr, &image_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create image: " << result << std::endl;
+            Logger::getInstance().error("Failed to create image: " + std::to_string(result));
             return false;
         }
 
@@ -141,7 +140,8 @@ namespace kera
         // TODO: Create image view
         // TODO: Create sampler if needed
 
-        std::cout << "Image created successfully (" << width << "x" << height << ")" << std::endl;
+        Logger::getInstance().debug("Image created successfully (" + std::to_string(width) + "x" +
+                                    std::to_string(height) + ")");
         return true;
     }
 

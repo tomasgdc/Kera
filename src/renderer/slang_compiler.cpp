@@ -245,8 +245,8 @@ namespace kera
         outSpirv.resize(byteCount / sizeof(uint32_t));
         std::memcpy(outSpirv.data(), spirvBlob->getBufferPointer(), byteCount);
 
-        Logger::getInstance().info("Compiled Slang shader at startup: " + request.shaderPath + " [" +
-                                   request.entryPoint + "]");
+        Logger::getInstance().debug("Compiled and reflected Slang shader at startup: " + request.shaderPath + " [" +
+                                    request.entryPoint + "]");
         return true;
 #endif
     }

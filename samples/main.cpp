@@ -1,5 +1,7 @@
 #include "samples.h"
 
+#include "kera/utilities/logger.h"
+
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -21,7 +23,7 @@ int main(int argc, char* argv[])
         {
             if (index + 1 >= argc)
             {
-                std::cerr << "--smoke-frames requires a frame count\n";
+                kera::Logger::getInstance().error("--smoke-frames requires a frame count");
                 return EXIT_FAILURE;
             }
             options.maxFrames = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
@@ -34,7 +36,7 @@ int main(int argc, char* argv[])
         {
             if (index + 1 >= argc)
             {
-                std::cerr << "--sample-index requires a sample index\n";
+                kera::Logger::getInstance().error("--sample-index requires a sample index");
                 return EXIT_FAILURE;
             }
             options.initialSampleIndex = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
@@ -47,7 +49,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            std::cerr << "Unknown argument: " << arg << '\n';
+            kera::Logger::getInstance().error("Unknown argument: " + arg);
             return EXIT_FAILURE;
         }
     }

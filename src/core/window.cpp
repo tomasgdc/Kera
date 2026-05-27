@@ -1,10 +1,10 @@
 #include "kera/core/window.h"
 
+#include "kera/utilities/logger.h"
+
 #include "sdl_input_utils.h"
 
 #include <SDL3/SDL.h>
-
-#include <iostream>
 
 namespace kera
 {
@@ -62,7 +62,7 @@ namespace kera
 
         if (!window_)
         {
-            std::cerr << "Failed to create SDL window: " << SDL_GetError() << std::endl;
+            Logger::getInstance().error("Failed to create SDL window: " + std::string(SDL_GetError()));
             return false;
         }
 
@@ -71,7 +71,8 @@ namespace kera
         should_close_ = false;
         was_resized_ = false;
 
-        std::cout << "Window initialized: " << title << " (" << width << "x" << height << ")" << std::endl;
+        Logger::getInstance().info("Window initialized: " + title + " (" + std::to_string(width) + "x" +
+                                   std::to_string(height) + ")");
         return true;
     }
 
@@ -85,7 +86,7 @@ namespace kera
             height_ = 0;
             should_close_ = false;
             was_resized_ = false;
-            std::cout << "Window shutdown" << std::endl;
+            Logger::getInstance().info("Window shutdown");
         }
     }
 
