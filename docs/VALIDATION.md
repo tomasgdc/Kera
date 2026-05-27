@@ -57,24 +57,33 @@ When `KERA_RUN_GPU_SMOKE=1` is set, sample smoke logs are written beside the sam
 - `build/windows-debug/samples/Debug/kera_depth_smoke.log`
 - `build/windows-debug/samples/Debug/kera_many_lights_resize_smoke.log`
 - `build/windows-debug/samples/Debug/kera_instanced_resize_smoke.log`
+- `build/windows-debug/samples/Debug/kera_damaged_helmet_smoke.log`
+- `build/windows-debug/samples/Debug/kera_damaged_helmet_zero_resize_smoke.log`
+- `build/windows-debug/samples/Debug/kera_damaged_helmet_visual_regression_smoke.log`
+- `build/windows-debug/samples/Debug/kera_damaged_helmet_back_visual_smoke.log`
+- `build/windows-debug/samples/Debug/kera_damaged_helmet_gamma_audit_smoke.log`
 
 ## Frame Capture Lane
 
 Use this lane when validation passes but rendered output, image layouts, descriptors, or pass ordering need visible
 proof.
 
-RenderDoc capture:
+RenderDoc capture through the repo script:
 
 ```powershell
-$env:KERA_RUN_GPU_SMOKE = '1'
-renderdoccmd capture --wait-for-exit --output build/windows-debug/samples/Debug/kera_many_lights `
-    build/windows-debug/samples/Debug/kera_samples.exe --smoke-test --smoke-frames 2 --sample-index 2
+tools/CaptureKeraFrame.ps1 -Tool RenderDoc -SampleIndex 2 -Frames 2
 ```
 
-Nsight Graphics can launch the same executable and arguments:
+Print the exact sample command without launching a capture tool:
 
 ```powershell
-build/windows-debug/samples/Debug/kera_samples.exe --smoke-test --smoke-frames 2 --sample-index 2
+tools/CaptureKeraFrame.ps1 -Tool Print -SampleIndex 2 -Frames 2
+```
+
+Nsight Graphics launch sheet:
+
+```powershell
+tools/CaptureKeraFrame.ps1 -Tool Nsight -SampleIndex 2 -Frames 2
 ```
 
 Expected first capture target:
@@ -87,6 +96,22 @@ Expected first capture target:
 
 ## Shader Contract Lane
 
-Kera uses Slang shader sources. The shader CTest lane intentionally validates source files, entry point names, and
-stage annotations instead of requiring a Vulkan-only SPIR-V validator. Runtime Vulkan compilation can still generate
-SPIR-V through the existing Slang compiler path.
+Kera uses Slang shader sources. The shader CTest lane validates source files, entry point names, stage annotations,
+Slang reflection JSON, and the C++ `SlangReflectionMetadata` parser for representative descriptor and vertex-input
+contracts. Runtime Slang shader-program creation also compiles and reflects Slang stages automatically, then stores
+the merged metadata on the shader-program resource for renderer-side validation and future descriptor layout work.
+The runtime path uses the Slang API directly: it keeps the linked-program session, module, entry point, and composite
+component alive while calling `getLayout()` and `toJson()`, then parses the JSON into typed C++ metadata.
+Graphics pipeline creation derives descriptor set layouts from shader-program reflection when samples leave descriptor
+sets empty, so descriptor names, bindings, and descriptor kinds stay owned by the Slang source rather than duplicated
+in sample code. C++ renderer convenience APIs cover the common sample path: `createGraphicsShaderProgram()` builds a
+two-stage graphics program from one Slang file, `PipelineReflectionBuilder` declares C++ host vertex bindings and
+required shader resources, and high-level `createGraphicsPipeline(GraphicsPipelineCreateDesc)` applies that contract
+using the shader program's stored reflection metadata. The low-level `appendValidatedReflectedPipelineContract()` helper remains
+available as an escape hatch, but samples no longer call it directly. `vertexBinding<T>()` derives binding stride from
+the host type while offsets remain explicit, `debugName()` prefixes contract diagnostics, and
+`getGraphicsPipelineDescriptorSets()` exposes pipeline descriptor layouts for tools. `updateDescriptors()` updates
+descriptors by reflected shader variable name and returns an accumulated `ok()` result. The renderer helper appends
+vertex bindings and reflected attributes while rejecting missing, ambiguous, duplicate, or unused semantic mappings.
+The sample shaders avoid manual `register(...)` bindings where Slang reflection can supply layout data, and single-set
+reflected pipelines can allocate and bind descriptor sets without repeating the reflected set index in sample code.

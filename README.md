@@ -1,14 +1,24 @@
 # Kera - Cross-Platform Rendering Library
 
-Kera is a cross-platform rendering library built on Vulkan and SDL3, designed for high-performance graphics applications.
+Kera is a Vulkan-first rendering library built with SDL3, Slang, and CMake for high-performance graphics applications.
 
 ## Features
 
-- **Vulkan-based rendering**: Modern, cross-platform graphics API
-- **SDL3 integration**: Window management, input handling, and platform abstraction
-- **Slang shader language**: Cross-platform shading with HLSL-like syntax
-- **Modular architecture**: Clean separation between core systems and rendering
-- **Sample applications**: Interactive demos showcasing different rendering techniques
+- **Vulkan renderer**: Vulkan 1.3+ rendering backend with swapchain, render target, descriptor, synchronization, and validation hardening.
+- **SDL3 integration**: Window management, input handling, and platform abstraction.
+- **Slang shaders**: Runtime Slang compilation and reflection for graphics shader programs.
+- **Reflection-driven pipelines**: C++ vertex/layout contracts are validated against Slang entry points and descriptor names.
+- **glTF texture loading sample**: DamagedHelmet demonstrates renderer-owned glTF asset loading, texture upload, mipmaps, and sampler fidelity.
+- **Sample application**: Basic Triangle, Instanced Triangle, Many Lights, and DamagedHelmet renderer demonstrations.
+- **No-exception build**: Kera targets no-exception C++ and routes diagnostics through the Kera logger facade.
+
+## Documentation
+
+- [Renderer API](docs/RENDERER_API.md): C++ convenience API, Slang reflection, descriptor updates, and renderer lifetime notes.
+- [Renderer ABI Policy](docs/RENDERER_ABI.md): installed STL-free public ABI headers and shared-build guardrails.
+- [Validation](docs/VALIDATION.md): CTest labels, Vulkan smoke tests, shader contract checks, and capture lanes.
+- [Vulkan Implementation Log](VULKAN_IMPLEMENTATION_LOG.md): step-by-step implementation history.
+- [DamagedHelmet Attribution](samples/assets/gltf/DamagedHelmet/ATTRIBUTION.md): source and license note for the bundled glTF sample asset.
 
 ## Building
 
@@ -17,13 +27,13 @@ Kera is a cross-platform rendering library built on Vulkan and SDL3, designed fo
 - CMake 3.25 or later
 - C++20 compatible compiler
 - Vulkan SDK
-- Git (for submodules)
+- Git for submodules
 
-### Clone with Submodules
+### Clone With Submodules
 
 ```bash
-git clone --recursive https://github.com/your-repo/kera.git
-cd kera
+git clone --recursive https://github.com/tomasgdc/Kera.git
+cd Kera
 ```
 
 If you already cloned without `--recursive`, initialize submodules:
@@ -32,63 +42,119 @@ If you already cloned without `--recursive`, initialize submodules:
 git submodule update --init --recursive
 ```
 
-### Build
+### Configure And Build
 
 ```bash
 # Configure
-cmake --preset windows-debug  # or linux-debug
+cmake --preset windows-debug
 
 # Build
-cmake --build --preset windows-debug  # or linux-debug
-
-# Run samples
-./build/windows-debug/samples/kera_samples
+cmake --build --preset windows-debug
 ```
 
-### Validation
+Default presets build Kera as a static library. Shared-library presets are guarded while internal C++ convenience
+headers still expose STL types; see [Renderer ABI Policy](docs/RENDERER_ABI.md). Other configured presets are listed in
+`CMakePresets.json`.
 
-```bash
+### Run Samples
+
+With the Visual Studio generator on Windows, the debug sample executable is:
+
+```powershell
+build/windows-debug/samples/Debug/kera_samples.exe
+```
+
+Useful sample arguments:
+
+```powershell
+build/windows-debug/samples/Debug/kera_samples.exe --sample-index 3
+build/windows-debug/samples/Debug/kera_samples.exe --help
+```
+
+Sample indices:
+
+- `0`: Basic Triangle
+- `1`: Instanced Triangle
+- `2`: Instanced Triangle Many Lights
+- `3`: DamagedHelmet Texture Loading
+
+## Validation
+
+```powershell
 ctest --test-dir build/windows-debug -C Debug --output-on-failure
 ```
 
 GPU-backed Vulkan smoke tests are registered with CTest but skip by default. Set `KERA_RUN_GPU_SMOKE=1` to launch
-them. See `docs/VALIDATION.md` for labels, shader contract checks, and smoke log paths.
+them. See [Validation](docs/VALIDATION.md) for labels, shader contract checks, smoke log paths, and capture commands.
 
 ## Project Structure
 
-```
-├── include/kera/          # Public headers
-├── src/                   # Source files
-│   ├── core/             # SDL3 platform layer
-│   ├── renderer/         # Vulkan rendering
-│   └── utilities/        # Helper utilities
-├── samples/              # Sample applications
-├── third_party/          # External dependencies
-│   └── SDL/             # SDL3 submodule
-└── CMakeLists.txt       # Build configuration
+```text
+include/kera/          Public headers
+src/                   Source files
+  core/                SDL3 platform layer
+  renderer/            Vulkan renderer and renderer-owned asset helpers
+  utilities/           Logging, file I/O, validation, and common helpers
+samples/               Sample application, shaders, and sample assets
+docs/                  Renderer API, ABI, and validation documentation
+third_party/           Vendored dependencies
+CMakeLists.txt         Build configuration
 ```
 
-## Architecture
+## Renderer API Shape
 
-- **Core Layer**: SDL3-based window, input, and platform abstraction
-- **Renderer Layer**: Vulkan implementation with shader management
-- **Utilities**: Logging, file I/O, validation, and common helpers
-- **Samples**: Demonstrations of rendering techniques and API usage
+The common Slang graphics path uses the renderer-facing C++ convenience API:
+
+```cpp
+ShaderProgramHandle program = renderer.createGraphicsShaderProgram({
+    .path = resolveShaderPath("shaders/triangle.slang"),
+    .vertexEntryPoint = "vertexMain",
+    .fragmentEntryPoint = "fragmentMain",
+});
+
+const PipelineReflectionContract contract =
+    PipelineReflectionBuilder{}
+        .debugName("Triangle Pipeline")
+        .vertexEntry("vertexMain")
+        .vertexBinding<Vertex>("meshVertex", 0)
+        .semantic("POSITION", "meshVertex", offsetof(Vertex, position), VertexFormat::Float3)
+        .semantic("COLOR", "meshVertex", offsetof(Vertex, color), VertexFormat::Float3)
+        .build();
+
+GraphicsPipelineHandle pipeline = renderer.createGraphicsPipeline({
+    .shaderProgram = program,
+    .reflectionContract = contract,
+});
+```
+
+Descriptor updates use reflected shader variable names:
+
+```cpp
+const bool ok = renderer.updateDescriptors(descriptorSet)
+    .uniform<Uniforms>("globalParams", uniformBuffer)
+    .sampledImage("sceneTexture", sceneTexture)
+    .sampler("sceneSampler", sceneSampler)
+    .ok();
+```
+
+See [Renderer API](docs/RENDERER_API.md) for the full current flow, including result objects, reflection metadata,
+debug names, and validation helpers.
 
 ## Dependencies
 
-- **SDL3**: Window management and input (included as submodule)
-- **Vulkan**: Graphics API (requires Vulkan SDK)
-- **Slang**: Shader compilation from `.slang` source at startup
-
-## Shader Compilation
-
-Kera is set up to compile `.slang` shaders to SPIR-V at application startup.
-
-- Add shader source files to your project, for example `basic_triangle.slang`
-- Call `Shader::initializeFromSlangFile(...)` with the shader path and entry point name
-- Kera will compile the Slang source in process and create the Vulkan shader module from the generated SPIR-V
+- **Vulkan SDK**: graphics API, validation layers, and shader tooling.
+- **SDL3**: window management and input.
+- **GLM**: math types.
+- **Slang**: shader compilation and reflection.
+- **Dear ImGui**: optional sample stats/debug overlay.
+- **spdlog**: private implementation behind Kera's logger facade.
+- **tinygltf/stb/nlohmann-json**: private renderer implementation dependencies for glTF loading.
 
 ## License
 
-See LICENSE file for details.
+Kera-owned source code and documentation are licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for
+project attribution and distribution notes.
+
+Third-party dependencies and bundled sample assets retain their own licenses. The bundled DamagedHelmet sample asset
+remains Creative Commons Attribution-NonCommercial and is not relicensed by Kera; see
+[DamagedHelmet Attribution](samples/assets/gltf/DamagedHelmet/ATTRIBUTION.md).
