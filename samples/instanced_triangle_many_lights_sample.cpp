@@ -1,5 +1,6 @@
 #include "instanced_triangle_many_lights_sample.h"
 
+#include "kera/renderer/reflection_contracts.h"
 #include "kera/utilities/logger.h"
 #include "render_context.h"
 #include "sample_utils.h"
@@ -7,8 +8,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <array>
 #include <cmath>
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace kera
@@ -34,12 +37,6 @@ namespace kera
             glm::mat4 view;
         };
 
-        struct FullscreenVertex
-        {
-            glm::vec2 position;
-            glm::vec2 uv;
-        };
-
         struct LightData
         {
             glm::vec4 positionRadius;
@@ -51,6 +48,37 @@ namespace kera
             glm::vec4 ambientTimeLightCount;
             std::array<LightData, 64> lights;
         };
+
+        namespace ManyLightsShader
+        {
+            constexpr const char* Path = "shaders/instanced_triangle_many_lights.slang";
+            constexpr const char* GeometryVertexEntryPoint = "geometryVertexMain";
+            constexpr const char* GeometryFragmentEntryPoint = "geometryFragmentMain";
+            constexpr const char* FullscreenVertexEntryPoint = "fullscreenVertexMain";
+            constexpr const char* LightingFragmentEntryPoint = "lightingFragmentMain";
+            constexpr const char* MeshVertexBinding = "meshVertex";
+            constexpr const char* InstanceVertexBinding = "instanceData";
+            constexpr const char* FullscreenVertexBinding = "fullscreenVertex";
+
+            const ReflectedDescriptorBindingDesc GeometryParams{
+                .name = "geometryParams",
+                .type = DescriptorType::UniformBuffer,
+                .uniformSize = sizeof(GeometryUniforms),
+            };
+            const ReflectedDescriptorBindingDesc LightingParams{
+                .name = "lightingParams",
+                .type = DescriptorType::UniformBuffer,
+                .uniformSize = sizeof(LightingUniforms),
+            };
+            const ReflectedDescriptorBindingDesc SceneTexture{
+                .name = "sceneTexture",
+                .type = DescriptorType::SampledImage,
+            };
+            const ReflectedDescriptorBindingDesc SceneSampler{
+                .name = "sceneSampler",
+                .type = DescriptorType::Sampler,
+            };
+        }  // namespace ManyLightsShader
 
     }  // namespace
 
@@ -91,46 +119,22 @@ namespace kera
 
     bool InstancedTriangleManyLightsSample::createShaderPrograms()
     {
-        const std::string shaderPath = resolveShaderPath("shaders/instanced_triangle_many_lights.slang");
+        const std::string shaderPath = resolveShaderPath(ManyLightsShader::Path);
 
-        m_geometryShaderProgram = m_renderer.createShaderProgram({
-            .stages =
-                {
-                    {
-                        .path = shaderPath,
-                        .entryPoint = "geometryVertexMain",
-                        .stage = ShaderStage::Vertex,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                    {
-                        .path = shaderPath,
-                        .entryPoint = "geometryFragmentMain",
-                        .stage = ShaderStage::Fragment,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                },
+        m_geometryShaderProgram = m_renderer.createGraphicsShaderProgram({
+            .path = shaderPath,
+            .vertexEntryPoint = ManyLightsShader::GeometryVertexEntryPoint,
+            .fragmentEntryPoint = ManyLightsShader::GeometryFragmentEntryPoint,
         });
         if (!m_geometryShaderProgram.isValid())
         {
             return false;
         }
 
-        m_lightingShaderProgram = m_renderer.createShaderProgram({
-            .stages =
-                {
-                    {
-                        .path = shaderPath,
-                        .entryPoint = "fullscreenVertexMain",
-                        .stage = ShaderStage::Vertex,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                    {
-                        .path = shaderPath,
-                        .entryPoint = "lightingFragmentMain",
-                        .stage = ShaderStage::Fragment,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                },
+        m_lightingShaderProgram = m_renderer.createGraphicsShaderProgram({
+            .path = shaderPath,
+            .vertexEntryPoint = ManyLightsShader::FullscreenVertexEntryPoint,
+            .fragmentEntryPoint = ManyLightsShader::LightingFragmentEntryPoint,
         });
         return m_lightingShaderProgram.isValid();
     }
@@ -179,22 +183,18 @@ namespace kera
             return false;
         }
 
-        const std::vector<FullscreenVertex> fullscreenVertices = {
-            {{-1.0f, -1.0f}, {0.0f, 1.0f}},
-            {{3.0f, -1.0f}, {2.0f, 1.0f}},
-            {{-1.0f, 3.0f}, {0.0f, -1.0f}},
-        };
-        const std::vector<uint16_t> fullscreenIndices = {0, 1, 2};
+        const auto& fullscreenVertices = fullscreenTriangleVertices();
+        const auto& fullscreenIndices = fullscreenTriangleIndices();
         m_fullscreenIndexCount = static_cast<uint32_t>(fullscreenIndices.size());
 
         m_fullscreenVertexBuffer = m_renderer.createBuffer({
-            .size = fullscreenVertices.size() * sizeof(FullscreenVertex),
+            .size = fullscreenVertices.size() * sizeof(FullscreenTriangleVertex),
             .usage = BufferUsageKind::Vertex,
             .memoryAccess = MemoryAccess::CpuWrite,
         });
         if (!m_fullscreenVertexBuffer.isValid() ||
             !m_renderer.uploadBuffer(m_fullscreenVertexBuffer, fullscreenVertices.data(),
-                                     fullscreenVertices.size() * sizeof(FullscreenVertex)))
+                                     fullscreenVertices.size() * sizeof(FullscreenTriangleVertex)))
         {
             return false;
         }
@@ -283,136 +283,75 @@ namespace kera
 
     bool InstancedTriangleManyLightsSample::createPipelinesAndDescriptors()
     {
-        GraphicsPipelineDesc geometryPipelineDesc{};
-        geometryPipelineDesc.renderTarget = m_sceneRenderTarget;
-        geometryPipelineDesc.cullMode = CullModeKind::None;
-        geometryPipelineDesc.depthTest = true;
-        geometryPipelineDesc.depthWrite = true;
-        geometryPipelineDesc.vertexLayout.bindings.push_back({
-            .binding = 0,
-            .stride = static_cast<uint32_t>(sizeof(Vertex)),
-        });
-        geometryPipelineDesc.vertexLayout.bindings.push_back({
-            .binding = 1,
-            .stride = static_cast<uint32_t>(sizeof(InstanceData)),
-            .inputRate = VertexInputRate::Instance,
-        });
-        geometryPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 0,
-            .binding = 0,
-            .offset = 0,
-            .format = VertexFormat::Float3,
-        });
-        geometryPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 1,
-            .binding = 0,
-            .offset = static_cast<uint32_t>(offsetof(Vertex, color)),
-            .format = VertexFormat::Float3,
-        });
-        geometryPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 2,
-            .binding = 1,
-            .offset = 0,
-            .format = VertexFormat::Float4,
-        });
-        geometryPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 3,
-            .binding = 1,
-            .offset = sizeof(glm::vec4),
-            .format = VertexFormat::Float4,
-        });
-        geometryPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 4,
-            .binding = 1,
-            .offset = sizeof(glm::vec4) * 2,
-            .format = VertexFormat::Float4,
-        });
-        geometryPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 5,
-            .binding = 1,
-            .offset = sizeof(glm::vec4) * 3,
-            .format = VertexFormat::Float4,
-        });
-        geometryPipelineDesc.descriptorSets.push_back({
-            .set = 0,
-            .bindings =
-                {
-                    {
-                        .binding = 0,
-                        .type = DescriptorType::UniformBuffer,
-                        .stage = ShaderStage::Vertex,
-                    },
-                },
-        });
+        const PipelineReflectionContract geometryContract =
+            PipelineReflectionBuilder{}
+                .debugName("Many Lights Geometry Pipeline")
+                .vertexEntry(ManyLightsShader::GeometryVertexEntryPoint)
+                .vertexBinding<Vertex>(ManyLightsShader::MeshVertexBinding, 0)
+                .vertexBinding<InstanceData>(ManyLightsShader::InstanceVertexBinding, 1, VertexInputRate::Instance)
+                .semantic("POSITION", ManyLightsShader::MeshVertexBinding, 0, VertexFormat::Float3)
+                .semantic("COLOR", ManyLightsShader::MeshVertexBinding,
+                          static_cast<uint32_t>(offsetof(Vertex, color)), VertexFormat::Float3)
+                .semantic("TRANSFORM", ManyLightsShader::InstanceVertexBinding, 0, VertexFormat::Float4)
+                .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams.name)
+                .build();
 
-        m_geometryPipeline = m_renderer.createGraphicsPipeline(geometryPipelineDesc, m_geometryShaderProgram);
+        m_geometryPipeline = m_renderer.createGraphicsPipeline({
+            .shaderProgram = m_geometryShaderProgram,
+            .reflectionContract = geometryContract,
+            .renderTarget = m_sceneRenderTarget,
+            .cullMode = CullModeKind::None,
+            .depthTest = true,
+            .depthWrite = true,
+        });
         if (!m_geometryPipeline.isValid())
         {
             return false;
         }
 
-        m_geometryDescriptorSet = m_renderer.createDescriptorSet(m_geometryPipeline, 0);
+        m_geometryDescriptorSet = m_renderer.createDescriptorSet(m_geometryPipeline);
         if (!m_geometryDescriptorSet.isValid() ||
-            !m_renderer.updateDescriptorSet(m_geometryDescriptorSet, 0, m_geometryUniformBuffer))
+            !m_renderer.updateDescriptors(m_geometryDescriptorSet)
+                 .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams.name, m_geometryUniformBuffer)
+                 .ok())
         {
             return false;
         }
 
-        GraphicsPipelineDesc lightingPipelineDesc{};
-        lightingPipelineDesc.cullMode = CullModeKind::None;
-        lightingPipelineDesc.vertexLayout.bindings.push_back({
-            .binding = 0,
-            .stride = static_cast<uint32_t>(sizeof(FullscreenVertex)),
-        });
-        lightingPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 0,
-            .binding = 0,
-            .offset = 0,
-            .format = VertexFormat::Float2,
-        });
-        lightingPipelineDesc.vertexLayout.attributes.push_back({
-            .location = 1,
-            .binding = 0,
-            .offset = static_cast<uint32_t>(offsetof(FullscreenVertex, uv)),
-            .format = VertexFormat::Float2,
-        });
-        lightingPipelineDesc.descriptorSets.push_back({
-            .set = 0,
-            .bindings =
-                {
-                    {
-                        .binding = 3,
-                        .type = DescriptorType::UniformBuffer,
-                        .stage = ShaderStage::Fragment,
-                    },
-                    {
-                        .binding = 1,
-                        .type = DescriptorType::SampledImage,
-                        .stage = ShaderStage::Fragment,
-                    },
-                    {
-                        .binding = 2,
-                        .type = DescriptorType::Sampler,
-                        .stage = ShaderStage::Fragment,
-                    },
-                },
-        });
+        const PipelineReflectionContract lightingContract =
+            PipelineReflectionBuilder{}
+                .debugName("Many Lights Lighting Pipeline")
+                .vertexEntry(ManyLightsShader::FullscreenVertexEntryPoint)
+                .vertexBinding<FullscreenTriangleVertex>(ManyLightsShader::FullscreenVertexBinding, 0)
+                .semantic("POSITION", ManyLightsShader::FullscreenVertexBinding, 0, VertexFormat::Float2)
+                .semantic("TEXCOORD0", ManyLightsShader::FullscreenVertexBinding,
+                          static_cast<uint32_t>(offsetof(FullscreenTriangleVertex, uv)), VertexFormat::Float2)
+                .uniform<LightingUniforms>(ManyLightsShader::LightingParams.name)
+                .sampledImage(ManyLightsShader::SceneTexture.name)
+                .sampler(ManyLightsShader::SceneSampler.name)
+                .build();
 
-        m_lightingPipeline = m_renderer.createGraphicsPipeline(lightingPipelineDesc, m_lightingShaderProgram);
+        m_lightingPipeline = m_renderer.createGraphicsPipeline({
+            .shaderProgram = m_lightingShaderProgram,
+            .reflectionContract = lightingContract,
+            .cullMode = CullModeKind::None,
+        });
         if (!m_lightingPipeline.isValid())
         {
             return false;
         }
 
-        m_lightingDescriptorSet = m_renderer.createDescriptorSet(m_lightingPipeline, 0);
+        m_lightingDescriptorSet = m_renderer.createDescriptorSet(m_lightingPipeline);
         if (!m_lightingDescriptorSet.isValid())
         {
             return false;
         }
 
-        return m_renderer.updateDescriptorSet(m_lightingDescriptorSet, 3, m_lightingUniformBuffer) &&
-               m_renderer.updateDescriptorSet(m_lightingDescriptorSet, 1, m_sceneTexture) &&
-               m_renderer.updateDescriptorSet(m_lightingDescriptorSet, 2, m_sceneSampler);
+        return m_renderer.updateDescriptors(m_lightingDescriptorSet)
+            .uniform<LightingUniforms>(ManyLightsShader::LightingParams.name, m_lightingUniformBuffer)
+            .sampledImage(ManyLightsShader::SceneTexture.name, m_sceneTexture)
+            .sampler(ManyLightsShader::SceneSampler.name, m_sceneSampler)
+            .ok();
     }
 
     void InstancedTriangleManyLightsSample::resize(Extent2D extent)
@@ -545,7 +484,7 @@ namespace kera
                                     m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
                                     m_renderer.bindVertexBuffer(frame, 1, m_instanceBuffer);
                                     m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
-                                    m_renderer.bindDescriptorSet(frame, m_geometryPipeline, 0, m_geometryDescriptorSet);
+                                    m_renderer.bindDescriptorSet(frame, m_geometryPipeline, m_geometryDescriptorSet);
                                     m_renderer.drawIndexed(frame, m_indexCount, m_instanceCount);
                                 });
 
@@ -555,8 +494,7 @@ namespace kera
                                        m_renderer.bindPipeline(frame, m_lightingPipeline);
                                        m_renderer.bindVertexBuffer(frame, 0, m_fullscreenVertexBuffer);
                                        m_renderer.bindIndexBuffer(frame, m_fullscreenIndexBuffer, IndexFormat::UInt16);
-                                       m_renderer.bindDescriptorSet(frame, m_lightingPipeline, 0,
-                                                                    m_lightingDescriptorSet);
+                                       m_renderer.bindDescriptorSet(frame, m_lightingPipeline, m_lightingDescriptorSet);
                                        m_renderer.drawIndexed(frame, m_fullscreenIndexCount);
                                    });
     }

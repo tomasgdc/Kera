@@ -17,6 +17,19 @@ namespace kera
         return nullptr;
     }
 
+    inline const DescriptorBindingDesc* findDescriptorBinding(const DescriptorSetLayoutDesc& layout,
+                                                              const std::string& name)
+    {
+        for (const DescriptorBindingDesc& bindingDesc : layout.bindings)
+        {
+            if (bindingDesc.name == name)
+            {
+                return &bindingDesc;
+            }
+        }
+        return nullptr;
+    }
+
     inline bool descriptorBindingAccepts(const DescriptorSetLayoutDesc& layout, uint32_t binding, DescriptorType type,
                                          uint32_t descriptorCount = 1)
     {

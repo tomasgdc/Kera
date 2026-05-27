@@ -144,6 +144,13 @@ namespace kera
     struct ShaderProgramDesc
     {
         std::vector<ShaderModuleDesc> stages;
+    struct GraphicsShaderProgramDesc
+    {
+        std::string path;
+        std::string vertexEntryPoint = "vertexMain";
+        std::string fragmentEntryPoint = "fragmentMain";
+        ShaderSourceKind source = ShaderSourceKind::SlangFile;
+        std::string debugName;
     };
 
     struct BufferDesc

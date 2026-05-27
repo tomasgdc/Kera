@@ -1,5 +1,6 @@
 #include "basic_triangle_sample.h"
 
+#include "kera/renderer/reflection_contracts.h"
 #include "kera/utilities/logger.h"
 #include "render_context.h"
 #include "sample_utils.h"
@@ -18,6 +19,14 @@ namespace kera
             glm::vec3 position;
             glm::vec3 color;
         };
+
+        namespace BasicTriangleShader
+        {
+            constexpr const char* Path = "shaders/triangle.slang";
+            constexpr const char* VertexEntryPoint = "vertexMain";
+            constexpr const char* FragmentEntryPoint = "fragmentMain";
+            constexpr const char* MeshVertexBinding = "meshVertex";
+        }  // namespace BasicTriangleShader
     }  // namespace
 
     BasicTriangleSample::BasicTriangleSample(IRenderer& renderer)
@@ -52,25 +61,11 @@ namespace kera
 
     bool BasicTriangleSample::createShaderProgram()
     {
-        ShaderProgramDesc programDesc{
-            .stages =
-                {
-                    {
-                        .path = resolveShaderPath("shaders/triangle.slang"),
-                        .entryPoint = "vertexMain",
-                        .stage = ShaderStage::Vertex,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                    {
-                        .path = resolveShaderPath("shaders/triangle.slang"),
-                        .entryPoint = "fragmentMain",
-                        .stage = ShaderStage::Fragment,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                },
-        };
-
-        m_shaderProgram = m_renderer.createShaderProgram(programDesc);
+        m_shaderProgram = m_renderer.createGraphicsShaderProgram({
+            .path = resolveShaderPath(BasicTriangleShader::Path),
+            .vertexEntryPoint = BasicTriangleShader::VertexEntryPoint,
+            .fragmentEntryPoint = BasicTriangleShader::FragmentEntryPoint,
+        });
         return static_cast<bool>(m_shaderProgram.isValid());
     }
 
@@ -117,27 +112,21 @@ namespace kera
 
     bool BasicTriangleSample::createPipeline()
     {
-        GraphicsPipelineDesc pipelineDesc{};
-        pipelineDesc.topology = PrimitiveTopologyKind::TriangleList;
-        pipelineDesc.vertexLayout.bindings.push_back({
-            .binding = 0,
-            .stride = static_cast<uint32_t>(sizeof(Vertex)),
-        });
+        const PipelineReflectionContract pipelineContract =
+            PipelineReflectionBuilder{}
+                .debugName("Basic Triangle Pipeline")
+                .vertexEntry(BasicTriangleShader::VertexEntryPoint)
+                .vertexBinding<Vertex>(BasicTriangleShader::MeshVertexBinding, 0)
+                .semantic("POSITION", BasicTriangleShader::MeshVertexBinding, 0, VertexFormat::Float3)
+                .semantic("COLOR", BasicTriangleShader::MeshVertexBinding,
+                          static_cast<uint32_t>(offsetof(Vertex, color)), VertexFormat::Float3)
+                .build();
 
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 0,
-            .binding = 0,
-            .offset = 0,
-            .format = VertexFormat::Float3,
+        m_pipeline = m_renderer.createGraphicsPipeline({
+            .shaderProgram = m_shaderProgram,
+            .reflectionContract = pipelineContract,
+            .topology = PrimitiveTopologyKind::TriangleList,
         });
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 1,
-            .binding = 0,
-            .offset = static_cast<uint32_t>(offsetof(Vertex, color)),
-            .format = VertexFormat::Float3,
-        });
-
-        m_pipeline = m_renderer.createGraphicsPipeline(pipelineDesc, m_shaderProgram);
         return static_cast<bool>(m_pipeline.isValid());
     }
 

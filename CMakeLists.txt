@@ -79,6 +79,7 @@ endif()
 
 # Add pre-compiled Slang libraries
 set(KERA_SLANG_TARGET "")
+set(KERA_SLANGC_EXECUTABLE "")
 if(KERA_ENABLE_SLANG)
     set(SLANG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/include")
     
@@ -123,6 +124,11 @@ if(KERA_ENABLE_SLANG)
         
         set(KERA_SLANG_TARGET slang)
         if(WIN32)
+            set(KERA_SLANGC_EXECUTABLE "${SLANG_BIN_DIR}/slangc.exe")
+        else()
+            set(KERA_SLANGC_EXECUTABLE "${SLANG_BIN_DIR}/slangc")
+        endif()
+        if(WIN32)
             file(GLOB KERA_SLANG_RUNTIME_DLLS CONFIGURE_DEPENDS "${SLANG_BIN_DIR}/*.dll")
         endif()
         message(STATUS "Using pre-compiled Slang from ${SLANG_LIB_DIR}")
@@ -160,6 +166,8 @@ set(KERA_RENDERER_SOURCES
     src/renderer/framebuffer.cpp
     src/renderer/shader.cpp
     src/renderer/slang_compiler.cpp
+    src/renderer/slang_reflection.cpp
+    src/renderer/reflection_contracts.cpp
     src/renderer/buffer.cpp
     src/renderer/image.cpp
 )
@@ -170,6 +178,7 @@ set(KERA_RENDERER_HEADERS
     include/kera/renderer/factory.h
     include/kera/renderer/interfaces.h
     include/kera/renderer/resource_registry.h
+    include/kera/renderer/backend/vulkan/layout_utils.h
     include/kera/renderer/backend/vulkan/vulkan_renderer.h
     include/kera/renderer/vulkan_renderer.h
     include/kera/renderer/instance.h
@@ -183,6 +192,9 @@ set(KERA_RENDERER_HEADERS
     include/kera/renderer/framebuffer.h
     include/kera/renderer/shader.h
     include/kera/renderer/slang_compiler.h
+    include/kera/renderer/slang_reflection.h
+    include/kera/renderer/reflection_contracts.h
+    include/kera/renderer/result.h
     include/kera/renderer/buffer.h
     include/kera/renderer/image.h
 )

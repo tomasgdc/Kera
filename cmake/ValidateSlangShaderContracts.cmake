@@ -30,5 +30,9 @@ kera_validate_slang_entry("instanced_triangle_many_lights.slang" "geometryVertex
 kera_validate_slang_entry("instanced_triangle_many_lights.slang" "geometryFragmentMain" "fragment")
 kera_validate_slang_entry("instanced_triangle_many_lights.slang" "fullscreenVertexMain" "vertex")
 kera_validate_slang_entry("instanced_triangle_many_lights.slang" "lightingFragmentMain" "fragment")
+kera_validate_slang_entry("damaged_helmet.slang" "helmetVertexMain" "vertex")
+kera_validate_slang_entry("damaged_helmet.slang" "helmetFragmentMain" "fragment")
+kera_validate_slang_entry("damaged_helmet.slang" "fullscreenVertexMain" "vertex")
+kera_validate_slang_entry("damaged_helmet.slang" "fullscreenFragmentMain" "fragment")
 
 message(STATUS "Slang shader contracts validated.")

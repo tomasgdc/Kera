@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kera/renderer/shader.h"
+#include "kera/renderer/slang_reflection.h"
 
 #include <string>
 #include <vector>
@@ -21,6 +22,9 @@ namespace kera
     public:
         static bool compileToSpirv(const SlangCompileRequest& request, std::vector<uint32_t>& outSpirv,
                                    std::string* outDiagnostics = nullptr);
+        static bool compileToSpirvAndReflect(const SlangCompileRequest& request, std::vector<uint32_t>& outSpirv,
+                                             SlangReflectionMetadata& outReflection,
+                                             std::string* outDiagnostics = nullptr);
 
     private:
         SlangCompiler() = delete;

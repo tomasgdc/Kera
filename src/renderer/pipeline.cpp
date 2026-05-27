@@ -2,10 +2,10 @@
 
 #include "kera/renderer/device.h"
 #include "kera/renderer/shader.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
 
-#include <iostream>
 #include <utility>
 
 namespace kera

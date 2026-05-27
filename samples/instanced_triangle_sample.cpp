@@ -1,5 +1,6 @@
 #include "instanced_triangle_sample.h"
 
+#include "kera/renderer/reflection_contracts.h"
 #include "kera/utilities/logger.h"
 #include "render_context.h"
 #include "sample_utils.h"
@@ -31,6 +32,20 @@ namespace kera
         {
             glm::mat4 modelMatrix;
         };
+
+        namespace InstancedTriangleShader
+        {
+            constexpr const char* Path = "shaders/instanced_triangle.slang";
+            constexpr const char* VertexEntryPoint = "vertexMain";
+            constexpr const char* FragmentEntryPoint = "fragmentMain";
+            constexpr const char* MeshVertexBinding = "meshVertex";
+            constexpr const char* InstanceVertexBinding = "instanceData";
+            const ReflectedDescriptorBindingDesc GlobalParams{
+                .name = "globalParams",
+                .type = DescriptorType::UniformBuffer,
+                .uniformSize = sizeof(Uniforms),
+            };
+        }  // namespace InstancedTriangleShader
 
         constexpr uint32_t kUniformRingSlots = 3;
     }  // namespace
@@ -67,25 +82,11 @@ namespace kera
 
     bool InstancedTriangleSample::createShaderProgram()
     {
-        ShaderProgramDesc programDesc{
-            .stages =
-                {
-                    {
-                        .path = resolveShaderPath("shaders/instanced_triangle.slang"),
-                        .entryPoint = "vertexMain",
-                        .stage = ShaderStage::Vertex,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                    {
-                        .path = resolveShaderPath("shaders/instanced_triangle.slang"),
-                        .entryPoint = "fragmentMain",
-                        .stage = ShaderStage::Fragment,
-                        .source = ShaderSourceKind::SlangFile,
-                    },
-                },
-        };
-
-        m_shaderProgram = m_renderer.createShaderProgram(programDesc);
+        m_shaderProgram = m_renderer.createGraphicsShaderProgram({
+            .path = resolveShaderPath(InstancedTriangleShader::Path),
+            .vertexEntryPoint = InstancedTriangleShader::VertexEntryPoint,
+            .fragmentEntryPoint = InstancedTriangleShader::FragmentEntryPoint,
+        });
         return static_cast<bool>(m_shaderProgram.isValid());
     }
 
@@ -153,79 +154,26 @@ namespace kera
 
     bool InstancedTriangleSample::createPipeline()
     {
-        GraphicsPipelineDesc pipelineDesc{};
-        pipelineDesc.topology = PrimitiveTopologyKind::TriangleList;
-        pipelineDesc.cullMode = CullModeKind::None;
+        const PipelineReflectionContract pipelineContract =
+            PipelineReflectionBuilder{}
+                .debugName("Instanced Triangle Pipeline")
+                .vertexEntry(InstancedTriangleShader::VertexEntryPoint)
+                .vertexBinding<Vertex>(InstancedTriangleShader::MeshVertexBinding, 0)
+                .vertexBinding<BasicInstanceData>(InstancedTriangleShader::InstanceVertexBinding, 1,
+                                                  VertexInputRate::Instance)
+                .semantic("POSITION", InstancedTriangleShader::MeshVertexBinding, 0, VertexFormat::Float3)
+                .semantic("COLOR", InstancedTriangleShader::MeshVertexBinding,
+                          static_cast<uint32_t>(offsetof(Vertex, color)), VertexFormat::Float3)
+                .semantic("TRANSFORM", InstancedTriangleShader::InstanceVertexBinding, 0, VertexFormat::Float4)
+                .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name)
+                .build();
 
-        // Binding 0 is the shared triangle mesh.
-        pipelineDesc.vertexLayout.bindings.push_back({
-            .binding = 0,
-            .stride = static_cast<uint32_t>(sizeof(Vertex)),
+        m_pipeline = m_renderer.createGraphicsPipeline({
+            .shaderProgram = m_shaderProgram,
+            .reflectionContract = pipelineContract,
+            .topology = PrimitiveTopologyKind::TriangleList,
+            .cullMode = CullModeKind::None,
         });
-
-        // Binding 1 advances once per instance and carries the model matrix.
-        pipelineDesc.vertexLayout.bindings.push_back({
-            .binding = 1,
-            .stride = static_cast<uint32_t>(sizeof(BasicInstanceData)),
-            .inputRate = VertexInputRate::Instance,
-        });
-
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 0,
-            .binding = 0,
-            .offset = 0,
-            .format = VertexFormat::Float3,
-        });
-
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 1,
-            .binding = 0,
-            .offset = static_cast<uint32_t>(offsetof(Vertex, color)),
-            .format = VertexFormat::Float3,
-        });
-
-        // A mat4 instance attribute is exposed as four vec4 vertex inputs.
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 2,
-            .binding = 1,
-            .offset = 0,
-            .format = VertexFormat::Float4,
-        });
-
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 3,
-            .binding = 1,
-            .offset = sizeof(glm::vec4),
-            .format = VertexFormat::Float4,
-        });
-
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 4,
-            .binding = 1,
-            .offset = sizeof(glm::vec4) * 2,
-            .format = VertexFormat::Float4,
-        });
-
-        pipelineDesc.vertexLayout.attributes.push_back({
-            .location = 5,
-            .binding = 1,
-            .offset = sizeof(glm::vec4) * 3,
-            .format = VertexFormat::Float4,
-        });
-
-        pipelineDesc.descriptorSets.push_back({
-            .set = 0,
-            .bindings =
-                {
-                    {
-                        .binding = 0,
-                        .type = DescriptorType::UniformBuffer,
-                        .stage = ShaderStage::Vertex,
-                    },
-                },
-        });
-
-        m_pipeline = m_renderer.createGraphicsPipeline(pipelineDesc, m_shaderProgram);
         if (!m_pipeline.isValid())
         {
             return false;
@@ -235,14 +183,16 @@ namespace kera
         m_uniformDescriptorSets.reserve(kUniformRingSlots);
         for (uint32_t index = 0; index < kUniformRingSlots; ++index)
         {
-            DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_pipeline, 0);
+            DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_pipeline);
             if (!descriptorSet.isValid())
             {
                 return false;
             }
 
             const std::size_t uniformOffset = sizeof(Uniforms) * index;
-            if (!m_renderer.updateDescriptorSet(descriptorSet, 0, m_uniformBuffer, uniformOffset, sizeof(Uniforms)))
+            if (!m_renderer.updateDescriptors(descriptorSet)
+                     .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name, m_uniformBuffer, uniformOffset)
+                     .ok())
             {
                 return false;
             }
@@ -325,8 +275,10 @@ namespace kera
                                            (uniformOffset / sizeof(Uniforms)) % m_uniformDescriptorSets.size();
                                        DescriptorSetHandle uniformDescriptorSet =
                                            m_uniformDescriptorSets[descriptorIndex];
-                                       if (!m_renderer.updateDescriptorSet(uniformDescriptorSet, 0, m_uniformBuffer,
-                                                                           uniformOffset, sizeof(Uniforms)))
+                                       if (!m_renderer.updateDescriptors(uniformDescriptorSet)
+                                                .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name,
+                                                                   m_uniformBuffer, uniformOffset)
+                                                .ok())
                                        {
                                            Logger::getInstance().error("Failed to update instanced triangle uniform descriptor.");
                                            return;
@@ -336,7 +288,7 @@ namespace kera
                                        m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
                                        m_renderer.bindVertexBuffer(frame, 1, m_instanceBuffer);
                                        m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
-                                       m_renderer.bindDescriptorSet(frame, m_pipeline, 0, uniformDescriptorSet);
+                                       m_renderer.bindDescriptorSet(frame, m_pipeline, uniformDescriptorSet);
                                        m_renderer.drawIndexed(frame, m_indexCount, m_instanceCount);
                                    });
     }

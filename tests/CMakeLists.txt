@@ -9,6 +9,22 @@ set_tests_properties(kera_renderer_lifecycle_tests PROPERTIES
     LABELS "quick;renderer;command_buffer"
 )
 
+add_executable(kera_slang_reflection_metadata_tests
+    slang_reflection_metadata_tests.cpp
+)
+
+target_link_libraries(kera_slang_reflection_metadata_tests PRIVATE kera)
+
+add_executable(kera_reflection_contracts_tests
+    reflection_contracts_tests.cpp
+)
+
+target_link_libraries(kera_reflection_contracts_tests PRIVATE kera)
+
+add_test(NAME kera_reflection_contracts_tests COMMAND kera_reflection_contracts_tests)
+set_tests_properties(kera_reflection_contracts_tests PROPERTIES
+    LABELS "quick;renderer;shader;reflection;descriptor"
+)
 add_executable(kera_logger_tests
     logger_tests.cpp
 )
@@ -27,6 +43,21 @@ add_test(NAME kera_logging_rule_tests
 set_tests_properties(kera_logging_rule_tests PROPERTIES
     LABELS "quick;logger;api"
 )
+
+if(KERA_SLANGC_EXECUTABLE)
+    add_test(NAME kera_slang_reflection_tests
+        COMMAND ${CMAKE_COMMAND}
+            -D KERA_SHADER_ROOT=${CMAKE_SOURCE_DIR}/samples/shaders
+            -D KERA_SLANGC_EXECUTABLE=${KERA_SLANGC_EXECUTABLE}
+            -D KERA_REFLECTION_OUTPUT_DIR=${CMAKE_BINARY_DIR}/shader-reflection
+            -D KERA_REFLECTION_METADATA_TEST_EXE=$<TARGET_FILE:kera_slang_reflection_metadata_tests>
+            -P "${CMAKE_SOURCE_DIR}/cmake/ReflectSlangShaderContracts.cmake"
+    )
+    set_tests_properties(kera_slang_reflection_tests PROPERTIES
+        LABELS "quick;shader;slang;reflection"
+    )
+endif()
+
 add_test(NAME kera_slang_shader_contracts
     COMMAND ${CMAKE_COMMAND}
         -D KERA_SHADER_ROOT=${CMAKE_SOURCE_DIR}/samples/shaders

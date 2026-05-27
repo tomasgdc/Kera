@@ -2,11 +2,11 @@
 
 #include "kera/renderer/device.h"
 #include "kera/renderer/slang_compiler.h"
+#include "kera/utilities/logger.h"
 
 #include <vulkan/vulkan.h>
 
 #include <fstream>
-#include <iostream>
 
 namespace kera
 {
@@ -87,11 +87,11 @@ namespace kera
         VkResult result = vkCreateShaderModule(vkDevice, &createInfo, nullptr, &shader_module_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create shader module: " << result << std::endl;
+            Logger::getInstance().error("Failed to create shader module: " + std::to_string(result));
             return false;
         }
 
-        std::cout << "Shader module created successfully" << std::endl;
+        Logger::getInstance().debug("Shader module created successfully");
         return true;
     }
 
@@ -101,7 +101,7 @@ namespace kera
 
         if (!file.is_open())
         {
-            std::cerr << "Failed to open shader file: " << filepath << std::endl;
+            Logger::getInstance().error("Failed to open shader file: " + filepath);
             return false;
         }
 

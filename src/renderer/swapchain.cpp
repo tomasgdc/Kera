@@ -7,7 +7,6 @@
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
-#include <iostream>
 #include <limits>
 
 namespace kera
@@ -57,11 +56,6 @@ namespace kera
     bool SwapChain::initialize(const PhysicalDevice& physicalDevice, const Device& device, VkSurfaceKHR surface,
                                uint32_t width, uint32_t height)
     {
-        if (swap_chain_)
-        {
-            shutdown();
-        }
-
         VkDevice vkDevice = device.getVulkanDevice();
         device_ = vkDevice;
         const auto& swapChainSupport = physicalDevice.getSwapChainSupport();
@@ -74,6 +68,12 @@ namespace kera
             Logger::getInstance().debug("Skipping swap chain creation while the surface extent is zero.");
             return false;
         }
+
+        if (swap_chain_)
+        {
+            shutdown();
+        }
+        device_ = vkDevice;
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
         if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
