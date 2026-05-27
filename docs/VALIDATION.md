@@ -96,22 +96,21 @@ Expected first capture target:
 
 ## Shader Contract Lane
 
-Kera uses Slang shader sources. The shader CTest lane validates source files, entry point names, stage annotations,
-Slang reflection JSON, and the C++ `SlangReflectionMetadata` parser for representative descriptor and vertex-input
-contracts. Runtime Slang shader-program creation also compiles and reflects Slang stages automatically, then stores
-the merged metadata on the shader-program resource for renderer-side validation and future descriptor layout work.
-The runtime path uses the Slang API directly: it keeps the linked-program session, module, entry point, and composite
-component alive while calling `getLayout()` and `toJson()`, then parses the JSON into typed C++ metadata.
-Graphics pipeline creation derives descriptor set layouts from shader-program reflection when samples leave descriptor
-sets empty, so descriptor names, bindings, and descriptor kinds stay owned by the Slang source rather than duplicated
-in sample code. C++ renderer convenience APIs cover the common sample path: `createGraphicsShaderProgram()` builds a
-two-stage graphics program from one Slang file, `PipelineReflectionBuilder` declares C++ host vertex bindings and
-required shader resources, and high-level `createGraphicsPipeline(GraphicsPipelineCreateDesc)` applies that contract
-using the shader program's stored reflection metadata. The low-level `appendValidatedReflectedPipelineContract()` helper remains
-available as an escape hatch, but samples no longer call it directly. `vertexBinding<T>()` derives binding stride from
-the host type while offsets remain explicit, `debugName()` prefixes contract diagnostics, and
-`getGraphicsPipelineDescriptorSets()` exposes pipeline descriptor layouts for tools. `updateDescriptors()` updates
-descriptors by reflected shader variable name and returns an accumulated `ok()` result. The renderer helper appends
-vertex bindings and reflected attributes while rejecting missing, ambiguous, duplicate, or unused semantic mappings.
-The sample shaders avoid manual `register(...)` bindings where Slang reflection can supply layout data, and single-set
-reflected pipelines can allocate and bind descriptor sets without repeating the reflected set index in sample code.
+Kera uses Slang as the source of truth for shader-facing contracts. The shader CTest lane checks:
+
+- shader source files, entry point names, and stage annotations
+- Slang reflection JSON for representative sample shaders
+- the C++ `SlangReflectionMetadata` parser for descriptor and vertex-input metadata
+
+At runtime, graphics shader programs compile and reflect their Slang stages in one path. The renderer stores the merged
+reflection metadata on the shader-program resource, then uses it when creating reflected graphics pipelines.
+
+Reflection-driven pipeline creation keeps shader-owned data in the shader:
+
+- descriptor names, binding numbers, descriptor kinds, and entry-point inputs come from Slang reflection
+- C++ still owns host layout details such as vertex structs, binding slots, offsets, strides, and input rates
+- `PipelineReflectionBuilder` connects those two sides and reports mismatches early
+
+When a reflected pipeline omits manual descriptor set layouts, the Vulkan backend derives them from shader reflection.
+Samples update descriptors by shader variable name through `updateDescriptors()`, and single-set reflected pipelines can
+allocate and bind descriptor sets without repeating the reflected set index.
