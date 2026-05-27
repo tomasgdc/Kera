@@ -18,7 +18,6 @@
 #include <limits>
 #include <optional>
 #include <span>
-#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -116,7 +115,8 @@ namespace kera
             }
         }
 
-        uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties)
+        bool findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties,
+                            uint32_t& outMemoryType)
         {
             VkPhysicalDeviceMemoryProperties memoryProperties{};
             vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
@@ -126,74 +126,34 @@ namespace kera
                 if ((typeFilter & (1u << i)) &&
                     (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
                 {
-                    return i;
+                    outMemoryType = i;
+                    return true;
                 }
             }
 
-            throw std::runtime_error("Failed to find suitable Vulkan memory type.");
-        }
-
-        VkAccessFlags2 accessMask2ForLayout(VkImageLayout layout)
-        {
-            switch (layout)
-            {
-                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-                    return VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-                    return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-                    return VK_ACCESS_2_TRANSFER_WRITE_BIT;
-                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-                    return VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-                case VK_IMAGE_LAYOUT_UNDEFINED:
-                default:
-                    return 0;
-            }
-        }
-
-        VkPipelineStageFlags2 stageMask2ForLayout(VkImageLayout layout)
-        {
-            switch (layout)
-            {
-                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-                    return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-                    return VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-                    return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-                    return VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-                case VK_IMAGE_LAYOUT_UNDEFINED:
-                default:
-                    return VK_PIPELINE_STAGE_2_NONE;
-            }
-        }
-
-        const char* layoutName(VkImageLayout layout)
-        {
-            switch (layout)
-            {
-                case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-                    return "ColorAttachment";
-                case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-                    return "DepthAttachment";
-                case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-                    return "TransferDst";
-                case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-                    return "ShaderRead";
-                case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-                    return "Present";
-                case VK_IMAGE_LAYOUT_UNDEFINED:
-                default:
-                    return "Undefined";
-            }
+            return false;
         }
 
         VkPipelineStageFlags2 signalStageForTimelineSubmit(VkPipelineStageFlags2 producerStage)
         {
             return producerStage == 0 ? VK_PIPELINE_STAGE_2_NONE : producerStage;
+        }
+
+        std::string swapchainFormatName(VkFormat format)
+        {
+            switch (format)
+            {
+                case VK_FORMAT_B8G8R8A8_UNORM:
+                    return "VK_FORMAT_B8G8R8A8_UNORM";
+                case VK_FORMAT_B8G8R8A8_SRGB:
+                    return "VK_FORMAT_B8G8R8A8_SRGB";
+                case VK_FORMAT_R8G8B8A8_UNORM:
+                    return "VK_FORMAT_R8G8B8A8_UNORM";
+                case VK_FORMAT_R8G8B8A8_SRGB:
+                    return "VK_FORMAT_R8G8B8A8_SRGB";
+                default:
+                    return "VK_FORMAT_" + std::to_string(static_cast<uint32_t>(format));
+            }
         }
 
         VkPipelineStageFlags2 renderCompleteStageMask()
@@ -819,7 +779,7 @@ namespace kera
 
         if (hasActiveFrames())
         {
-            Logger::getInstance().warning("Deferring Vulkan resize while a frame is active.");
+            Logger::getInstance().info("Deferring Vulkan resize until the active frame completes.");
             m_swapchainRecreateRequested = true;
             return false;
         }
@@ -1254,15 +1214,10 @@ namespace kera
         VkMemoryAllocateInfo allocateInfo{};
         allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocateInfo.allocationSize = memoryRequirements.size;
-        try
+        if (!findMemoryType(m_device->getVulkanPhysicalDevice(), memoryRequirements.memoryTypeBits,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, allocateInfo.memoryTypeIndex))
         {
-            allocateInfo.memoryTypeIndex =
-                findMemoryType(m_device->getVulkanPhysicalDevice(), memoryRequirements.memoryTypeBits,
-                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        }
-        catch (const std::runtime_error& error)
-        {
-            Logger::getInstance().error(error.what());
+            Logger::getInstance().error("Failed to find suitable Vulkan texture memory type.");
             resource.shutdown();
             return {};
         }

@@ -133,6 +133,23 @@ namespace kera
             return true;
         }
 
+        template <typename Fn>
+        bool forEach(Fn&& fn) const
+        {
+            for (uint32_t i = 0; i < m_slots.size(); ++i)
+            {
+                const Slot& slot = m_slots[i];
+                if (slot.m_value)
+                {
+                    if (!fn(HandleT{static_cast<int32_t>(i), slot.m_generation}, *slot.m_value))
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
     private:
         struct Slot
         {

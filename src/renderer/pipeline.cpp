@@ -164,7 +164,7 @@ namespace kera
             const DescriptorSetLayoutDesc& setDesc = desc.descriptorSets[setIndex];
             if (setDesc.set != setIndex)
             {
-                std::cerr << "Descriptor set layouts must be dense and sorted from set 0." << std::endl;
+                Logger::getInstance().error("Descriptor set layouts must be dense and sorted from set 0.");
                 return false;
             }
 
@@ -189,7 +189,7 @@ namespace kera
             VkResult result = vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &descriptorSetLayout);
             if (result != VK_SUCCESS)
             {
-                std::cerr << "Failed to create descriptor set layout: " << result << std::endl;
+                Logger::getInstance().error("Failed to create descriptor set layout: " + std::to_string(result));
                 shutdown();
                 return false;
             }
@@ -206,7 +206,7 @@ namespace kera
         VkResult result = vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipeline_layout_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create pipeline layout: " << result << std::endl;
+            Logger::getInstance().error("Failed to create pipeline layout: " + std::to_string(result));
             shutdown();
             return false;
         }
@@ -217,7 +217,7 @@ namespace kera
         {
             if (!shader)
             {
-                std::cerr << "Graphics pipeline initialization received a null shader stage." << std::endl;
+                Logger::getInstance().error("Graphics pipeline initialization received a null shader stage.");
                 shutdown();
                 return false;
             }
@@ -332,12 +332,12 @@ namespace kera
         result = vkCreateGraphicsPipelines(vkDevice, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline_);
         if (result != VK_SUCCESS)
         {
-            std::cerr << "Failed to create graphics pipeline: " << result << std::endl;
+            Logger::getInstance().error("Failed to create graphics pipeline: " + std::to_string(result));
             shutdown();
             return false;
         }
 
-        std::cout << "Graphics pipeline created successfully" << std::endl;
+        Logger::getInstance().debug("Graphics pipeline created successfully");
         return true;
     }
 

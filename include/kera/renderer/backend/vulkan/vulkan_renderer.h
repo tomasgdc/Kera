@@ -351,6 +351,7 @@ namespace kera
         bool validateGraphicsPipelineDescriptorSets(GraphicsPipelineHandle pipeline) const override;
         RendererValidationReport validateDescriptorSetDetailed(DescriptorSetHandle set) const override;
         RendererValidationReport validateGraphicsPipelineDescriptorSetsDetailed(
+            GraphicsPipelineHandle pipeline) const override;
         bool destroyDescriptorSet(DescriptorSetHandle set) override;
 
         FrameHandle beginFrame() override;

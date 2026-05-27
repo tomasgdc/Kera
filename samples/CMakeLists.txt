@@ -25,6 +25,7 @@ add_executable(kera_samples
     ${SHADER_FILES}
 )
 target_link_libraries(kera_samples PRIVATE kera)
+kera_configure_no_exceptions(kera_samples)
 
 if(WIN32)
     if(KERA_BUILD_SHARED OR KERA_SLANG_TARGET)

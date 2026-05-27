@@ -8,8 +8,40 @@ option(KERA_BUILD_SHARED "Build Kera as shared library" OFF)
 option(KERA_BUILD_TESTS "Build Kera tests" ON)
 option(KERA_ENABLE_SLANG "Enable Slang shader compilation support" ON)
 option(KERA_ENABLE_IMGUI "Enable Dear ImGui debug UI support" ${KERA_BUILD_SAMPLES})
+option(KERA_ALLOW_STL_CPP_SHARED_ABI "Allow the STL-based C++ convenience API to be built as a shared-library ABI" OFF)
 
 include(CTest)
+
+if(KERA_BUILD_SHARED AND NOT KERA_ALLOW_STL_CPP_SHARED_ABI)
+    message(FATAL_ERROR
+        "KERA_BUILD_SHARED is blocked because internal C++ convenience renderer headers still contain STL types. "
+        "Use the STL-free installed public headers include/kera/kera.h and include/kera/renderer/api.h, or set "
+        "KERA_ALLOW_STL_CPP_SHARED_ABI=ON only for local/internal builds that accept compiler/STL ABI coupling."
+    )
+endif()
+
+function(kera_configure_no_exceptions target_name)
+    if(MSVC)
+        target_compile_options(${target_name} PUBLIC /EHs-c-)
+        target_compile_definitions(${target_name} PUBLIC _HAS_EXCEPTIONS=0)
+    else()
+        target_compile_options(${target_name} PUBLIC -fno-exceptions)
+    endif()
+endfunction()
+
+if(MSVC)
+    foreach(flag_var
+        CMAKE_CXX_FLAGS
+        CMAKE_CXX_FLAGS_DEBUG
+        CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_CXX_FLAGS_RELWITHDEBINFO
+        CMAKE_CXX_FLAGS_MINSIZEREL
+    )
+        string(REPLACE "/EHsc" "" ${flag_var} "${${flag_var}}")
+        string(REPLACE "/EHsc-" "" ${flag_var} "${${flag_var}}")
+        set(${flag_var} "${${flag_var}}" CACHE STRING "" FORCE)
+    endforeach()
+endif()
 
 # C++ Standard
 set(CMAKE_CXX_STANDARD 20)
@@ -75,6 +107,7 @@ if(KERA_ENABLE_IMGUI)
         Vulkan::Vulkan
         ${KERA_SDL_TARGET}
     )
+    kera_configure_no_exceptions(kera_imgui)
 endif()
 
 # Add pre-compiled Slang libraries
@@ -172,7 +205,12 @@ set(KERA_RENDERER_SOURCES
     src/renderer/image.cpp
 )
 
-set(KERA_RENDERER_HEADERS
+set(KERA_RENDERER_PUBLIC_HEADERS
+    include/kera/renderer/api.h
+    include/kera/renderer/abi.h
+)
+
+set(KERA_RENDERER_INTERNAL_HEADERS
     include/kera/renderer/descriptors.h
     include/kera/renderer/descriptor_contracts.h
     include/kera/renderer/factory.h
@@ -197,6 +235,17 @@ set(KERA_RENDERER_HEADERS
     include/kera/renderer/result.h
     include/kera/renderer/buffer.h
     include/kera/renderer/image.h
+)
+
+set(KERA_PUBLIC_API_HEADERS
+    include/kera/kera.h
+    include/kera/renderer/api.h
+    include/kera/renderer/abi.h
+)
+
+set(KERA_RENDERER_HEADERS
+    ${KERA_RENDERER_PUBLIC_HEADERS}
+    ${KERA_RENDERER_INTERNAL_HEADERS}
 )
 
 # === KERA UTILITIES ===
@@ -271,9 +320,11 @@ if(TARGET kera_imgui)
     target_compile_definitions(kera PUBLIC KERA_HAS_IMGUI=1)
 endif()
 
+kera_configure_no_exceptions(kera)
+
 # Compiler warnings
 if(MSVC)
-    target_compile_options(kera PRIVATE /W4 /WX /EHsc)
+    target_compile_options(kera PRIVATE /W4 /WX)
 else()
     target_compile_options(kera PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
@@ -295,6 +346,11 @@ install(TARGETS kera
     RUNTIME DESTINATION bin
 )
 
-install(DIRECTORY include/kera
-    DESTINATION include
+install(FILES include/kera/kera.h
+    DESTINATION include/kera
+)
+
+install(FILES
+    ${KERA_RENDERER_PUBLIC_HEADERS}
+    DESTINATION include/kera/renderer
 )

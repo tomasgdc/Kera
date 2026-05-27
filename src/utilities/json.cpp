@@ -5,6 +5,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <system_error>
 
 namespace kera
 {
@@ -261,17 +262,17 @@ namespace kera
             }
 
             const std::string numberText = text.substr(start, offset - start);
-            try
-            {
-                double value = std::stod(numberText);
-                outValue = JsonValue(value);
-                return true;
-            }
-            catch (const std::exception&)
+            double value = 0.0;
+            const char* numberBegin = numberText.data();
+            const char* numberEnd = numberBegin + numberText.size();
+            const std::from_chars_result result = std::from_chars(numberBegin, numberEnd, value);
+            if (result.ec != std::errc{} || result.ptr != numberEnd)
             {
                 Logger::getInstance().error("Failed to parse JSON number");
                 return false;
             }
+            outValue = JsonValue(value);
+            return true;
         }
 
         bool parseLiteral(const std::string& text, size_t& offset, JsonValue& outValue)
