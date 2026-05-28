@@ -4,22 +4,28 @@
 #include "kera/renderer/slang_compiler.h"
 #include "kera/renderer/slang_reflection.h"
 
+#include <gtest/gtest.h>
+
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 namespace
 {
-    int g_failures = 0;
+#if defined(_CPPUNWIND) || defined(__EXCEPTIONS)
+#error "Kera tests must compile with C++ exceptions disabled."
+#endif
 
-    void expect(bool condition, const char* message)
+#if defined(_MSC_VER)
+    static_assert(_HAS_EXCEPTIONS == 0, "Kera MSVC builds must compile the STL with exceptions disabled.");
+#endif
+
+    const char* getEnv(const char* name)
     {
-        if (!condition)
-        {
-            std::cerr << "FAILED: " << message << '\n';
-            ++g_failures;
-        }
+        return std::getenv(name);
     }
 
     std::string readTextFile(const std::filesystem::path& path)
@@ -35,141 +41,99 @@ namespace
         kera::SlangReflectionMetadata metadata;
         std::string diagnostics;
         const std::string json = readTextFile(path);
-        expect(!json.empty(), "reflection JSON should be readable");
-        expect(kera::parseSlangReflectionMetadata(json, metadata, &diagnostics), "reflection JSON should parse");
-        if (!diagnostics.empty())
-        {
-            std::cerr << diagnostics << '\n';
-        }
+        EXPECT_FALSE(json.empty()) << "Reflection JSON should be readable: " << path.string();
+        EXPECT_TRUE(kera::parseSlangReflectionMetadata(json, metadata, &diagnostics))
+            << "Reflection JSON should parse: " << path.string() << '\n'
+            << diagnostics;
         return metadata;
     }
-}
+}  // namespace
 
-int main(int argc, char** argv)
+TEST(KeraSlangReflectionMetadata, GeneratedJsonContracts)
 {
-    if (argc < 3)
+    const char* instancedJson = getEnv("KERA_REFLECTION_INSTANCED_JSON");
+    const char* lightingJson = getEnv("KERA_REFLECTION_LIGHTING_JSON");
+    const char* shaderRootEnv = getEnv("KERA_REFLECTION_SHADER_ROOT");
+    if (instancedJson == nullptr || lightingJson == nullptr || shaderRootEnv == nullptr)
     {
-        std::cerr << "Usage: kera_slang_reflection_metadata_tests <instanced-json> <lighting-json> [shader-root]\n";
-        return 1;
+        GTEST_SKIP() << "Generated Slang reflection JSON paths are provided by kera_slang_reflection_tests.";
     }
 
-    const kera::SlangReflectionMetadata instanced = parseMetadata(argv[1]);
+    const kera::SlangReflectionMetadata instanced = parseMetadata(instancedJson);
     const kera::SlangReflectionBinding* globalParams = instanced.findBinding("globalParams");
-    expect(globalParams != nullptr, "instanced metadata should expose globalParams");
-    if (globalParams)
-    {
-        expect(globalParams->kind == kera::SlangReflectionBindingKind::ParameterBlock,
-               "globalParams should be a parameter block");
-        expect(globalParams->binding == 0, "globalParams should bind at descriptor binding 0");
-        expect(globalParams->uniformSize == 128, "globalParams uniform layout should be 128 bytes");
-        expect(globalParams->typeName == "Uniforms", "globalParams should expose Uniforms type name");
-    }
+    ASSERT_NE(globalParams, nullptr);
+    EXPECT_EQ(globalParams->kind, kera::SlangReflectionBindingKind::ParameterBlock);
+    EXPECT_EQ(globalParams->binding, 0u);
+    EXPECT_EQ(globalParams->uniformSize, 128u);
+    EXPECT_EQ(globalParams->typeName, "Uniforms");
 
     const kera::SlangReflectionEntryPoint* vertexMain = instanced.findEntryPoint("vertexMain");
-    expect(vertexMain != nullptr, "instanced metadata should expose vertexMain");
-    if (vertexMain)
-    {
-        expect(vertexMain->stage == kera::ShaderType::Vertex, "vertexMain should be a vertex stage");
-        expect(vertexMain->inputs.size() == 3, "vertexMain should expose position, color, and model matrix inputs");
-        expect(vertexMain->inputs[0].semanticName == "POSITION", "first vertex input should be POSITION");
-        expect(vertexMain->inputs[0].location == 0, "POSITION should use location 0");
-        expect(vertexMain->inputs[1].semanticName == "COLOR", "second vertex input should be COLOR");
-        expect(vertexMain->inputs[1].location == 1, "COLOR should use location 1");
-        expect(vertexMain->inputs[2].semanticName == "TRANSFORM", "third vertex input should be TRANSFORM");
-        expect(vertexMain->inputs[2].location == 2, "TRANSFORM should begin at location 2");
-        expect(vertexMain->inputs[2].locationCount == 4, "TRANSFORM matrix should span four locations");
-    }
+    ASSERT_NE(vertexMain, nullptr);
+    EXPECT_EQ(vertexMain->stage, kera::ShaderType::Vertex);
+    ASSERT_EQ(vertexMain->inputs.size(), 3u);
+    EXPECT_EQ(vertexMain->inputs[0].semanticName, "POSITION");
+    EXPECT_EQ(vertexMain->inputs[0].location, 0u);
+    EXPECT_EQ(vertexMain->inputs[1].semanticName, "COLOR");
+    EXPECT_EQ(vertexMain->inputs[1].location, 1u);
+    EXPECT_EQ(vertexMain->inputs[2].semanticName, "TRANSFORM");
+    EXPECT_EQ(vertexMain->inputs[2].location, 2u);
+    EXPECT_EQ(vertexMain->inputs[2].locationCount, 4u);
 
-    const kera::SlangReflectionMetadata lighting = parseMetadata(argv[2]);
+    const kera::SlangReflectionMetadata lighting = parseMetadata(lightingJson);
     const kera::SlangReflectionBinding* sceneTexture = lighting.findBinding("sceneTexture");
-    expect(sceneTexture != nullptr, "lighting metadata should expose sceneTexture");
-    if (sceneTexture)
-    {
-        expect(sceneTexture->kind == kera::SlangReflectionBindingKind::Resource, "sceneTexture should be a resource");
-        expect(sceneTexture->binding == 1, "sceneTexture should bind at descriptor binding 1");
-    }
+    ASSERT_NE(sceneTexture, nullptr);
+    EXPECT_EQ(sceneTexture->kind, kera::SlangReflectionBindingKind::Resource);
+    EXPECT_EQ(sceneTexture->binding, 1u);
 
     const kera::SlangReflectionBinding* sceneSampler = lighting.findBinding("sceneSampler");
-    expect(sceneSampler != nullptr, "lighting metadata should expose sceneSampler");
-    if (sceneSampler)
-    {
-        expect(sceneSampler->kind == kera::SlangReflectionBindingKind::SamplerState,
-               "sceneSampler should be a sampler");
-        expect(sceneSampler->binding == 2, "sceneSampler should bind at descriptor binding 2");
-    }
+    ASSERT_NE(sceneSampler, nullptr);
+    EXPECT_EQ(sceneSampler->kind, kera::SlangReflectionBindingKind::SamplerState);
+    EXPECT_EQ(sceneSampler->binding, 2u);
 
     const kera::SlangReflectionBinding* lightingParams = lighting.findBinding("lightingParams");
-    expect(lightingParams != nullptr, "lighting metadata should expose lightingParams");
-    if (lightingParams)
-    {
-        expect(lightingParams->kind == kera::SlangReflectionBindingKind::ConstantBuffer,
-               "lightingParams should be a constant buffer");
-        expect(lightingParams->binding == 3, "lightingParams should bind at descriptor binding 3");
-        expect(lightingParams->uniformSize == 2064, "lightingParams uniform layout should be 2064 bytes");
-        expect(lightingParams->typeName == "LightingUniforms",
-               "lightingParams should expose LightingUniforms type name");
-    }
+    ASSERT_NE(lightingParams, nullptr);
+    EXPECT_EQ(lightingParams->kind, kera::SlangReflectionBindingKind::ConstantBuffer);
+    EXPECT_EQ(lightingParams->binding, 3u);
+    EXPECT_EQ(lightingParams->uniformSize, 2064u);
+    EXPECT_EQ(lightingParams->typeName, "LightingUniforms");
 
     const kera::SlangReflectionEntryPoint* lightingFragmentMain = lighting.findEntryPoint("lightingFragmentMain");
-    expect(lightingFragmentMain != nullptr, "lighting metadata should expose lightingFragmentMain");
-    if (lightingFragmentMain)
-    {
-        expect(lightingFragmentMain->stage == kera::ShaderType::Fragment,
-               "lightingFragmentMain should be a fragment stage");
-    }
+    ASSERT_NE(lightingFragmentMain, nullptr);
+    EXPECT_EQ(lightingFragmentMain->stage, kera::ShaderType::Fragment);
 
-    if (argc >= 4)
-    {
-        std::vector<uint32_t> spirv;
-        kera::SlangReflectionMetadata runtimeReflection;
-        std::string diagnostics;
-        const std::filesystem::path shaderRoot(argv[3]);
-        const bool compiled = kera::SlangCompiler::compileToSpirvAndReflect(
-            {
-                .shaderPath = (shaderRoot / "instanced_triangle.slang").string(),
-                .entryPoint = "vertexMain",
-                .shaderType = kera::ShaderType::Vertex,
-            },
-            spirv, runtimeReflection, &diagnostics);
-
-        expect(compiled, "compileToSpirvAndReflect should compile and reflect in one C++ call");
-        expect(!spirv.empty(), "compileToSpirvAndReflect should return SPIR-V");
-        expect(runtimeReflection.findBinding("globalParams") != nullptr,
-               "compileToSpirvAndReflect should return reflected bindings");
-        expect(runtimeReflection.findEntryPoint("vertexMain") != nullptr,
-               "compileToSpirvAndReflect should return reflected entry points");
-        const kera::SlangReflectionBinding* runtimeGlobalParams = runtimeReflection.findBinding("globalParams");
-        if (runtimeGlobalParams)
+    std::vector<uint32_t> spirv;
+    kera::SlangReflectionMetadata runtimeReflection;
+    std::string diagnostics;
+    const std::filesystem::path shaderRoot(shaderRootEnv);
+    const bool compiled = kera::SlangCompiler::compileToSpirvAndReflect(
         {
-            expect(runtimeGlobalParams->stage == kera::ShaderType::Vertex,
-                   "compileToSpirvAndReflect should tag runtime bindings with their shader stage");
-        }
+            .shaderPath = (shaderRoot / "instanced_triangle.slang").string(),
+            .entryPoint = "vertexMain",
+            .shaderType = kera::ShaderType::Vertex,
+        },
+        spirv, runtimeReflection, &diagnostics);
 
-        std::vector<uint32_t> lightingSpirv;
-        kera::SlangReflectionMetadata runtimeLightingReflection;
-        const bool lightingCompiled = kera::SlangCompiler::compileToSpirvAndReflect(
-            {
-                .shaderPath = (shaderRoot / "instanced_triangle_many_lights.slang").string(),
-                .entryPoint = "lightingFragmentMain",
-                .shaderType = kera::ShaderType::Fragment,
-            },
-            lightingSpirv, runtimeLightingReflection, &diagnostics);
+    EXPECT_TRUE(compiled) << diagnostics;
+    EXPECT_FALSE(spirv.empty());
+    EXPECT_NE(runtimeReflection.findBinding("globalParams"), nullptr);
+    EXPECT_NE(runtimeReflection.findEntryPoint("vertexMain"), nullptr);
+    const kera::SlangReflectionBinding* runtimeGlobalParams = runtimeReflection.findBinding("globalParams");
+    ASSERT_NE(runtimeGlobalParams, nullptr);
+    EXPECT_EQ(runtimeGlobalParams->stage, kera::ShaderType::Vertex);
 
-        expect(lightingCompiled, "compileToSpirvAndReflect should compile and reflect the lighting fragment shader");
-        const kera::SlangReflectionBinding* runtimeLightingParams =
-            runtimeLightingReflection.findBinding("lightingParams");
-        expect(runtimeLightingParams != nullptr,
-               "compileToSpirvAndReflect should return reflected lighting fragment bindings");
-        if (runtimeLightingParams)
+    std::vector<uint32_t> lightingSpirv;
+    kera::SlangReflectionMetadata runtimeLightingReflection;
+    diagnostics.clear();
+    const bool lightingCompiled = kera::SlangCompiler::compileToSpirvAndReflect(
         {
-            expect(runtimeLightingParams->stage == kera::ShaderType::Fragment,
-                   "compileToSpirvAndReflect should tag fragment bindings with the fragment stage");
-        }
-        if (!diagnostics.empty())
-        {
-            std::cerr << diagnostics << '\n';
-        }
-    }
+            .shaderPath = (shaderRoot / "instanced_triangle_many_lights.slang").string(),
+            .entryPoint = "lightingFragmentMain",
+            .shaderType = kera::ShaderType::Fragment,
+        },
+        lightingSpirv, runtimeLightingReflection, &diagnostics);
 
-    return g_failures == 0 ? 0 : 1;
+    EXPECT_TRUE(lightingCompiled) << diagnostics;
+    const kera::SlangReflectionBinding* runtimeLightingParams = runtimeLightingReflection.findBinding("lightingParams");
+    ASSERT_NE(runtimeLightingParams, nullptr);
+    EXPECT_EQ(runtimeLightingParams->stage, kera::ShaderType::Fragment);
 }

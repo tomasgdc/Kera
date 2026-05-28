@@ -3,7 +3,8 @@
 
 #include "kera/renderer/api.h"
 
-#include <cassert>
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <type_traits>
 
@@ -25,7 +26,7 @@ namespace
     static_assert(KERA_RENDERER_ABI_VERSION == 1u);
 }  // namespace
 
-int main()
+TEST(KeraRendererPublicApi, BufferDescriptorsAndFunctionTableAreAbiStable)
 {
     const KeraStringView debugName{
         "Public Buffer",
@@ -38,15 +39,13 @@ int main()
         KERA_MEMORY_ACCESS_CPU_WRITE,
         debugName,
     };
-    assert(bufferDesc.size == 256);
-    assert(bufferDesc.debugName.data == debugName.data);
-    assert(bufferDesc.debugName.size == debugName.size);
+    EXPECT_EQ(bufferDesc.size, 256u);
+    EXPECT_EQ(bufferDesc.debugName.data, debugName.data);
+    EXPECT_EQ(bufferDesc.debugName.size, debugName.size);
 
     KeraRendererApiV1 api{};
     api.abiVersion = KERA_RENDERER_ABI_VERSION;
-    assert(api.abiVersion == 1u);
-    assert(keraGetRendererApiV1() != nullptr);
-    assert(keraGetRendererApiV1()->abiVersion == KERA_RENDERER_ABI_VERSION);
-
-    return 0;
+    EXPECT_EQ(api.abiVersion, 1u);
+    ASSERT_NE(keraGetRendererApiV1(), nullptr);
+    EXPECT_EQ(keraGetRendererApiV1()->abiVersion, KERA_RENDERER_ABI_VERSION);
 }

@@ -4,7 +4,8 @@
 #include "kera/renderer/gltf_loader.h"
 #include "kera/renderer/interfaces.h"
 
-#include <cassert>
+#include <gtest/gtest.h>
+
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -389,60 +390,63 @@ namespace
     }
 }  // namespace
 
-int main()
+TEST(KeraGltfLoader, ReportsValidationFailuresForMissingPaths)
 {
     NullRenderer renderer;
 
     const kera::RendererResult<kera::GltfLoadedModel> emptyPath =
         kera::loadGltfModel(renderer, {.path = "", .debugName = "Empty"});
-    assert(!emptyPath.ok());
-    assert(emptyPath.errorCode() == kera::RendererErrorCode::ValidationFailed);
-    assert(!emptyPath.errorMessage().empty());
+    EXPECT_FALSE(emptyPath.ok());
+    EXPECT_EQ(emptyPath.errorCode(), kera::RendererErrorCode::ValidationFailed);
+    EXPECT_FALSE(emptyPath.errorMessage().empty());
 
     const kera::RendererResult<kera::GltfLoadedModel> missingFile =
         kera::loadGltfModel(renderer, {.path = "missing_file_that_should_not_exist.gltf", .debugName = "Missing"});
-    assert(!missingFile.ok());
-    assert(missingFile.errorCode() == kera::RendererErrorCode::ValidationFailed);
-    assert(!missingFile.errorMessage().empty());
+    EXPECT_FALSE(missingFile.ok());
+    EXPECT_EQ(missingFile.errorCode(), kera::RendererErrorCode::ValidationFailed);
+    EXPECT_FALSE(missingFile.errorMessage().empty());
+}
 
+TEST(KeraGltfLoader, LoadsDamagedHelmetResourcesAndGeneratedTangents)
+{
     NullRenderer resourceRenderer(true);
     const std::string damagedHelmetPath =
         std::string(KERA_SOURCE_DIR) + "/samples/assets/gltf/DamagedHelmet/DamagedHelmet.gltf";
     kera::RendererResult<kera::GltfLoadedModel> damagedHelmet =
         kera::loadGltfModel(resourceRenderer, {.path = damagedHelmetPath, .debugName = "DamagedHelmet"});
-    assert(damagedHelmet.ok());
-    assert(damagedHelmet.value().indexCount == 46356);
-    assert(damagedHelmet.value().materialFactors.baseColor == glm::vec4(1.0f));
-    assert(damagedHelmet.value().materialFactors.emissive == glm::vec3(1.0f));
-    assert(damagedHelmet.value().materialFactors.metallic == 1.0f);
-    assert(damagedHelmet.value().materialFactors.roughness == 1.0f);
-    assert(damagedHelmet.value().materialFactors.normalScale == 1.0f);
-    assert(damagedHelmet.value().materialFactors.occlusionStrength == 1.0f);
-    assert(damagedHelmet.value().materialFactors.alphaCutoff == 0.5f);
-    assert(damagedHelmet.value().materialFactors.alphaMode == kera::GltfAlphaMode::Opaque);
-    assert(!damagedHelmet.value().materialFactors.doubleSided);
+    ASSERT_TRUE(damagedHelmet.ok());
+    EXPECT_EQ(damagedHelmet.value().indexCount, 46356u);
+    EXPECT_EQ(damagedHelmet.value().materialFactors.baseColor, glm::vec4(1.0f));
+    EXPECT_EQ(damagedHelmet.value().materialFactors.emissive, glm::vec3(1.0f));
+    EXPECT_EQ(damagedHelmet.value().materialFactors.metallic, 1.0f);
+    EXPECT_EQ(damagedHelmet.value().materialFactors.roughness, 1.0f);
+    EXPECT_EQ(damagedHelmet.value().materialFactors.normalScale, 1.0f);
+    EXPECT_EQ(damagedHelmet.value().materialFactors.occlusionStrength, 1.0f);
+    EXPECT_EQ(damagedHelmet.value().materialFactors.alphaCutoff, 0.5f);
+    EXPECT_EQ(damagedHelmet.value().materialFactors.alphaMode, kera::GltfAlphaMode::Opaque);
+    EXPECT_FALSE(damagedHelmet.value().materialFactors.doubleSided);
 
-    assert(resourceRenderer.textureDescs.size() == 5);
-    assert(resourceRenderer.textureDescs[0].format == kera::TextureFormat::RGBA8Srgb);
-    assert(resourceRenderer.textureDescs[1].format == kera::TextureFormat::RGBA8);
-    assert(resourceRenderer.textureDescs[2].format == kera::TextureFormat::RGBA8Srgb);
-    assert(resourceRenderer.textureDescs[3].format == kera::TextureFormat::RGBA8);
-    assert(resourceRenderer.textureDescs[4].format == kera::TextureFormat::RGBA8);
+    ASSERT_EQ(resourceRenderer.textureDescs.size(), 5u);
+    EXPECT_EQ(resourceRenderer.textureDescs[0].format, kera::TextureFormat::RGBA8Srgb);
+    EXPECT_EQ(resourceRenderer.textureDescs[1].format, kera::TextureFormat::RGBA8);
+    EXPECT_EQ(resourceRenderer.textureDescs[2].format, kera::TextureFormat::RGBA8Srgb);
+    EXPECT_EQ(resourceRenderer.textureDescs[3].format, kera::TextureFormat::RGBA8);
+    EXPECT_EQ(resourceRenderer.textureDescs[4].format, kera::TextureFormat::RGBA8);
     for (const kera::TextureDesc& textureDesc : resourceRenderer.textureDescs)
     {
-        assert(textureDesc.generateMipmaps);
-        assert(textureDesc.mipLevels == kera::textureFullMipLevelCount(textureDesc.width, textureDesc.height));
-        assert(textureDesc.mipLevels > 1);
+        EXPECT_TRUE(textureDesc.generateMipmaps);
+        EXPECT_EQ(textureDesc.mipLevels, kera::textureFullMipLevelCount(textureDesc.width, textureDesc.height));
+        EXPECT_GT(textureDesc.mipLevels, 1u);
     }
-    assert(resourceRenderer.samplerDescs.size() == 1);
-    assert(resourceRenderer.samplerDescs[0].minFilter == kera::SamplerFilter::Linear);
-    assert(resourceRenderer.samplerDescs[0].magFilter == kera::SamplerFilter::Linear);
-    assert(resourceRenderer.samplerDescs[0].mipFilter == kera::SamplerMipFilter::Linear);
-    assert(resourceRenderer.samplerDescs[0].addressModeU == kera::SamplerAddressMode::Repeat);
-    assert(resourceRenderer.samplerDescs[0].addressModeV == kera::SamplerAddressMode::Repeat);
-    assert(resourceRenderer.samplerDescs[0].maxLod > 1.0f);
-    assert(resourceRenderer.samplerDescs[0].maxAnisotropy == 1.0f);
-    assert(!resourceRenderer.uploadedVertices.empty());
+    ASSERT_EQ(resourceRenderer.samplerDescs.size(), 1u);
+    EXPECT_EQ(resourceRenderer.samplerDescs[0].minFilter, kera::SamplerFilter::Linear);
+    EXPECT_EQ(resourceRenderer.samplerDescs[0].magFilter, kera::SamplerFilter::Linear);
+    EXPECT_EQ(resourceRenderer.samplerDescs[0].mipFilter, kera::SamplerMipFilter::Linear);
+    EXPECT_EQ(resourceRenderer.samplerDescs[0].addressModeU, kera::SamplerAddressMode::Repeat);
+    EXPECT_EQ(resourceRenderer.samplerDescs[0].addressModeV, kera::SamplerAddressMode::Repeat);
+    EXPECT_GT(resourceRenderer.samplerDescs[0].maxLod, 1.0f);
+    EXPECT_EQ(resourceRenderer.samplerDescs[0].maxAnisotropy, 1.0f);
+    ASSERT_FALSE(resourceRenderer.uploadedVertices.empty());
 
     bool foundGeneratedTangent = false;
     for (const kera::GltfVertex& vertex : resourceRenderer.uploadedVertices)
@@ -454,11 +458,14 @@ int main()
             break;
         }
     }
-    assert(foundGeneratedTangent);
+    EXPECT_TRUE(foundGeneratedTangent);
     kera::destroyGltfModel(resourceRenderer, damagedHelmet.value());
+}
 
+TEST(KeraGltfLoader, PreservesAuthoredTangentsAndGeneratesFallbackTangents)
+{
     const std::string authoredBasePath = "authored_tangent_material";
-    assert(writeTangentGltfFixture(authoredBasePath, true));
+    ASSERT_TRUE(writeTangentGltfFixture(authoredBasePath, true));
 
     NullRenderer authoredRenderer(true);
     kera::RendererResult<kera::GltfLoadedModel> authoredModel =
@@ -467,29 +474,29 @@ int main()
                                                   .debugName = "Authored Tangent Material",
                                                   .requireMaterialTextures = false,
                                               });
-    assert(authoredModel.ok());
-    assert(authoredModel.value().indexCount == 3);
-    assert(authoredModel.value().materialFactors.baseColor == glm::vec4(0.2f, 0.3f, 0.4f, 0.6f));
-    assert(authoredModel.value().materialFactors.emissive == glm::vec3(0.0f));
-    assert(authoredModel.value().materialFactors.metallic == 0.25f);
-    assert(authoredModel.value().materialFactors.roughness == 0.75f);
-    assert(authoredModel.value().materialFactors.alphaCutoff == 0.42f);
-    assert(authoredModel.value().materialFactors.alphaMode == kera::GltfAlphaMode::Mask);
-    assert(authoredModel.value().materialFactors.doubleSided);
-    assert(authoredRenderer.textureDescs.empty());
-    assert(authoredRenderer.samplerDescs.size() == 1);
-    assert(!authoredRenderer.uploadedVertices.empty());
+    ASSERT_TRUE(authoredModel.ok());
+    EXPECT_EQ(authoredModel.value().indexCount, 3u);
+    EXPECT_EQ(authoredModel.value().materialFactors.baseColor, glm::vec4(0.2f, 0.3f, 0.4f, 0.6f));
+    EXPECT_EQ(authoredModel.value().materialFactors.emissive, glm::vec3(0.0f));
+    EXPECT_EQ(authoredModel.value().materialFactors.metallic, 0.25f);
+    EXPECT_EQ(authoredModel.value().materialFactors.roughness, 0.75f);
+    EXPECT_EQ(authoredModel.value().materialFactors.alphaCutoff, 0.42f);
+    EXPECT_EQ(authoredModel.value().materialFactors.alphaMode, kera::GltfAlphaMode::Mask);
+    EXPECT_TRUE(authoredModel.value().materialFactors.doubleSided);
+    EXPECT_TRUE(authoredRenderer.textureDescs.empty());
+    ASSERT_EQ(authoredRenderer.samplerDescs.size(), 1u);
+    ASSERT_FALSE(authoredRenderer.uploadedVertices.empty());
     for (const kera::GltfVertex& vertex : authoredRenderer.uploadedVertices)
     {
-        assert(std::abs(vertex.tangent.x - 0.0f) < 0.001f);
-        assert(std::abs(vertex.tangent.y - 1.0f) < 0.001f);
-        assert(std::abs(vertex.tangent.z - 0.0f) < 0.001f);
-        assert(std::abs(vertex.tangent.w + 1.0f) < 0.001f);
+        EXPECT_NEAR(vertex.tangent.x, 0.0f, 0.001f);
+        EXPECT_NEAR(vertex.tangent.y, 1.0f, 0.001f);
+        EXPECT_NEAR(vertex.tangent.z, 0.0f, 0.001f);
+        EXPECT_NEAR(vertex.tangent.w, -1.0f, 0.001f);
     }
     kera::destroyGltfModel(authoredRenderer, authoredModel.value());
 
     const std::string generatedBasePath = "generated_tangent_material";
-    assert(writeTangentGltfFixture(generatedBasePath, false));
+    ASSERT_TRUE(writeTangentGltfFixture(generatedBasePath, false));
 
     NullRenderer generatedRenderer(true);
     kera::RendererResult<kera::GltfLoadedModel> generatedModel =
@@ -498,16 +505,14 @@ int main()
                                                    .debugName = "Generated Tangent Material",
                                                    .requireMaterialTextures = false,
                                                });
-    assert(generatedModel.ok());
-    assert(!generatedRenderer.uploadedVertices.empty());
+    ASSERT_TRUE(generatedModel.ok());
+    ASSERT_FALSE(generatedRenderer.uploadedVertices.empty());
     for (const kera::GltfVertex& vertex : generatedRenderer.uploadedVertices)
     {
-        assert(std::abs(vertex.tangent.x - 1.0f) < 0.001f);
-        assert(std::abs(vertex.tangent.y - 0.0f) < 0.001f);
-        assert(std::abs(vertex.tangent.z - 0.0f) < 0.001f);
-        assert(std::abs(vertex.tangent.w - 1.0f) < 0.001f);
+        EXPECT_NEAR(vertex.tangent.x, 1.0f, 0.001f);
+        EXPECT_NEAR(vertex.tangent.y, 0.0f, 0.001f);
+        EXPECT_NEAR(vertex.tangent.z, 0.0f, 0.001f);
+        EXPECT_NEAR(vertex.tangent.w, 1.0f, 0.001f);
     }
     kera::destroyGltfModel(generatedRenderer, generatedModel.value());
-
-    return 0;
 }

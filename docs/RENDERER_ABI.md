@@ -54,11 +54,9 @@ public virtual renderer interfaces from installed headers.
 
 The boundary is checked by:
 
-- `kera_renderer_abi_header_tests`
+- `kera_unit_repo_policy_abi_tests`
 - `kera_renderer_public_api_tests`
-- `kera_sample_public_api_usage_tests`
-- `cmake/ValidateRendererAbiHeaders.cmake`
-- `cmake/ValidateSamplePublicApiUsage.cmake`
+- `kera_unit_repo_policy_sample_api_tests`
 
 These tests scan installed headers for forbidden STL patterns and verify samples use the public
 renderer API instead of private/internal Kera renderer headers.

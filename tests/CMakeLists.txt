@@ -26,102 +26,40 @@ function(kera_copy_test_runtime_dlls target_name)
     endif()
 endfunction()
 
-add_executable(kera_renderer_lifecycle_tests
+add_executable(kera_unit_tests
     renderer_lifecycle_tests.cpp
-)
-
-target_link_libraries(kera_renderer_lifecycle_tests PRIVATE ${KERA_INTERNAL_TEST_TARGET})
-kera_copy_test_runtime_dlls(kera_renderer_lifecycle_tests)
-
-add_test(NAME kera_renderer_lifecycle_tests COMMAND kera_renderer_lifecycle_tests)
-set_tests_properties(kera_renderer_lifecycle_tests PROPERTIES
-    LABELS "quick;renderer;command_buffer"
-)
-
-add_executable(kera_slang_reflection_metadata_tests
+    reflection_contracts_tests.cpp
+    renderer_public_api_tests.cpp
+    gltf_loader_tests.cpp
+    logger_tests.cpp
+    repo_policy_tests.cpp
     slang_reflection_metadata_tests.cpp
 )
 
-target_link_libraries(kera_slang_reflection_metadata_tests PRIVATE ${KERA_INTERNAL_TEST_TARGET})
-kera_copy_test_runtime_dlls(kera_slang_reflection_metadata_tests)
-
-add_executable(kera_reflection_contracts_tests
-    reflection_contracts_tests.cpp
-)
-
-target_link_libraries(kera_reflection_contracts_tests PRIVATE ${KERA_INTERNAL_TEST_TARGET})
-kera_copy_test_runtime_dlls(kera_reflection_contracts_tests)
-
-add_test(NAME kera_reflection_contracts_tests COMMAND kera_reflection_contracts_tests)
-set_tests_properties(kera_reflection_contracts_tests PROPERTIES
-    LABELS "quick;renderer;shader;reflection;descriptor"
-)
-
-add_executable(kera_renderer_public_api_tests
-    renderer_public_api_tests.cpp
-)
-
-target_link_libraries(kera_renderer_public_api_tests PRIVATE kera)
-kera_copy_test_runtime_dlls(kera_renderer_public_api_tests)
-
-add_test(NAME kera_renderer_public_api_tests COMMAND kera_renderer_public_api_tests)
-set_tests_properties(kera_renderer_public_api_tests PROPERTIES
-    LABELS "quick;renderer;api"
-)
-
-add_executable(kera_gltf_loader_tests
-    gltf_loader_tests.cpp
-)
-
-target_link_libraries(kera_gltf_loader_tests PRIVATE ${KERA_INTERNAL_TEST_TARGET})
-kera_copy_test_runtime_dlls(kera_gltf_loader_tests)
-target_compile_definitions(kera_gltf_loader_tests PRIVATE
+target_link_libraries(kera_unit_tests PRIVATE ${KERA_INTERNAL_TEST_TARGET} GTest::gtest_main)
+target_compile_definitions(kera_unit_tests PRIVATE
     KERA_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
+kera_copy_test_runtime_dlls(kera_unit_tests)
 
-add_test(NAME kera_gltf_loader_tests COMMAND kera_gltf_loader_tests)
-set_tests_properties(kera_gltf_loader_tests PROPERTIES
-    LABELS "quick;renderer;gltf;texture"
-)
+function(kera_add_unit_test test_name filter labels)
+    add_test(NAME ${test_name}
+        COMMAND kera_unit_tests --gtest_filter=${filter}
+    )
+    set_tests_properties(${test_name} PROPERTIES
+        LABELS "${labels}"
+    )
+endfunction()
 
-add_executable(kera_logger_tests
-    logger_tests.cpp
-)
-
-target_link_libraries(kera_logger_tests PRIVATE ${KERA_INTERNAL_TEST_TARGET})
-kera_copy_test_runtime_dlls(kera_logger_tests)
-
-add_test(NAME kera_logger_tests COMMAND kera_logger_tests)
-set_tests_properties(kera_logger_tests PROPERTIES
-    LABELS "quick;logger;utilities"
-)
-
-add_test(NAME kera_renderer_abi_header_tests
-    COMMAND ${CMAKE_COMMAND}
-        -D KERA_SOURCE_DIR=${CMAKE_SOURCE_DIR}
-        -P "${CMAKE_SOURCE_DIR}/cmake/ValidateRendererAbiHeaders.cmake"
-)
-set_tests_properties(kera_renderer_abi_header_tests PROPERTIES
-    LABELS "quick;renderer;api;abi"
-)
-
-add_test(NAME kera_sample_public_api_usage_tests
-    COMMAND ${CMAKE_COMMAND}
-        -D KERA_SOURCE_DIR=${CMAKE_SOURCE_DIR}
-        -P "${CMAKE_SOURCE_DIR}/cmake/ValidateSamplePublicApiUsage.cmake"
-)
-set_tests_properties(kera_sample_public_api_usage_tests PROPERTIES
-    LABELS "quick;renderer;api;samples"
-)
-
-add_test(NAME kera_logging_rule_tests
-    COMMAND ${CMAKE_COMMAND}
-        -D KERA_SOURCE_DIR=${CMAKE_SOURCE_DIR}
-        -P "${CMAKE_SOURCE_DIR}/cmake/ValidateLoggingRules.cmake"
-)
-set_tests_properties(kera_logging_rule_tests PROPERTIES
-    LABELS "quick;logger;api"
-)
+kera_add_unit_test(kera_unit_renderer_lifecycle_tests "KeraRendererLifecycle.*" "quick;renderer;command_buffer")
+kera_add_unit_test(kera_unit_reflection_contracts_tests "KeraReflectionContracts.*" "quick;renderer;shader;reflection;descriptor")
+kera_add_unit_test(kera_unit_renderer_public_api_tests "KeraRendererPublicApi.*" "quick;renderer;api")
+kera_add_unit_test(kera_unit_gltf_loader_tests "KeraGltfLoader.*" "quick;renderer;gltf;texture")
+kera_add_unit_test(kera_unit_logger_tests "KeraLogger.*" "quick;logger;utilities")
+kera_add_unit_test(kera_unit_repo_policy_abi_tests "KeraRepoPolicy.PublicAbiHeadersAreStlFree" "quick;renderer;api;abi")
+kera_add_unit_test(kera_unit_repo_policy_sample_api_tests "KeraRepoPolicy.SamplesUsePublicKeraApiOnly" "quick;renderer;api;samples")
+kera_add_unit_test(kera_unit_repo_policy_logging_tests "KeraRepoPolicy.LoggingRulesStayBehindLoggerFacade" "quick;logger;api")
+kera_add_unit_test(kera_unit_slang_shader_contracts "KeraShaderContracts.SourceEntryPointsAndStageMarkers" "quick;shader;slang")
 
 add_test(NAME kera_copyright_header_tests
     COMMAND ${CMAKE_COMMAND}
@@ -138,19 +76,10 @@ if(KERA_SLANGC_EXECUTABLE)
             -D KERA_SHADER_ROOT=${CMAKE_SOURCE_DIR}/samples/shaders
             -D KERA_SLANGC_EXECUTABLE=${KERA_SLANGC_EXECUTABLE}
             -D KERA_REFLECTION_OUTPUT_DIR=${CMAKE_BINARY_DIR}/shader-reflection
-            -D KERA_REFLECTION_METADATA_TEST_EXE=$<TARGET_FILE:kera_slang_reflection_metadata_tests>
+            -D KERA_UNIT_TEST_EXE=$<TARGET_FILE:kera_unit_tests>
             -P "${CMAKE_SOURCE_DIR}/cmake/ReflectSlangShaderContracts.cmake"
     )
     set_tests_properties(kera_slang_reflection_tests PROPERTIES
         LABELS "quick;shader;slang;reflection"
     )
 endif()
-
-add_test(NAME kera_slang_shader_contracts
-    COMMAND ${CMAKE_COMMAND}
-        -D KERA_SHADER_ROOT=${CMAKE_SOURCE_DIR}/samples/shaders
-        -P "${CMAKE_SOURCE_DIR}/cmake/ValidateSlangShaderContracts.cmake"
-)
-set_tests_properties(kera_slang_shader_contracts PROPERTIES
-    LABELS "quick;shader;slang"
-)

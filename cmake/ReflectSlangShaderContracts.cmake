@@ -131,12 +131,14 @@ kera_require_json_token(
     "DamagedHelmet should reflect normal texture binding"
 )
 
-if(DEFINED KERA_REFLECTION_METADATA_TEST_EXE AND NOT KERA_REFLECTION_METADATA_TEST_EXE STREQUAL "")
+if(DEFINED KERA_UNIT_TEST_EXE AND NOT KERA_UNIT_TEST_EXE STREQUAL "")
     execute_process(
-        COMMAND "${KERA_REFLECTION_METADATA_TEST_EXE}"
-            "${KERA_REFLECTION_OUTPUT_DIR}/instanced_triangle_vertexMain.reflection.json"
-            "${KERA_REFLECTION_OUTPUT_DIR}/instanced_triangle_many_lights_lightingFragmentMain.reflection.json"
-            "${KERA_SHADER_ROOT}"
+        COMMAND "${CMAKE_COMMAND}" -E env
+            "KERA_REFLECTION_INSTANCED_JSON=${KERA_REFLECTION_OUTPUT_DIR}/instanced_triangle_vertexMain.reflection.json"
+            "KERA_REFLECTION_LIGHTING_JSON=${KERA_REFLECTION_OUTPUT_DIR}/instanced_triangle_many_lights_lightingFragmentMain.reflection.json"
+            "KERA_REFLECTION_SHADER_ROOT=${KERA_SHADER_ROOT}"
+            "${KERA_UNIT_TEST_EXE}"
+            "--gtest_filter=KeraSlangReflectionMetadata.GeneratedJsonContracts"
         RESULT_VARIABLE metadata_result
         OUTPUT_VARIABLE metadata_output
         ERROR_VARIABLE metadata_error

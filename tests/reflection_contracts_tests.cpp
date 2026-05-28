@@ -4,7 +4,8 @@
 #include "kera/renderer/interfaces.h"
 #include "kera/renderer/reflection_contracts.h"
 
-#include <cassert>
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -267,19 +268,19 @@ namespace
     };
 }  // namespace
 
-int main()
+TEST(KeraReflectionContracts, BuildsValidatedPipelineContractsAndDescriptorUpdates)
 {
     const kera::SlangReflectionMetadata reflection = makeReflection();
     const kera::PipelineReflectionContract validContract = makeValidContract();
     const kera::ReflectedPipelineContract validContractView = validContract.view();
-    assert(validContractView.debugName == "Reflection Contract Test");
-    assert(validContractView.vertexBindings.size() == 1);
-    assert(validContractView.vertexBindings.front().stride == sizeof(Vertex));
+    EXPECT_TRUE(validContractView.debugName == "Reflection Contract Test");
+    EXPECT_TRUE(validContractView.vertexBindings.size() == 1);
+    EXPECT_TRUE(validContractView.vertexBindings.front().stride == sizeof(Vertex));
 
     kera::VertexLayoutDesc layout{};
-    assert(kera::appendValidatedReflectedPipelineContract(layout, &reflection, validContract));
-    assert(layout.bindings.size() == 1);
-    assert(layout.attributes.size() == 2);
+    EXPECT_TRUE(kera::appendValidatedReflectedPipelineContract(layout, &reflection, validContract));
+    EXPECT_TRUE(layout.bindings.size() == 1);
+    EXPECT_TRUE(layout.attributes.size() == 2);
 
     kera::VertexLayoutDesc unusedLayout{};
     const auto unusedContract =
@@ -292,7 +293,7 @@ int main()
             .semantic("TEXCOORD0", "meshVertex", 0, kera::VertexFormat::Float2)
             .uniform<Uniforms>("globalParams")
             .build();
-    assert(!kera::appendValidatedReflectedPipelineContract(unusedLayout, &reflection, unusedContract));
+    EXPECT_TRUE(!kera::appendValidatedReflectedPipelineContract(unusedLayout, &reflection, unusedContract));
 
     kera::VertexLayoutDesc duplicateLayout{};
     const auto duplicateContract =
@@ -303,7 +304,7 @@ int main()
             .semantic("POSITION", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
             .uniform<Uniforms>("globalParams")
             .build();
-    assert(!kera::appendValidatedReflectedPipelineContract(duplicateLayout, &reflection, duplicateContract));
+    EXPECT_TRUE(!kera::appendValidatedReflectedPipelineContract(duplicateLayout, &reflection, duplicateContract));
 
     FakeRenderer renderer;
     const kera::DescriptorSetHandle descriptorSet{0, 1};
@@ -314,20 +315,18 @@ int main()
                                                  .uniform<Uniforms>("globalParams", buffer)
                                                  .sampledImage("sceneTexture", texture)
                                                  .sampler("sceneSampler", sampler);
-    assert(update.ok());
+    EXPECT_TRUE(update.ok());
     const kera::DescriptorSetUpdate failedUpdate =
         renderer.updateDescriptors(descriptorSet).sampledImage("globalParams", texture);
-    assert(!failedUpdate.ok());
-    assert(!failedUpdate.errorMessage().empty());
-    assert(!failedUpdate.report().ok());
-    assert(failedUpdate.report().issues.size() == 1);
-    assert(failedUpdate.report().issues.front().code == kera::RendererErrorCode::ValidationFailed);
-    assert(failedUpdate.report().issues.front().category == kera::RendererValidationCategory::Descriptor);
-    assert(!failedUpdate.result().ok());
-    assert(failedUpdate.result().errorCode() == kera::RendererErrorCode::ValidationFailed);
-    assert(!renderer.tryCreateGraphicsShaderProgram({}).ok());
-    assert(!renderer.tryCreateGraphicsPipeline({}).ok());
-    assert(!renderer.tryCreateDescriptorSet({0, 1}).ok());
-
-    return 0;
+    EXPECT_TRUE(!failedUpdate.ok());
+    EXPECT_TRUE(!failedUpdate.errorMessage().empty());
+    EXPECT_TRUE(!failedUpdate.report().ok());
+    EXPECT_TRUE(failedUpdate.report().issues.size() == 1);
+    EXPECT_TRUE(failedUpdate.report().issues.front().code == kera::RendererErrorCode::ValidationFailed);
+    EXPECT_TRUE(failedUpdate.report().issues.front().category == kera::RendererValidationCategory::Descriptor);
+    EXPECT_TRUE(!failedUpdate.result().ok());
+    EXPECT_TRUE(failedUpdate.result().errorCode() == kera::RendererErrorCode::ValidationFailed);
+    EXPECT_TRUE(!renderer.tryCreateGraphicsShaderProgram({}).ok());
+    EXPECT_TRUE(!renderer.tryCreateGraphicsPipeline({}).ok());
+    EXPECT_TRUE(!renderer.tryCreateDescriptorSet({0, 1}).ok());
 }

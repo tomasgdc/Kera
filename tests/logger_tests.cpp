@@ -4,6 +4,8 @@
 #include "kera/utilities/logger.h"
 #include "kera/utilities/validation.h"
 
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -55,16 +57,6 @@ namespace
         return haystack.find(needle) != std::string::npos;
     }
 
-    bool require(bool condition, const char* message)
-    {
-        if (!condition)
-        {
-            std::fprintf(stderr, "FAILED: %s\n", message);
-            return false;
-        }
-        return true;
-    }
-
     void setEnv(const char* name, const char* value)
     {
 #if defined(_WIN32)
@@ -89,7 +81,7 @@ namespace
     }
 }  // namespace
 
-int main()
+TEST(KeraLogger, WritesLevelsFiltersEnvironmentFatalAndValidationMessages)
 {
     kera::Logger& logger = kera::Logger::getInstance();
     logger.clearLogFile();
@@ -98,10 +90,7 @@ int main()
 
     const std::filesystem::path levelLog = makeLogPath("kera_logger_level_tests.log");
     removeFile(levelLog);
-    if (!require(logger.setLogFilePath(levelLog.string()), "set level test log file"))
-    {
-        return EXIT_FAILURE;
-    }
+    ASSERT_TRUE(logger.setLogFilePath(levelLog.string()));
 
     logger.debug("debug-visible");
     logger.info("info-visible");
@@ -111,20 +100,14 @@ int main()
     logger.clearLogFile();
 
     std::string content = readTextFile(levelLog);
-    if (!require(contains(content, "[DEBUG] debug-visible"), "debug message should be logged") ||
-        !require(contains(content, "[INFO] info-visible"), "info message should be logged") ||
-        !require(contains(content, "[WARN] warning-visible"), "warning message should be logged") ||
-        !require(contains(content, "[ERROR] error-visible"), "error message should be logged"))
-    {
-        return EXIT_FAILURE;
-    }
+    EXPECT_TRUE(contains(content, "[DEBUG] debug-visible"));
+    EXPECT_TRUE(contains(content, "[INFO] info-visible"));
+    EXPECT_TRUE(contains(content, "[WARN] warning-visible"));
+    EXPECT_TRUE(contains(content, "[ERROR] error-visible"));
 
     const std::filesystem::path filterLog = makeLogPath("kera_logger_filter_tests.log");
     removeFile(filterLog);
-    if (!require(logger.setLogFilePath(filterLog.string()), "set filter test log file"))
-    {
-        return EXIT_FAILURE;
-    }
+    ASSERT_TRUE(logger.setLogFilePath(filterLog.string()));
     logger.setLogLevel(kera::LogLevel::Warning);
     logger.info("filtered-info");
     logger.warning("kept-warning");
@@ -132,51 +115,36 @@ int main()
     logger.clearLogFile();
 
     content = readTextFile(filterLog);
-    if (!require(!contains(content, "filtered-info"), "info message should be filtered") ||
-        !require(contains(content, "[WARN] kept-warning"), "warning message should be kept"))
-    {
-        return EXIT_FAILURE;
-    }
+    EXPECT_FALSE(contains(content, "filtered-info"));
+    EXPECT_TRUE(contains(content, "[WARN] kept-warning"));
 
     setEnv("KERA_LOG_LEVEL", "error");
     logger.setLogLevel(kera::LogLevel::Debug);
     logger.configureFromEnvironment();
-    if (!require(logger.getLogLevel() == kera::LogLevel::Error, "KERA_LOG_LEVEL should set error level"))
-    {
-        return EXIT_FAILURE;
-    }
+    EXPECT_EQ(logger.getLogLevel(), kera::LogLevel::Error);
     clearEnv("KERA_LOG_LEVEL");
 
     const std::filesystem::path fatalLog = makeLogPath("kera_logger_fatal_tests.log");
     removeFile(fatalLog);
-    if (!require(logger.setLogFilePath(fatalLog.string()), "set fatal test log file"))
-    {
-        return EXIT_FAILURE;
-    }
+    ASSERT_TRUE(logger.setLogFilePath(fatalLog.string()));
     logger.setLogLevel(kera::LogLevel::Debug);
     logger.fatal("fatal-without-abort");
     logger.flush();
     logger.clearLogFile();
 
     content = readTextFile(fatalLog);
-    if (!require(contains(content, "[FATAL] fatal-without-abort"), "fatal message should be logged without abort"))
-    {
-        return EXIT_FAILURE;
-    }
+    EXPECT_TRUE(contains(content, "[FATAL] fatal-without-abort"));
 
     bool assertHandlerCalled = false;
     kera::Validation::setAssertHandler(
         [&assertHandlerCalled](const std::string& condition, const std::string& message, const char*, int)
         {
             assertHandlerCalled = true;
-            require(condition == "false", "assert handler should receive condition");
-            require(message == "handler-before-fatal", "assert handler should receive message");
+            EXPECT_EQ(condition, "false");
+            EXPECT_EQ(message, "handler-before-fatal");
         });
     kera::Validation::assertCondition(false, "false", "handler-before-fatal", "logger_tests.cpp", 123);
-    if (!require(assertHandlerCalled, "assert handler should run before fatal log"))
-    {
-        return EXIT_FAILURE;
-    }
+    EXPECT_TRUE(assertHandlerCalled);
     kera::Validation::setAssertHandler(nullptr);
 
     logger.clearLogFile();
@@ -185,6 +153,4 @@ int main()
     removeFile(levelLog);
     removeFile(filterLog);
     removeFile(fatalLog);
-
-    return 0;
 }
