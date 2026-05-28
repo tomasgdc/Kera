@@ -22,7 +22,6 @@ Kera is a Vulkan-first rendering library built with SDL3, Slang, and CMake for h
 - [Renderer API](docs/RENDERER_API.md): STL-free public renderer API, Slang reflection, descriptors, and frame flow.
 - [Renderer ABI Policy](docs/RENDERER_ABI.md): installed public ABI headers and shared-build guardrails.
 - [Validation](docs/VALIDATION.md): CTest labels, Vulkan smoke tests, shader contract checks, and capture lanes.
-- [Vulkan Implementation Log](VULKAN_IMPLEMENTATION_LOG.md): step-by-step implementation history.
 - [DamagedHelmet Attribution](samples/assets/gltf/DamagedHelmet/ATTRIBUTION.md): source and license note for the bundled glTF sample asset.
 
 ## Building
