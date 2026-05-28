@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/abi.h"
-
 #include "kera/renderer/backend/vulkan/vulkan_renderer.h"
 #include "kera/renderer/gltf_loader.h"
 #include "kera/renderer/interfaces.h"
@@ -466,7 +465,8 @@ namespace
 
     int mapBuffer(KeraRenderer* renderer, KeraBufferHandle buffer, void** data)
     {
-        return renderer && renderer->renderer && renderer->renderer->mapBuffer(fromKera<kera::BufferHandle>(buffer), data)
+        return renderer && renderer->renderer &&
+                       renderer->renderer->mapBuffer(fromKera<kera::BufferHandle>(buffer), data)
                    ? 1
                    : 0;
     }
@@ -571,10 +571,9 @@ namespace
     KeraDescriptorSetHandle createDescriptorSet(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline,
                                                 uint32_t set)
     {
-        return renderer && renderer->renderer
-                   ? toKera(renderer->renderer->createDescriptorSet(fromKera<kera::GraphicsPipelineHandle>(pipeline),
-                                                                    set))
-                   : KeraDescriptorSetHandle{};
+        return renderer && renderer->renderer ? toKera(renderer->renderer->createDescriptorSet(
+                                                    fromKera<kera::GraphicsPipelineHandle>(pipeline), set))
+                                              : KeraDescriptorSetHandle{};
     }
 
     int destroyDescriptorSet(KeraRenderer* renderer, KeraDescriptorSetHandle set)
@@ -589,9 +588,8 @@ namespace
                                KeraBufferHandle buffer, size_t offset, size_t range)
     {
         return renderer && renderer->renderer &&
-                       renderer->renderer->updateDescriptorSet(fromKera<kera::DescriptorSetHandle>(set),
-                                                              toString(name), fromKera<kera::BufferHandle>(buffer),
-                                                              offset, range)
+                       renderer->renderer->updateDescriptorSet(fromKera<kera::DescriptorSetHandle>(set), toString(name),
+                                                               fromKera<kera::BufferHandle>(buffer), offset, range)
                    ? 1
                    : 0;
     }
@@ -600,8 +598,8 @@ namespace
                                 KeraTextureHandle texture)
     {
         return renderer && renderer->renderer &&
-                       renderer->renderer->updateDescriptorSet(fromKera<kera::DescriptorSetHandle>(set),
-                                                              toString(name), fromKera<kera::TextureHandle>(texture))
+                       renderer->renderer->updateDescriptorSet(fromKera<kera::DescriptorSetHandle>(set), toString(name),
+                                                               fromKera<kera::TextureHandle>(texture))
                    ? 1
                    : 0;
     }
@@ -610,8 +608,8 @@ namespace
                                 KeraSamplerHandle sampler)
     {
         return renderer && renderer->renderer &&
-                       renderer->renderer->updateDescriptorSet(fromKera<kera::DescriptorSetHandle>(set),
-                                                              toString(name), fromKera<kera::SamplerHandle>(sampler))
+                       renderer->renderer->updateDescriptorSet(fromKera<kera::DescriptorSetHandle>(set), toString(name),
+                                                               fromKera<kera::SamplerHandle>(sampler))
                    ? 1
                    : 0;
     }
@@ -666,9 +664,9 @@ namespace
     {
         if (renderer && renderer->renderer && desc)
         {
-            renderer->renderer->beginRenderPass(fromKera<kera::FrameHandle>(frame),
-                                                {.clearColor = fromKera(desc->clearColor),
-                                                 .clearDepth = desc->clearDepth});
+            renderer->renderer->beginRenderPass(
+                fromKera<kera::FrameHandle>(frame),
+                {.clearColor = fromKera(desc->clearColor), .clearDepth = desc->clearDepth});
         }
     }
 
@@ -677,10 +675,9 @@ namespace
     {
         if (renderer && renderer->renderer && desc)
         {
-            renderer->renderer->beginRenderPass(fromKera<kera::FrameHandle>(frame),
-                                                fromKera<kera::RenderTargetHandle>(target),
-                                                {.clearColor = fromKera(desc->clearColor),
-                                                 .clearDepth = desc->clearDepth});
+            renderer->renderer->beginRenderPass(
+                fromKera<kera::FrameHandle>(frame), fromKera<kera::RenderTargetHandle>(target),
+                {.clearColor = fromKera(desc->clearColor), .clearDepth = desc->clearDepth});
         }
     }
 
