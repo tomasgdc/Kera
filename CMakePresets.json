@@ -24,7 +24,7 @@
       "binaryDir": "${sourceDir}/build/windows-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "KERA_BUILD_SHARED": "OFF"
+        "KERA_BUILD_SHARED": "ON"
       },
       "condition": {
         "type": "equals",
@@ -42,13 +42,22 @@
       }
     },
     {
+      "name": "windows-debug-static",
+      "inherits": "windows-debug",
+      "displayName": "Windows Debug Static",
+      "binaryDir": "${sourceDir}/build/windows-debug-static",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "OFF"
+      }
+    },
+    {
       "name": "windows-release",
       "inherits": "windows-debug",
       "displayName": "Windows Release",
       "binaryDir": "${sourceDir}/build/windows-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "KERA_BUILD_SHARED": "OFF"
+        "KERA_BUILD_SHARED": "ON"
       }
     },
     {
@@ -61,13 +70,22 @@
       }
     },
     {
+      "name": "windows-release-static",
+      "inherits": "windows-release",
+      "displayName": "Windows Release Static",
+      "binaryDir": "${sourceDir}/build/windows-release-static",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "OFF"
+      }
+    },
+    {
       "name": "linux-debug",
       "inherits": "default",
       "displayName": "Linux Debug",
       "binaryDir": "${sourceDir}/build/linux-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "KERA_BUILD_SHARED": "OFF"
+        "KERA_BUILD_SHARED": "ON"
       },
       "condition": {
         "type": "equals",
@@ -85,13 +103,22 @@
       }
     },
     {
+      "name": "linux-debug-static",
+      "inherits": "linux-debug",
+      "displayName": "Linux Debug Static",
+      "binaryDir": "${sourceDir}/build/linux-debug-static",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "OFF"
+      }
+    },
+    {
       "name": "linux-release",
       "inherits": "linux-debug",
       "displayName": "Linux Release",
       "binaryDir": "${sourceDir}/build/linux-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "KERA_BUILD_SHARED": "OFF"
+        "KERA_BUILD_SHARED": "ON"
       }
     },
     {
@@ -101,6 +128,15 @@
       "binaryDir": "${sourceDir}/build/linux-release-shared",
       "cacheVariables": {
         "KERA_BUILD_SHARED": "ON"
+      }
+    },
+    {
+      "name": "linux-release-static",
+      "inherits": "linux-release",
+      "displayName": "Linux Release Static",
+      "binaryDir": "${sourceDir}/build/linux-release-static",
+      "cacheVariables": {
+        "KERA_BUILD_SHARED": "OFF"
       }
     }
   ],
@@ -114,12 +150,20 @@
       "configurePreset": "windows-debug-shared"
     },
     {
+      "name": "windows-debug-static",
+      "configurePreset": "windows-debug-static"
+    },
+    {
       "name": "windows-release",
       "configurePreset": "windows-release"
     },
     {
       "name": "windows-release-shared",
       "configurePreset": "windows-release-shared"
+    },
+    {
+      "name": "windows-release-static",
+      "configurePreset": "windows-release-static"
     },
     {
       "name": "linux-debug",
@@ -130,12 +174,20 @@
       "configurePreset": "linux-debug-shared"
     },
     {
+      "name": "linux-debug-static",
+      "configurePreset": "linux-debug-static"
+    },
+    {
       "name": "linux-release",
       "configurePreset": "linux-release"
     },
     {
       "name": "linux-release-shared",
       "configurePreset": "linux-release-shared"
+    },
+    {
+      "name": "linux-release-static",
+      "configurePreset": "linux-release-static"
     }
   ]
 }

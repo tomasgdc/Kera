@@ -1,4 +1,7 @@
-#include "kera/utilities/logger.h"
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
+#include "sample_utils.h"
 #include "samples.h"
 
 #include <cstdlib>
@@ -22,7 +25,7 @@ int main(int argc, char* argv[])
         {
             if (index + 1 >= argc)
             {
-                kera::Logger::getInstance().error("--smoke-frames requires a frame count");
+                kera::sampleLogError("--smoke-frames requires a frame count");
                 return EXIT_FAILURE;
             }
             options.maxFrames = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
@@ -43,7 +46,7 @@ int main(int argc, char* argv[])
         {
             if (index + 1 >= argc)
             {
-                kera::Logger::getInstance().error("--damaged-helmet-debug-view requires a mode index");
+                kera::sampleLogError("--damaged-helmet-debug-view requires a mode index");
                 return EXIT_FAILURE;
             }
             options.damagedHelmetDebugView = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
@@ -52,7 +55,7 @@ int main(int argc, char* argv[])
         {
             if (index + 1 >= argc)
             {
-                kera::Logger::getInstance().error("--damaged-helmet-fixed-yaw-degrees requires a degree value");
+                kera::sampleLogError("--damaged-helmet-fixed-yaw-degrees requires a degree value");
                 return EXIT_FAILURE;
             }
             options.damagedHelmetFixedYaw = true;
@@ -62,7 +65,7 @@ int main(int argc, char* argv[])
         {
             if (index + 1 >= argc)
             {
-                kera::Logger::getInstance().error("--sample-index requires a sample index");
+                kera::sampleLogError("--sample-index requires a sample index");
                 return EXIT_FAILURE;
             }
             options.initialSampleIndex = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
@@ -76,7 +79,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            kera::Logger::getInstance().error("Unknown argument: " + arg);
+            kera::sampleLogError("Unknown argument: " + arg);
             return EXIT_FAILURE;
         }
     }

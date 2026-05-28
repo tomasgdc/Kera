@@ -1,4 +1,7 @@
-#include "kera/utilities/logger.h"
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
+#include "sample_utils.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -114,7 +117,7 @@ int main(int argc, char** argv)
     Options options;
     if (!parseArgs(argc, argv, options))
     {
-        kera::Logger::getInstance().error(
+        kera::sampleLogError(
             "Usage: kera_ppm_metrics <image.ppm> [--min-coverage N] [--max-coverage N] "
             "[--min-luma-range N] [--min-dark-coverage N]");
         return EXIT_FAILURE;
@@ -123,14 +126,14 @@ int main(int argc, char** argv)
     std::ifstream file(options.path, std::ios::binary);
     if (!file)
     {
-        kera::Logger::getInstance().error("Failed to open PPM image: " + options.path);
+        kera::sampleLogError("Failed to open PPM image: " + options.path);
         return EXIT_FAILURE;
     }
 
     std::string token;
     if (!readToken(file, token) || token != "P6")
     {
-        kera::Logger::getInstance().error("PPM image is not binary P6: " + options.path);
+        kera::sampleLogError("PPM image is not binary P6: " + options.path);
         return EXIT_FAILURE;
     }
 
@@ -151,7 +154,7 @@ int main(int argc, char** argv)
     const int maxValue = std::atoi(token.c_str());
     if (width <= 0 || height <= 0 || maxValue != 255)
     {
-        kera::Logger::getInstance().error("Unsupported PPM header in " + options.path);
+        kera::sampleLogError("Unsupported PPM header in " + options.path);
         return EXIT_FAILURE;
     }
 
@@ -160,7 +163,7 @@ int main(int argc, char** argv)
     file.read(reinterpret_cast<char*>(pixels.data()), static_cast<std::streamsize>(pixels.size()));
     if (static_cast<size_t>(file.gcount()) != pixels.size())
     {
-        kera::Logger::getInstance().error("PPM image payload is truncated: " + options.path);
+        kera::sampleLogError("PPM image payload is truncated: " + options.path);
         return EXIT_FAILURE;
     }
 
@@ -222,13 +225,13 @@ int main(int argc, char** argv)
     const double coverage = static_cast<double>(covered) / static_cast<double>(pixelCount);
     const double darkCoverage = static_cast<double>(dark) / static_cast<double>(pixelCount);
     const double lumaRange = maxLuma - minLuma;
-    kera::Logger::getInstance().info("PPM metrics coverage=" + std::to_string(coverage) + " dark=" +
-                                     std::to_string(darkCoverage) + " luma_range=" + std::to_string(lumaRange));
+    kera::sampleLogInfo("PPM metrics coverage=" + std::to_string(coverage) + " dark=" + std::to_string(darkCoverage) +
+                        " luma_range=" + std::to_string(lumaRange));
 
     if (coverage < options.minCoverage || coverage > options.maxCoverage || lumaRange < options.minLumaRange ||
         darkCoverage < options.minDarkCoverage)
     {
-        kera::Logger::getInstance().error("PPM metrics failed thresholds for " + options.path);
+        kera::sampleLogError("PPM metrics failed thresholds for " + options.path);
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

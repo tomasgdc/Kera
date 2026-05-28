@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "kera/core/input.h"
 
 #include "sdl_input_utils.h"

@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Tomas Mikalauskas
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Kera - Cross-Platform Rendering Library
 
 Kera is a Vulkan-first rendering library built with SDL3, Slang, and CMake for high-performance graphics applications.
@@ -14,8 +19,8 @@ Kera is a Vulkan-first rendering library built with SDL3, Slang, and CMake for h
 
 ## Documentation
 
-- [Renderer API](docs/RENDERER_API.md): C++ convenience API, Slang reflection, descriptor updates, and renderer lifetime notes.
-- [Renderer ABI Policy](docs/RENDERER_ABI.md): installed STL-free public ABI headers and shared-build guardrails.
+- [Renderer API](docs/RENDERER_API.md): STL-free public renderer API, Slang reflection, descriptors, and frame flow.
+- [Renderer ABI Policy](docs/RENDERER_ABI.md): installed public ABI headers and shared-build guardrails.
 - [Validation](docs/VALIDATION.md): CTest labels, Vulkan smoke tests, shader contract checks, and capture lanes.
 - [Vulkan Implementation Log](VULKAN_IMPLEMENTATION_LOG.md): step-by-step implementation history.
 - [DamagedHelmet Attribution](samples/assets/gltf/DamagedHelmet/ATTRIBUTION.md): source and license note for the bundled glTF sample asset.
@@ -52,9 +57,10 @@ cmake --preset windows-debug
 cmake --build --preset windows-debug
 ```
 
-Default presets build Kera as a static library. Shared-library presets are guarded while internal C++ convenience
-headers still expose STL types; see [Renderer ABI Policy](docs/RENDERER_ABI.md). Other configured presets are listed in
-`CMakePresets.json`.
+Default presets build Kera as a shared library so samples exercise the same STL-free DLL boundary
+external users consume. Static build presets remain available with the `-static` suffix. See
+[Renderer ABI Policy](docs/RENDERER_ABI.md) for the public ABI rules. Other configured presets are
+listed in `CMakePresets.json`.
 
 ### Run Samples
 
@@ -90,7 +96,7 @@ them. See [Validation](docs/VALIDATION.md) for labels, shader contract checks, s
 ## Project Structure
 
 ```text
-include/kera/          Public headers
+include/kera/          Public STL-free ABI entry headers plus private build-tree headers
 src/                   Source files
   core/                SDL3 platform layer
   renderer/            Vulkan renderer and renderer-owned asset helpers
@@ -103,13 +109,14 @@ CMakeLists.txt         Build configuration
 
 ## Renderer API Shape
 
-The common Slang graphics path uses the renderer-facing C++ convenience API:
+The common Slang graphics path uses the STL-free public renderer wrapper in `kera/renderer/api.h`:
 
 ```cpp
 ShaderProgramHandle program = renderer.createGraphicsShaderProgram({
-    .path = resolveShaderPath("shaders/triangle.slang"),
-    .vertexEntryPoint = "vertexMain",
-    .fragmentEntryPoint = "fragmentMain",
+    .path = kera::stringView("samples/shaders/triangle.slang"),
+    .vertexEntryPoint = kera::stringView("vertexMain"),
+    .fragmentEntryPoint = kera::stringView("fragmentMain"),
+    .source = KERA_SHADER_SOURCE_SLANG_FILE,
 });
 
 const PipelineReflectionContract contract =
@@ -137,8 +144,8 @@ const bool ok = renderer.updateDescriptors(descriptorSet)
     .ok();
 ```
 
-See [Renderer API](docs/RENDERER_API.md) for the full current flow, including result objects, reflection metadata,
-debug names, and validation helpers.
+Samples use this same public API boundary. Internal renderer headers may still use STL, but they are not the installed
+public API. See [Renderer API](docs/RENDERER_API.md) for the current flow.
 
 ## Dependencies
 

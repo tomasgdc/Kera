@@ -1,15 +1,17 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "samples.h"
 
 #include "basic_triangle_sample.h"
 #include "damaged_helmet_sample.h"
 #include "instanced_triangle_many_lights_sample.h"
 #include "instanced_triangle_sample.h"
-#include "kera/core/input.h"
-#include "kera/core/window.h"
-#include "kera/renderer/factory.h"
-#include "kera/utilities/logger.h"
 #include "render_context.h"
+#include "sample_utils.h"
 #include "stats_overlay.h"
+
+#include <SDL3/SDL.h>
 
 #include <chrono>
 
@@ -23,6 +25,21 @@ namespace kera
         constexpr Extent2D kResizeSmokeExtent{800, 600};
         constexpr Extent2D kZeroResizeSmokeExtent{0, 0};
 
+        bool isPreviousSampleKey(const SDL_Event& event)
+        {
+            return event.key.key == SDLK_A;
+        }
+
+        bool isNextSampleKey(const SDL_Event& event)
+        {
+            return event.key.key == SDLK_D;
+        }
+
+        bool isToggleStatsKey(const SDL_Event& event)
+        {
+            return event.key.key == SDLK_F1;
+        }
+
         void cleanupActiveSample(std::vector<std::unique_ptr<Sample>>& samples, int& activeSampleIndex)
         {
             if (activeSampleIndex < 0 || activeSampleIndex >= static_cast<int>(samples.size()))
@@ -35,6 +52,91 @@ namespace kera
         }
 
     }  // namespace
+
+    struct SampleApplication::SampleWindow
+    {
+        SDL_Window* window = nullptr;
+        int width = 0;
+        int height = 0;
+        bool shouldClose = false;
+        bool wasResized = false;
+
+        bool initialize(const char* title, int initialWidth, int initialHeight)
+        {
+            if (!SDL_Init(SDL_INIT_VIDEO))
+            {
+                sampleLogError("Failed to initialize SDL: " + std::string(SDL_GetError()));
+                return false;
+            }
+
+            window = SDL_CreateWindow(title, initialWidth, initialHeight, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+            if (!window)
+            {
+                sampleLogError("Failed to create SDL window: " + std::string(SDL_GetError()));
+                return false;
+            }
+
+            width = initialWidth;
+            height = initialHeight;
+            shouldClose = false;
+            wasResized = false;
+            return true;
+        }
+
+        void shutdown()
+        {
+            if (window)
+            {
+                SDL_DestroyWindow(window);
+                window = nullptr;
+            }
+            SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        }
+
+        void processEvents(Renderer* renderer, StatsOverlay* statsOverlay, SampleApplication& app)
+        {
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+            {
+                if (renderer)
+                {
+                    renderer->handleUiEvent(&event);
+                }
+
+                switch (event.type)
+                {
+                    case SDL_EVENT_QUIT:
+                        shouldClose = true;
+                        break;
+                    case SDL_EVENT_WINDOW_RESIZED:
+                    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+                        width = event.window.data1;
+                        height = event.window.data2;
+                        wasResized = true;
+                        break;
+                    case SDL_EVENT_KEY_DOWN:
+                        if (!event.key.repeat)
+                        {
+                            if (isPreviousSampleKey(event))
+                            {
+                                app.switchActiveSample(-1);
+                            }
+                            else if (isNextSampleKey(event))
+                            {
+                                app.switchActiveSample(1);
+                            }
+                            else if (isToggleStatsKey(event) && statsOverlay)
+                            {
+                                statsOverlay->toggleVisible();
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    };
 
     SampleApplication::SampleApplication() : m_activeSampleIndex(-1) {}
 
@@ -53,7 +155,7 @@ namespace kera
     {
         if (index < 0 || index >= static_cast<int>(m_samples.size()))
         {
-            Logger::getInstance().error("Invalid sample index: " + std::to_string(index));
+            sampleLogError("Invalid sample index: " + std::to_string(index));
             return;
         }
 
@@ -61,7 +163,7 @@ namespace kera
 
         m_activeSampleIndex = index;
         m_samples[m_activeSampleIndex]->initialize();
-        Logger::getInstance().info("Switched to sample: " + m_samples[m_activeSampleIndex]->getName());
+        sampleLogInfo("Switched to sample: " + m_samples[m_activeSampleIndex]->getName());
     }
 
     void SampleApplication::switchActiveSample(int offset)
@@ -84,37 +186,34 @@ namespace kera
 
     bool SampleApplication::initializeRenderer()
     {
-        Logger::getInstance().info("Initializing renderer");
+        sampleLogInfo("Initializing renderer");
 
-        m_window = std::make_unique<Window>();
+        m_window = std::make_unique<SampleWindow>();
         if (!m_window->initialize("Kera Samples", kInitialWindowWidth, kInitialWindowHeight))
         {
-            Logger::getInstance().error("Failed to create window");
+            sampleLogError("Failed to create window");
             return false;
         }
-        Logger::getInstance().info("Window created successfully (" + std::to_string(kInitialWindowWidth) + "x" +
-                                   std::to_string(kInitialWindowHeight) + ")");
+        sampleLogInfo("Window created successfully (" + std::to_string(kInitialWindowWidth) + "x" +
+                      std::to_string(kInitialWindowHeight) + ")");
 
-        m_renderer = CreateRenderer(GraphicsBackend::Vulkan, *m_window);
-        if (!m_renderer)
+        auto renderer = Renderer::create({
+            .backend = GraphicsBackend::Vulkan,
+            .sdlWindow = m_window->window,
+            .width = static_cast<uint32_t>(m_window->width),
+            .height = static_cast<uint32_t>(m_window->height),
+        });
+        if (!renderer.isValid())
         {
-            Logger::getInstance().error("Failed to create renderer");
+            sampleLogError("Failed to create renderer");
             return false;
         }
+        m_renderer = std::make_unique<Renderer>(std::move(renderer));
 
         m_renderer->initializeUi();
         m_statsOverlay = std::make_unique<StatsOverlay>();
 
-        m_window->setEventCallback(
-            [this](const SDL_Event& event)
-            {
-                if (m_renderer)
-                {
-                    m_renderer->handleUiEvent(event);
-                }
-            });
-
-        Logger::getInstance().info("Renderer initialized successfully");
+        sampleLogInfo("Renderer initialized successfully");
         return true;
     }
 
@@ -125,22 +224,22 @@ namespace kera
             return false;
         }
 
-        const int width = m_window->getWidth();
-        const int height = m_window->getHeight();
+        const int width = m_window->width;
+        const int height = m_window->height;
         if (width <= 0 || height <= 0)
         {
             return false;
         }
 
-        Logger::getInstance().info("Recreating swapchain resources for window size " + std::to_string(width) + "x" +
-                                   std::to_string(height));
+        sampleLogInfo("Recreating swapchain resources for window size " + std::to_string(width) + "x" +
+                      std::to_string(height));
 
         if (!m_renderer->resize({
                 static_cast<uint32_t>(width),
                 static_cast<uint32_t>(height),
             }))
         {
-            Logger::getInstance().error("Failed to resize renderer");
+            sampleLogError("Failed to resize renderer");
             return false;
         }
 
@@ -152,8 +251,8 @@ namespace kera
             });
         }
 
-        m_window->clearResizeFlag();
-        Logger::getInstance().info("Swapchain resources recreated successfully");
+        m_window->wasResized = false;
+        sampleLogInfo("Swapchain resources recreated successfully");
         return true;
     }
 
@@ -179,16 +278,17 @@ namespace kera
         if (m_window)
         {
             m_window->shutdown();
+            m_window.reset();
         }
     }
 
     void SampleApplication::run(const SampleRunOptions& options)
     {
-        Logger::getInstance().info("Starting Kera Sample Application");
+        sampleLogInfo("Starting Kera Sample Application");
 
         if (!initializeRenderer())
         {
-            Logger::getInstance().error("Failed to initialize renderer");
+            sampleLogError("Failed to initialize renderer");
             return;
         }
         if (m_statsOverlay)
@@ -203,55 +303,32 @@ namespace kera
                                                         options.damagedHelmetFixedYaw,
                                                         options.damagedHelmetYawRadians));
 
-        Logger::getInstance().info("Available samples:");
+        sampleLogInfo("Available samples:");
         for (size_t i = 0; i < m_samples.size(); ++i)
         {
-            Logger::getInstance().info("  " + std::to_string(i) + ": " + m_samples[i]->getName());
+            sampleLogInfo("  " + std::to_string(i) + ": " + m_samples[i]->getName());
         }
 
         if (m_samples.empty())
         {
-            Logger::getInstance().warning("No samples registered");
+            sampleLogWarning("No samples registered");
             return;
         }
 
-        m_window->setKeyCallback(
-            [this](Key key, bool pressed)
-            {
-                if (!pressed)
-                {
-                    return;
-                }
-
-                if (key == Key::A)
-                {
-                    switchActiveSample(-1);
-                }
-                else if (key == Key::D)
-                {
-                    switchActiveSample(1);
-                }
-                else if (key == Key::F1 && m_statsOverlay)
-                {
-                    m_statsOverlay->toggleVisible();
-                }
-            });
-
         if (options.initialSampleIndex >= m_samples.size())
         {
-            Logger::getInstance().error("Requested sample index is out of range: " +
-                                        std::to_string(options.initialSampleIndex));
+            sampleLogError("Requested sample index is out of range: " + std::to_string(options.initialSampleIndex));
             return;
         }
 
         setActiveSample(static_cast<int>(options.initialSampleIndex));
-        Logger::getInstance().info("Running windowed render loop");
+        sampleLogInfo("Running windowed render loop");
 
         auto previousFrameTime = std::chrono::steady_clock::now();
         uint32_t renderedFrames = 0;
         bool resizeSmokeTriggered = false;
         bool zeroResizeSmokeTriggered = false;
-        while (!m_window->shouldClose())
+        while (!m_window->shouldClose)
         {
             const auto currentFrameTime = std::chrono::steady_clock::now();
             const std::chrono::duration<float> frameDelta = currentFrameTime - previousFrameTime;
@@ -260,22 +337,22 @@ namespace kera
             const float deltaTime = frameDelta.count();
             const float frameTimeMs = deltaTime * 1000.0f;
 
-            m_window->processEvents();
+            m_window->processEvents(m_renderer.get(), m_statsOverlay.get(), *this);
             if (m_activeSampleIndex < 0 || m_activeSampleIndex >= static_cast<int>(m_samples.size()))
             {
                 break;
             }
-            if (m_window->getWidth() <= 0 || m_window->getHeight() <= 0)
+            if (m_window->width <= 0 || m_window->height <= 0)
             {
                 continue;
             }
 
             if (options.resizeSmoke && !resizeSmokeTriggered && renderedFrames > 0)
             {
-                Logger::getInstance().info("Running resize smoke step at 800x600.");
+                sampleLogInfo("Running resize smoke step at 800x600.");
                 if (!m_renderer->resize(kResizeSmokeExtent))
                 {
-                    Logger::getInstance().error("Resize smoke step failed.");
+                    sampleLogError("Resize smoke step failed.");
                     break;
                 }
                 m_samples[m_activeSampleIndex]->resize(kResizeSmokeExtent);
@@ -283,26 +360,27 @@ namespace kera
             }
             if (options.zeroResizeSmoke && !zeroResizeSmokeTriggered && renderedFrames > 0)
             {
-                Logger::getInstance().info("Running zero-size resize smoke step.");
+                sampleLogInfo("Running zero-size resize smoke step.");
                 if (!m_renderer->resize(kZeroResizeSmokeExtent))
                 {
-                    Logger::getInstance().error("Zero-size resize smoke step failed.");
+                    sampleLogError("Zero-size resize smoke step failed.");
                     break;
                 }
                 m_samples[m_activeSampleIndex]->resize(kZeroResizeSmokeExtent);
                 zeroResizeSmokeTriggered = true;
+                break;
             }
 
-            if (m_window->wasResized())
+            if (m_window->wasResized)
             {
-                if (m_window->getWidth() == 0 || m_window->getHeight() == 0)
+                if (m_window->width == 0 || m_window->height == 0)
                 {
                     continue;
                 }
 
                 if (!recreateSwapchainResources())
                 {
-                    Logger::getInstance().error("Failed to handle window resize");
+                    sampleLogError("Failed to handle window resize");
                     break;
                 }
             }
@@ -336,14 +414,14 @@ namespace kera
 
             if (!m_renderer->endFrame(frame))
             {
-                Logger::getInstance().error("Failed to end frame");
+                sampleLogError("Failed to end frame");
                 break;
             }
 
             ++renderedFrames;
             if (options.maxFrames > 0 && renderedFrames >= options.maxFrames)
             {
-                Logger::getInstance().info("Sample smoke frame limit reached.");
+                sampleLogInfo("Sample smoke frame limit reached.");
                 break;
             }
         }

@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 struct VertexInput {
     float3 position : POSITION;
     float3 color    : COLOR;

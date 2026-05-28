@@ -1,11 +1,13 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "damaged_helmet_sample.h"
 
-#include "kera/renderer/reflection_contracts.h"
-#include "kera/utilities/logger.h"
 #include "render_context.h"
 #include "sample_utils.h"
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <cstddef>
 #include <string>
@@ -51,34 +53,34 @@ namespace kera
         constexpr uint32_t kUniformRingSlots = 3;
         constexpr uint32_t kMaxDamagedHelmetDebugView = 11;
 
-        float toShaderAlphaMode(GltfAlphaMode mode)
+        float toShaderAlphaMode(KeraGltfAlphaMode mode)
         {
             switch (mode)
             {
-                case GltfAlphaMode::Mask:
+                case KERA_GLTF_ALPHA_MASK:
                     return 1.0f;
-                case GltfAlphaMode::Blend:
+                case KERA_GLTF_ALPHA_BLEND:
                     return 2.0f;
-                case GltfAlphaMode::Opaque:
+                case KERA_GLTF_ALPHA_OPAQUE:
                 default:
                     return 0.0f;
             }
         }
     }  // namespace
 
-    DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer)
+    DamagedHelmetSample::DamagedHelmetSample(Renderer& renderer)
         : Sample("DamagedHelmet Texture Loading"), m_renderer(renderer)
     {
     }
 
-    DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer, uint32_t debugView)
+    DamagedHelmetSample::DamagedHelmetSample(Renderer& renderer, uint32_t debugView)
         : Sample("DamagedHelmet Texture Loading")
         , m_renderer(renderer)
         , m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
     {
     }
 
-    DamagedHelmetSample::DamagedHelmetSample(IRenderer& renderer, uint32_t debugView, bool fixedYaw, float yawRadians)
+    DamagedHelmetSample::DamagedHelmetSample(Renderer& renderer, uint32_t debugView, bool fixedYaw, float yawRadians)
         : Sample("DamagedHelmet Texture Loading")
         , m_renderer(renderer)
         , m_initialYawRadians(fixedYaw ? yawRadians : 2.2f)
@@ -89,48 +91,50 @@ namespace kera
 
     void DamagedHelmetSample::initialize()
     {
-        Logger::getInstance().info("Initializing " + std::string(getName()));
+        sampleLogInfo("Initializing " + std::string(getName()));
         m_initialized = false;
 
         if (!createShaderPrograms())
         {
-            Logger::getInstance().error("Failed to create DamagedHelmet shader programs.");
+            sampleLogError("Failed to create DamagedHelmet shader programs.");
             cleanup();
             return;
         }
 
         if (!loadGltfModelResources())
         {
-            Logger::getInstance().error("Failed to load DamagedHelmet glTF model resources.");
+            sampleLogError("Failed to load DamagedHelmet glTF model resources.");
             cleanup();
             return;
         }
 
         if (!createFullscreenGeometry())
         {
-            Logger::getInstance().error("Failed to create DamagedHelmet fullscreen geometry.");
+            sampleLogError("Failed to create DamagedHelmet fullscreen geometry.");
             cleanup();
             return;
         }
 
         if (!recreateRenderResources(m_renderer.getDrawableExtent()))
         {
-            Logger::getInstance().error("Failed to create DamagedHelmet render resources.");
+            sampleLogError("Failed to create DamagedHelmet render resources.");
             cleanup();
             return;
         }
 
         m_initialized = true;
-        Logger::getInstance().info("DamagedHelmet sample initialized successfully.");
+        sampleLogInfo("DamagedHelmet sample initialized successfully.");
     }
 
     bool DamagedHelmetSample::createShaderPrograms()
     {
         const std::string shaderPath = resolveShaderPath(DamagedHelmetShader::Path);
         m_meshShaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = shaderPath,
-            .vertexEntryPoint = DamagedHelmetShader::MeshVertexEntryPoint,
-            .fragmentEntryPoint = DamagedHelmetShader::MeshFragmentEntryPoint,
+            .path = sampleStringView(shaderPath),
+            .vertexEntryPoint = stringView(DamagedHelmetShader::MeshVertexEntryPoint),
+            .fragmentEntryPoint = stringView(DamagedHelmetShader::MeshFragmentEntryPoint),
+            .source = KERA_SHADER_SOURCE_SLANG_FILE,
+            .debugName = {},
         });
         if (!m_meshShaderProgram.isValid())
         {
@@ -138,9 +142,11 @@ namespace kera
         }
 
         m_displayShaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = shaderPath,
-            .vertexEntryPoint = DamagedHelmetShader::FullscreenVertexEntryPoint,
-            .fragmentEntryPoint = DamagedHelmetShader::FullscreenFragmentEntryPoint,
+            .path = sampleStringView(shaderPath),
+            .vertexEntryPoint = stringView(DamagedHelmetShader::FullscreenVertexEntryPoint),
+            .fragmentEntryPoint = stringView(DamagedHelmetShader::FullscreenFragmentEntryPoint),
+            .source = KERA_SHADER_SOURCE_SLANG_FILE,
+            .debugName = {},
         });
         return m_displayShaderProgram.isValid();
     }
@@ -148,17 +154,18 @@ namespace kera
     bool DamagedHelmetSample::loadGltfModelResources()
     {
         const std::string assetPath = resolveSampleAssetPath("assets/gltf/DamagedHelmet/DamagedHelmet.gltf");
-        RendererResult<GltfLoadedModel> result = loadGltfModel(m_renderer, {
-                                                                               .path = assetPath,
-                                                                               .debugName = "DamagedHelmet",
-                                                                           });
-        if (!result)
+        if (!m_renderer.loadGltfModel(
+                {
+                    .path = sampleStringView(assetPath),
+                    .debugName = stringView("DamagedHelmet"),
+                    .requireMaterialTextures = 1,
+                },
+                m_model))
         {
-            Logger::getInstance().error("DamagedHelmet glTF load failed: " + result.errorMessage());
+            sampleLogError("DamagedHelmet glTF load failed.");
             return false;
         }
 
-        m_model = std::move(result.value());
         m_uniformBuffer = m_renderer.createUniformRingBuffer(sizeof(HelmetUniforms), kUniformRingSlots);
         return m_uniformBuffer.isValid();
     }
@@ -173,13 +180,13 @@ namespace kera
             .size = vertices.size() * sizeof(FullscreenTriangleVertex),
             .usage = BufferUsageKind::Vertex,
             .memoryAccess = MemoryAccess::CpuWrite,
-            .debugName = "DamagedHelmet Fullscreen Vertex Buffer",
+            .debugName = stringView("DamagedHelmet Fullscreen Vertex Buffer"),
         });
         m_fullscreenIndexBuffer = m_renderer.createBuffer({
             .size = indices.size() * sizeof(uint16_t),
             .usage = BufferUsageKind::Index,
             .memoryAccess = MemoryAccess::CpuWrite,
-            .debugName = "DamagedHelmet Fullscreen Index Buffer",
+            .debugName = stringView("DamagedHelmet Fullscreen Index Buffer"),
         });
 
         return m_fullscreenVertexBuffer.isValid() && m_fullscreenIndexBuffer.isValid() &&
@@ -204,7 +211,7 @@ namespace kera
             .format = TextureFormat::RGBA8,
             .renderTarget = true,
             .sampled = true,
-            .debugName = "DamagedHelmet Scene Texture",
+            .debugName = stringView("DamagedHelmet Scene Texture"),
         });
         m_sceneDepthTexture = m_renderer.createTexture({
             .width = extent.width,
@@ -213,7 +220,7 @@ namespace kera
             .renderTarget = true,
             .sampled = false,
             .depthStencil = true,
-            .debugName = "DamagedHelmet Depth Texture",
+            .debugName = stringView("DamagedHelmet Depth Texture"),
         });
         if (!m_sceneTexture.isValid() || !m_sceneDepthTexture.isValid())
         {
@@ -223,7 +230,7 @@ namespace kera
         m_sceneRenderTarget = m_renderer.createRenderTarget({
             .colorTexture = m_sceneTexture,
             .depthTexture = m_sceneDepthTexture,
-            .debugName = "DamagedHelmet Render Target",
+            .debugName = stringView("DamagedHelmet Render Target"),
         });
         return m_sceneRenderTarget.isValid() && createPipelinesAndDescriptors();
     }
@@ -257,11 +264,11 @@ namespace kera
             .renderTarget = m_sceneRenderTarget,
             .cullMode = m_model.materialFactors.doubleSided ? CullModeKind::None : CullModeKind::Back,
             .frontFace = FrontFaceKind::Clockwise,
-            .blendMode = m_model.materialFactors.alphaMode == GltfAlphaMode::Blend ? BlendModeKind::Alpha
-                                                                                   : BlendModeKind::Opaque,
+            .blendMode = m_model.materialFactors.alphaMode == KERA_GLTF_ALPHA_BLEND ? BlendModeKind::Alpha
+                                                                                    : BlendModeKind::Opaque,
             .depthTest = true,
-            .depthWrite = m_model.materialFactors.alphaMode != GltfAlphaMode::Blend,
-            .debugName = "DamagedHelmet Mesh Pipeline",
+            .depthWrite = m_model.materialFactors.alphaMode != KERA_GLTF_ALPHA_BLEND,
+            .debugName = stringView("DamagedHelmet Mesh Pipeline"),
         });
         if (!m_meshPipeline.isValid())
         {
@@ -310,7 +317,7 @@ namespace kera
             .shaderProgram = m_displayShaderProgram,
             .reflectionContract = displayContract,
             .cullMode = CullModeKind::None,
-            .debugName = "DamagedHelmet Display Pipeline",
+            .debugName = stringView("DamagedHelmet Display Pipeline"),
         });
         if (!m_displayPipeline.isValid())
         {
@@ -342,7 +349,7 @@ namespace kera
 
         if (!recreateRenderResources(extent))
         {
-            Logger::getInstance().error("Failed to resize DamagedHelmet render resources.");
+            sampleLogError("Failed to resize DamagedHelmet render resources.");
             m_initialized = false;
         }
     }
@@ -356,7 +363,7 @@ namespace kera
         if (!m_meshPipeline.isValid() || !m_displayPipeline.isValid() || !m_sceneRenderTarget.isValid() ||
             m_meshDescriptorSets.empty() || !m_displayDescriptorSet.isValid())
         {
-            Logger::getInstance().warning("Render called before DamagedHelmet resources were initialized.");
+            sampleLogWarning("Render called before DamagedHelmet resources were initialized.");
             return;
         }
 
@@ -370,15 +377,18 @@ namespace kera
                                                                       static_cast<float>(m_renderExtent.height);
                 const glm::vec3 cameraPosition(0.36f, 0.08f, -3.0f);
                 const float yawRadians = m_fixedYaw ? m_initialYawRadians : m_initialYawRadians + m_elapsedTime * 0.25f;
-                uniforms.model =
-                    glm::rotate(glm::mat4(1.0f), yawRadians, glm::vec3(0.0f, 1.0f, 0.0f)) * m_model.transform;
+                uniforms.model = glm::rotate(glm::mat4(1.0f), yawRadians, glm::vec3(0.0f, 1.0f, 0.0f)) *
+                                 glm::make_mat4(m_model.transform);
                 uniforms.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, -0.05f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
                 uniforms.projection = glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
                 uniforms.cameraPosition = glm::vec4(cameraPosition, 1.0f);
                 uniforms.lightDirectionAmbient = glm::vec4(glm::normalize(glm::vec3(-0.42f, -0.72f, -0.48f)), 0.08f);
-                uniforms.baseColorFactor = m_model.materialFactors.baseColor;
+                uniforms.baseColorFactor =
+                    glm::vec4(m_model.materialFactors.baseColor[0], m_model.materialFactors.baseColor[1],
+                              m_model.materialFactors.baseColor[2], m_model.materialFactors.baseColor[3]);
                 uniforms.emissiveFactorNormalScale =
-                    glm::vec4(m_model.materialFactors.emissive, m_model.materialFactors.normalScale);
+                    glm::vec4(m_model.materialFactors.emissive[0], m_model.materialFactors.emissive[1],
+                              m_model.materialFactors.emissive[2], m_model.materialFactors.normalScale);
                 uniforms.metallicRoughnessOcclusion =
                     glm::vec4(m_model.materialFactors.metallic, m_model.materialFactors.roughness,
                               m_model.materialFactors.occlusionStrength, 0.0f);
@@ -390,7 +400,7 @@ namespace kera
 
                 if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(uniforms)))
                 {
-                    Logger::getInstance().error("Failed to upload DamagedHelmet uniforms.");
+                    sampleLogError("Failed to upload DamagedHelmet uniforms.");
                     return;
                 }
 
@@ -481,12 +491,12 @@ namespace kera
             m_renderer.destroyBuffer(m_fullscreenVertexBuffer);
             m_fullscreenVertexBuffer = {};
         }
-        destroyGltfModel(m_renderer, m_model);
+        m_renderer.destroyGltfModel(m_model);
     }
 
     void DamagedHelmetSample::cleanup()
     {
-        Logger::getInstance().info("Cleaning up " + std::string(getName()));
+        sampleLogInfo("Cleaning up " + std::string(getName()));
         m_initialized = false;
 
         destroyRenderResources();

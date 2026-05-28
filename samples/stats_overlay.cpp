@@ -1,6 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "stats_overlay.h"
 
-#include "kera/renderer/interfaces.h"
+#include "kera/renderer/api.h"
 
 #ifdef KERA_HAS_IMGUI
 #include <imgui.h>
@@ -9,7 +12,7 @@
 namespace kera
 {
 
-    void StatsOverlay::draw(const IRenderer& renderer, int activeSampleIndex, const std::string& activeSampleName,
+    void StatsOverlay::draw(const Renderer& renderer, int activeSampleIndex, const std::string& activeSampleName,
                             float frameTimeMs)
     {
 #ifdef KERA_HAS_IMGUI

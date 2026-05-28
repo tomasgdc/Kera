@@ -1,3 +1,6 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 if(NOT DEFINED KERA_SHADER_ROOT)
     message(FATAL_ERROR "KERA_SHADER_ROOT is required")
 endif()

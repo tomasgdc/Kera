@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <string>
@@ -5,7 +8,7 @@
 namespace kera
 {
 
-    class IRenderer;
+    class Renderer;
 
     class StatsOverlay
     {
@@ -23,7 +26,7 @@ namespace kera
             return m_visible;
         }
 
-        void draw(const IRenderer& renderer, int activeSampleIndex, const std::string& activeSampleName,
+        void draw(const Renderer& renderer, int activeSampleIndex, const std::string& activeSampleName,
                   float frameTimeMs);
 
     private:

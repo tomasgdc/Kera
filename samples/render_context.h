@@ -1,6 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include "kera/renderer/interfaces.h"
+#include "kera/renderer/api.h"
 
 #include <functional>
 
@@ -10,9 +13,9 @@ namespace kera
     class RenderContext
     {
     public:
-        RenderContext(IRenderer& renderer, FrameHandle frame);
+        RenderContext(Renderer& renderer, FrameHandle frame);
 
-        IRenderer& renderer() const
+        Renderer& renderer() const
         {
             return m_renderer;
         }
@@ -30,7 +33,7 @@ namespace kera
                              const std::function<void(FrameHandle)>& draw);
 
     private:
-        IRenderer& m_renderer;
+        Renderer& m_renderer;
         FrameHandle m_frame;
         bool m_renderedBackbuffer = false;
     };

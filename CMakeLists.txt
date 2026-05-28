@@ -1,24 +1,18 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 cmake_minimum_required(VERSION 3.25)
 
 project(Kera VERSION 0.1.0 LANGUAGES CXX)
 
 # Options
 option(KERA_BUILD_SAMPLES "Build Kera samples" ON)
-option(KERA_BUILD_SHARED "Build Kera as shared library" OFF)
+option(KERA_BUILD_SHARED "Build Kera as shared library" ON)
 option(KERA_BUILD_TESTS "Build Kera tests" ON)
 option(KERA_ENABLE_SLANG "Enable Slang shader compilation support" ON)
 option(KERA_ENABLE_IMGUI "Enable Dear ImGui debug UI support" ${KERA_BUILD_SAMPLES})
-option(KERA_ALLOW_STL_CPP_SHARED_ABI "Allow the STL-based C++ convenience API to be built as a shared-library ABI" OFF)
 
 include(CTest)
-
-if(KERA_BUILD_SHARED AND NOT KERA_ALLOW_STL_CPP_SHARED_ABI)
-    message(FATAL_ERROR
-        "KERA_BUILD_SHARED is blocked because internal C++ convenience renderer headers still contain STL types. "
-        "Use the STL-free installed public headers include/kera/kera.h and include/kera/renderer/api.h, or set "
-        "KERA_ALLOW_STL_CPP_SHARED_ABI=ON only for local/internal builds that accept compiler/STL ABI coupling."
-    )
-endif()
 
 function(kera_configure_no_exceptions target_name)
     if(MSVC)
@@ -90,14 +84,32 @@ if(KERA_ENABLE_IMGUI)
         message(FATAL_ERROR "KERA_ENABLE_IMGUI is ON but third_party/imgui is missing")
     endif()
 
-    add_library(kera_imgui STATIC
-        "${IMGUI_DIR}/imgui.cpp"
-        "${IMGUI_DIR}/imgui_draw.cpp"
-        "${IMGUI_DIR}/imgui_tables.cpp"
-        "${IMGUI_DIR}/imgui_widgets.cpp"
-        "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
-        "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
-    )
+    if(KERA_BUILD_SHARED)
+        add_library(kera_imgui SHARED
+            "${IMGUI_DIR}/imgui.cpp"
+            "${IMGUI_DIR}/imgui_draw.cpp"
+            "${IMGUI_DIR}/imgui_tables.cpp"
+            "${IMGUI_DIR}/imgui_widgets.cpp"
+            "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
+            "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
+        )
+        if(WIN32)
+            set_target_properties(kera_imgui PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+            target_compile_definitions(kera_imgui
+                PRIVATE "IMGUI_API=__declspec(dllexport)"
+                INTERFACE "IMGUI_API=__declspec(dllimport)"
+            )
+        endif()
+    else()
+        add_library(kera_imgui STATIC
+            "${IMGUI_DIR}/imgui.cpp"
+            "${IMGUI_DIR}/imgui_draw.cpp"
+            "${IMGUI_DIR}/imgui_tables.cpp"
+            "${IMGUI_DIR}/imgui_widgets.cpp"
+            "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
+            "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp"
+        )
+    endif()
     set_target_properties(kera_imgui PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_include_directories(kera_imgui PUBLIC
         "${IMGUI_DIR}"
@@ -186,6 +198,7 @@ set(KERA_CORE_HEADERS
 
 # === KERA RENDERER (Cross-platform Vulkan) ===
 set(KERA_RENDERER_SOURCES
+    src/renderer/api.cpp
     src/renderer/factory.cpp
     src/renderer/vulkan_renderer.cpp
     src/renderer/instance.cpp
@@ -337,6 +350,45 @@ if(MSVC)
     target_compile_options(kera PRIVATE /W4 /WX)
 else()
     target_compile_options(kera PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+if(BUILD_TESTING AND KERA_BUILD_TESTS AND KERA_BUILD_SHARED)
+    add_library(kera_internal_tests STATIC ${KERA_ALL_SOURCES} ${KERA_ALL_HEADERS})
+
+    target_include_directories(kera_internal_tests
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/json/include
+    )
+    target_compile_definitions(kera_internal_tests PRIVATE
+        TINYGLTF_NOEXCEPTION
+        JSON_NOEXCEPTION
+    )
+    target_link_libraries(kera_internal_tests
+        PUBLIC
+            Vulkan::Vulkan
+            ${KERA_SDL_TARGET}
+            glm::glm
+        PRIVATE
+            spdlog::spdlog
+    )
+    if(KERA_SLANG_TARGET)
+        target_link_libraries(kera_internal_tests PUBLIC ${KERA_SLANG_TARGET})
+        target_compile_definitions(kera_internal_tests PUBLIC KERA_HAS_SLANG=1)
+    endif()
+    if(TARGET kera_imgui)
+        target_link_libraries(kera_internal_tests PUBLIC kera_imgui)
+        target_compile_definitions(kera_internal_tests PUBLIC KERA_HAS_IMGUI=1)
+    endif()
+    kera_configure_no_exceptions(kera_internal_tests)
+    if(MSVC)
+        target_compile_options(kera_internal_tests PRIVATE /W4 /WX)
+    else()
+        target_compile_options(kera_internal_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    endif()
 endif()
 
 # Samples

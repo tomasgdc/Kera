@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "kera/renderer/backend/vulkan/layout_utils.h"
 #include "kera/renderer/command_buffer.h"
 #include "kera/renderer/descriptor_contracts.h"

@@ -1,7 +1,8 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "basic_triangle_sample.h"
 
-#include "kera/renderer/reflection_contracts.h"
-#include "kera/utilities/logger.h"
 #include "render_context.h"
 #include "sample_utils.h"
 
@@ -29,42 +30,45 @@ namespace kera
         }  // namespace BasicTriangleShader
     }  // namespace
 
-    BasicTriangleSample::BasicTriangleSample(IRenderer& renderer)
+    BasicTriangleSample::BasicTriangleSample(Renderer& renderer)
         : Sample("Basic Triangle"), m_renderer(renderer), m_indexCount(0), m_rotationAngle(0.0f)
     {
     }
 
     void BasicTriangleSample::initialize()
     {
-        Logger::getInstance().info("Initializing " + std::string(getName()));
+        sampleLogInfo("Initializing " + std::string(getName()));
 
         if (!createShaderProgram())
         {
-            Logger::getInstance().error("Failed to create Basic Triangle shader program");
+            sampleLogError("Failed to create Basic Triangle shader program");
             return;
         }
 
         if (!createGeometry())
         {
-            Logger::getInstance().error("Failed to create Basic Triangle geometry");
+            sampleLogError("Failed to create Basic Triangle geometry");
             return;
         }
 
         if (!createPipeline())
         {
-            Logger::getInstance().error("Failed to create Basic Triangle pipeline");
+            sampleLogError("Failed to create Basic Triangle pipeline");
             return;
         }
 
-        Logger::getInstance().info("Basic Triangle sample initialized successfully");
+        sampleLogInfo("Basic Triangle sample initialized successfully");
     }
 
     bool BasicTriangleSample::createShaderProgram()
     {
+        const std::string shaderPath = resolveShaderPath(BasicTriangleShader::Path);
         m_shaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = resolveShaderPath(BasicTriangleShader::Path),
-            .vertexEntryPoint = BasicTriangleShader::VertexEntryPoint,
-            .fragmentEntryPoint = BasicTriangleShader::FragmentEntryPoint,
+            .path = sampleStringView(shaderPath),
+            .vertexEntryPoint = stringView(BasicTriangleShader::VertexEntryPoint),
+            .fragmentEntryPoint = stringView(BasicTriangleShader::FragmentEntryPoint),
+            .source = KERA_SHADER_SOURCE_SLANG_FILE,
+            .debugName = {},
         });
         return static_cast<bool>(m_shaderProgram.isValid());
     }
@@ -143,7 +147,7 @@ namespace kera
     {
         if (!m_pipeline.isValid() || !m_vertexBuffer.isValid() || !m_indexBuffer.isValid())
         {
-            Logger::getInstance().warning("Render called before Basic Triangle resources were initialized");
+            sampleLogWarning("Render called before Basic Triangle resources were initialized");
             return;
         }
 
@@ -159,7 +163,7 @@ namespace kera
 
     void BasicTriangleSample::cleanup()
     {
-        Logger::getInstance().info("Cleaning up " + std::string(getName()));
+        sampleLogInfo("Cleaning up " + std::string(getName()));
         if (m_pipeline.isValid())
         {
             m_renderer.destroyGraphicsPipeline(m_pipeline);

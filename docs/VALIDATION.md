@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Tomas Mikalauskas
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Kera Validation
 
 This document records the local validation lanes used while hardening the Vulkan renderer.

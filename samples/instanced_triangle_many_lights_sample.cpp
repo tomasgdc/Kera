@@ -1,7 +1,8 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "instanced_triangle_many_lights_sample.h"
 
-#include "kera/renderer/reflection_contracts.h"
-#include "kera/utilities/logger.h"
 #include "render_context.h"
 #include "sample_utils.h"
 
@@ -60,61 +61,47 @@ namespace kera
             constexpr const char* InstanceVertexBinding = "instanceData";
             constexpr const char* FullscreenVertexBinding = "fullscreenVertex";
 
-            const ReflectedDescriptorBindingDesc GeometryParams{
-                .name = "geometryParams",
-                .type = DescriptorType::UniformBuffer,
-                .uniformSize = sizeof(GeometryUniforms),
-            };
-            const ReflectedDescriptorBindingDesc LightingParams{
-                .name = "lightingParams",
-                .type = DescriptorType::UniformBuffer,
-                .uniformSize = sizeof(LightingUniforms),
-            };
-            const ReflectedDescriptorBindingDesc SceneTexture{
-                .name = "sceneTexture",
-                .type = DescriptorType::SampledImage,
-            };
-            const ReflectedDescriptorBindingDesc SceneSampler{
-                .name = "sceneSampler",
-                .type = DescriptorType::Sampler,
-            };
+            constexpr const char* GeometryParams = "geometryParams";
+            constexpr const char* LightingParams = "lightingParams";
+            constexpr const char* SceneTexture = "sceneTexture";
+            constexpr const char* SceneSampler = "sceneSampler";
         }  // namespace ManyLightsShader
 
     }  // namespace
 
-    InstancedTriangleManyLightsSample::InstancedTriangleManyLightsSample(IRenderer& renderer)
+    InstancedTriangleManyLightsSample::InstancedTriangleManyLightsSample(Renderer& renderer)
         : Sample("Instanced Triangle Many Lights"), m_renderer(renderer)
     {
     }
 
     void InstancedTriangleManyLightsSample::initialize()
     {
-        Logger::getInstance().info("Initializing " + std::string(getName()));
+        sampleLogInfo("Initializing " + std::string(getName()));
         m_initialized = false;
 
         if (!createShaderPrograms())
         {
-            Logger::getInstance().error("Failed to create many-lights shader programs");
+            sampleLogError("Failed to create many-lights shader programs");
             cleanup();
             return;
         }
 
         if (!createGeometry())
         {
-            Logger::getInstance().error("Failed to create many-lights geometry");
+            sampleLogError("Failed to create many-lights geometry");
             cleanup();
             return;
         }
 
         if (!recreateRenderResources(m_renderer.getDrawableExtent()))
         {
-            Logger::getInstance().error("Failed to create many-lights render resources");
+            sampleLogError("Failed to create many-lights render resources");
             cleanup();
             return;
         }
 
         m_initialized = true;
-        Logger::getInstance().info("Many-lights sample initialized successfully");
+        sampleLogInfo("Many-lights sample initialized successfully");
     }
 
     bool InstancedTriangleManyLightsSample::createShaderPrograms()
@@ -122,9 +109,11 @@ namespace kera
         const std::string shaderPath = resolveShaderPath(ManyLightsShader::Path);
 
         m_geometryShaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = shaderPath,
-            .vertexEntryPoint = ManyLightsShader::GeometryVertexEntryPoint,
-            .fragmentEntryPoint = ManyLightsShader::GeometryFragmentEntryPoint,
+            .path = sampleStringView(shaderPath),
+            .vertexEntryPoint = stringView(ManyLightsShader::GeometryVertexEntryPoint),
+            .fragmentEntryPoint = stringView(ManyLightsShader::GeometryFragmentEntryPoint),
+            .source = KERA_SHADER_SOURCE_SLANG_FILE,
+            .debugName = {},
         });
         if (!m_geometryShaderProgram.isValid())
         {
@@ -132,9 +121,11 @@ namespace kera
         }
 
         m_lightingShaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = shaderPath,
-            .vertexEntryPoint = ManyLightsShader::FullscreenVertexEntryPoint,
-            .fragmentEntryPoint = ManyLightsShader::LightingFragmentEntryPoint,
+            .path = sampleStringView(shaderPath),
+            .vertexEntryPoint = stringView(ManyLightsShader::FullscreenVertexEntryPoint),
+            .fragmentEntryPoint = stringView(ManyLightsShader::LightingFragmentEntryPoint),
+            .source = KERA_SHADER_SOURCE_SLANG_FILE,
+            .debugName = {},
         });
         return m_lightingShaderProgram.isValid();
     }
@@ -293,7 +284,7 @@ namespace kera
                 .semantic("COLOR", ManyLightsShader::MeshVertexBinding, static_cast<uint32_t>(offsetof(Vertex, color)),
                           VertexFormat::Float3)
                 .semantic("TRANSFORM", ManyLightsShader::InstanceVertexBinding, 0, VertexFormat::Float4)
-                .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams.name)
+                .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams)
                 .build();
 
         m_geometryPipeline = m_renderer.createGraphicsPipeline({
@@ -312,7 +303,7 @@ namespace kera
         m_geometryDescriptorSet = m_renderer.createDescriptorSet(m_geometryPipeline);
         if (!m_geometryDescriptorSet.isValid() ||
             !m_renderer.updateDescriptors(m_geometryDescriptorSet)
-                 .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams.name, m_geometryUniformBuffer)
+                 .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams, m_geometryUniformBuffer)
                  .ok())
         {
             return false;
@@ -326,9 +317,9 @@ namespace kera
                 .semantic("POSITION", ManyLightsShader::FullscreenVertexBinding, 0, VertexFormat::Float2)
                 .semantic("TEXCOORD0", ManyLightsShader::FullscreenVertexBinding,
                           static_cast<uint32_t>(offsetof(FullscreenTriangleVertex, uv)), VertexFormat::Float2)
-                .uniform<LightingUniforms>(ManyLightsShader::LightingParams.name)
-                .sampledImage(ManyLightsShader::SceneTexture.name)
-                .sampler(ManyLightsShader::SceneSampler.name)
+                .uniform<LightingUniforms>(ManyLightsShader::LightingParams)
+                .sampledImage(ManyLightsShader::SceneTexture)
+                .sampler(ManyLightsShader::SceneSampler)
                 .build();
 
         m_lightingPipeline = m_renderer.createGraphicsPipeline({
@@ -348,9 +339,9 @@ namespace kera
         }
 
         return m_renderer.updateDescriptors(m_lightingDescriptorSet)
-            .uniform<LightingUniforms>(ManyLightsShader::LightingParams.name, m_lightingUniformBuffer)
-            .sampledImage(ManyLightsShader::SceneTexture.name, m_sceneTexture)
-            .sampler(ManyLightsShader::SceneSampler.name, m_sceneSampler)
+            .uniform<LightingUniforms>(ManyLightsShader::LightingParams, m_lightingUniformBuffer)
+            .sampledImage(ManyLightsShader::SceneTexture, m_sceneTexture)
+            .sampler(ManyLightsShader::SceneSampler, m_sceneSampler)
             .ok();
     }
 
@@ -363,7 +354,7 @@ namespace kera
 
         if (!recreateRenderResources(extent))
         {
-            Logger::getInstance().error("Failed to resize many-lights render resources.");
+            sampleLogError("Failed to resize many-lights render resources.");
             m_initialized = false;
         }
     }
@@ -387,7 +378,7 @@ namespace kera
         void* mappedData = nullptr;
         if (!m_renderer.mapBuffer(m_instanceBuffer, &mappedData))
         {
-            Logger::getInstance().error("Failed to map many-lights instance buffer.");
+            sampleLogError("Failed to map many-lights instance buffer.");
             return;
         }
 
@@ -416,7 +407,7 @@ namespace kera
         void* mappedData = nullptr;
         if (!m_renderer.mapBuffer(m_geometryUniformBuffer, &mappedData))
         {
-            Logger::getInstance().error("Failed to map many-lights geometry uniforms.");
+            sampleLogError("Failed to map many-lights geometry uniforms.");
             return;
         }
 
@@ -436,7 +427,7 @@ namespace kera
         void* mappedData = nullptr;
         if (!m_renderer.mapBuffer(m_lightingUniformBuffer, &mappedData))
         {
-            Logger::getInstance().error("Failed to map many-lights lighting uniforms.");
+            sampleLogError("Failed to map many-lights lighting uniforms.");
             return;
         }
 
@@ -473,7 +464,7 @@ namespace kera
         if (!m_geometryPipeline.isValid() || !m_lightingPipeline.isValid() || !m_sceneRenderTarget.isValid() ||
             !m_geometryDescriptorSet.isValid() || !m_lightingDescriptorSet.isValid())
         {
-            Logger::getInstance().warning("Render called before many-lights resources were initialized");
+            sampleLogWarning("Render called before many-lights resources were initialized");
             return;
         }
 
@@ -540,7 +531,7 @@ namespace kera
 
     void InstancedTriangleManyLightsSample::cleanup()
     {
-        Logger::getInstance().info("Cleaning up " + std::string(getName()));
+        sampleLogInfo("Cleaning up " + std::string(getName()));
         m_initialized = false;
 
         destroyRenderResources();

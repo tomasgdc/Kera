@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include <vulkan/vulkan.h>
@@ -26,6 +29,7 @@ namespace kera
         Surface& operator=(Surface&& other) noexcept;
 
         bool create(VkInstance instance, const Window& window);
+        bool create(VkInstance instance, SDL_Window* window);
         void destroy();
 
         VkSurfaceKHR getVulkanSurface() const

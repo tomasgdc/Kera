@@ -1,7 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include "kera/renderer/gltf_loader.h"
-#include "kera/renderer/interfaces.h"
+#include "kera/renderer/api.h"
 #include "samples.h"
 
 #include <cstdint>
@@ -13,9 +15,9 @@ namespace kera
     class DamagedHelmetSample : public Sample
     {
     public:
-        explicit DamagedHelmetSample(IRenderer& renderer);
-        DamagedHelmetSample(IRenderer& renderer, uint32_t debugView);
-        DamagedHelmetSample(IRenderer& renderer, uint32_t debugView, bool fixedYaw, float yawRadians);
+        explicit DamagedHelmetSample(Renderer& renderer);
+        DamagedHelmetSample(Renderer& renderer, uint32_t debugView);
+        DamagedHelmetSample(Renderer& renderer, uint32_t debugView, bool fixedYaw, float yawRadians);
 
         void initialize() override;
         void update(float deltaTime) override;
@@ -33,7 +35,7 @@ namespace kera
         void destroyRenderResources();
         void destroyLoadedResources();
 
-        IRenderer& m_renderer;
+        Renderer& m_renderer;
         ShaderProgramHandle m_meshShaderProgram;
         ShaderProgramHandle m_displayShaderProgram;
         GltfLoadedModel m_model;

@@ -1,3 +1,6 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 # Samples for Kera Rendering Library
 
 # Collect shader files so IDE generators show them under the sample target.
@@ -29,6 +32,8 @@ kera_configure_no_exceptions(kera_samples)
 
 add_executable(kera_ppm_metrics
     ppm_metrics.cpp
+    sample_utils.cpp
+    sample_utils.h
 )
 target_link_libraries(kera_ppm_metrics PRIVATE kera)
 kera_configure_no_exceptions(kera_ppm_metrics)

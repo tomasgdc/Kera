@@ -1,3 +1,6 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 $files = git ls-files "*.c" "*.cc" "*.cpp" "*.cxx" "*.h" "*.hpp" ":(exclude)third_party/" ":(exclude)*.slang.h"
 
 if (-not $files) {

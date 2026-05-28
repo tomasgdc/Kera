@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include "kera/renderer/buffer.h"
@@ -14,6 +17,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+struct SDL_Window;
 
 namespace kera
 {
@@ -291,6 +296,7 @@ namespace kera
         VulkanRenderer& operator=(const VulkanRenderer&) = delete;
 
         bool initialize(Window& window);
+        bool initialize(SDL_Window* window, uint32_t width, uint32_t height);
         void shutdown() override;
 
         GraphicsBackend getBackend() const override
@@ -441,6 +447,8 @@ namespace kera
         void destroyDescriptorPool();
 
         Window* m_window;
+        SDL_Window* m_sdlWindow = nullptr;
+        Extent2D m_windowExtent;
         std::shared_ptr<Instance> m_instance;
         std::shared_ptr<PhysicalDevice> m_physicalDevice;
         std::shared_ptr<Device> m_device;

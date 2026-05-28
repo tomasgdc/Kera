@@ -1,7 +1,8 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "instanced_triangle_sample.h"
 
-#include "kera/renderer/reflection_contracts.h"
-#include "kera/utilities/logger.h"
 #include "render_context.h"
 #include "sample_utils.h"
 
@@ -40,52 +41,51 @@ namespace kera
             constexpr const char* FragmentEntryPoint = "fragmentMain";
             constexpr const char* MeshVertexBinding = "meshVertex";
             constexpr const char* InstanceVertexBinding = "instanceData";
-            const ReflectedDescriptorBindingDesc GlobalParams{
-                .name = "globalParams",
-                .type = DescriptorType::UniformBuffer,
-                .uniformSize = sizeof(Uniforms),
-            };
+            constexpr const char* GlobalParams = "globalParams";
         }  // namespace InstancedTriangleShader
 
         constexpr uint32_t kUniformRingSlots = 3;
     }  // namespace
 
-    InstancedTriangleSample::InstancedTriangleSample(IRenderer& renderer)
+    InstancedTriangleSample::InstancedTriangleSample(Renderer& renderer)
         : Sample("Instanced Triangle"), m_renderer(renderer), m_indexCount(0), m_instanceCount(0), m_rotationAngle(0.0f)
     {
     }
 
     void InstancedTriangleSample::initialize()
     {
-        Logger::getInstance().info("Initializing " + std::string(getName()));
+        sampleLogInfo("Initializing " + std::string(getName()));
 
         if (!createShaderProgram())
         {
-            Logger::getInstance().error("Failed to create Instanced Triangle shader program");
+            sampleLogError("Failed to create Instanced Triangle shader program");
             return;
         }
 
         if (!createGeometry())
         {
-            Logger::getInstance().error("Failed to create Instanced Triangle geometry");
+            sampleLogError("Failed to create Instanced Triangle geometry");
             return;
         }
 
         if (!createPipeline())
         {
-            Logger::getInstance().error("Failed to create Instanced Triangle pipeline");
+            sampleLogError("Failed to create Instanced Triangle pipeline");
             return;
         }
 
-        Logger::getInstance().info("Instanced Triangle sample initialized successfully");
+        sampleLogInfo("Instanced Triangle sample initialized successfully");
     }
 
     bool InstancedTriangleSample::createShaderProgram()
     {
+        const std::string shaderPath = resolveShaderPath(InstancedTriangleShader::Path);
         m_shaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = resolveShaderPath(InstancedTriangleShader::Path),
-            .vertexEntryPoint = InstancedTriangleShader::VertexEntryPoint,
-            .fragmentEntryPoint = InstancedTriangleShader::FragmentEntryPoint,
+            .path = sampleStringView(shaderPath),
+            .vertexEntryPoint = stringView(InstancedTriangleShader::VertexEntryPoint),
+            .fragmentEntryPoint = stringView(InstancedTriangleShader::FragmentEntryPoint),
+            .source = KERA_SHADER_SOURCE_SLANG_FILE,
+            .debugName = {},
         });
         return static_cast<bool>(m_shaderProgram.isValid());
     }
@@ -165,7 +165,7 @@ namespace kera
                 .semantic("COLOR", InstancedTriangleShader::MeshVertexBinding,
                           static_cast<uint32_t>(offsetof(Vertex, color)), VertexFormat::Float3)
                 .semantic("TRANSFORM", InstancedTriangleShader::InstanceVertexBinding, 0, VertexFormat::Float4)
-                .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name)
+                .uniform<Uniforms>(InstancedTriangleShader::GlobalParams)
                 .build();
 
         m_pipeline = m_renderer.createGraphicsPipeline({
@@ -191,7 +191,7 @@ namespace kera
 
             const std::size_t uniformOffset = sizeof(Uniforms) * index;
             if (!m_renderer.updateDescriptors(descriptorSet)
-                     .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name, m_uniformBuffer, uniformOffset)
+                     .uniform<Uniforms>(InstancedTriangleShader::GlobalParams, m_uniformBuffer, uniformOffset)
                      .ok())
             {
                 return false;
@@ -236,7 +236,7 @@ namespace kera
         }
         else
         {
-            Logger::getInstance().error("Failed to map instance buffer for update.");
+            sampleLogError("Failed to map instance buffer for update.");
         }
     }
 
@@ -245,7 +245,7 @@ namespace kera
         if (!m_pipeline.isValid() || !m_vertexBuffer.isValid() || !m_indexBuffer.isValid() ||
             !m_instanceBuffer.isValid() || !m_uniformBuffer.isValid() || m_uniformDescriptorSets.empty())
         {
-            Logger::getInstance().warning("Render called before Instanced Triangle resources were initialized");
+            sampleLogWarning("Render called before Instanced Triangle resources were initialized");
             return;
         }
 
@@ -262,7 +262,7 @@ namespace kera
                                       glm::scale(glm::mat4(1.0f), glm::vec3(1.0f + timeFactor, 1.0f, 1.0f));
                 if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(Uniforms)))
                 {
-                    Logger::getInstance().error("Failed to upload instanced triangle uniforms.");
+                    sampleLogError("Failed to upload instanced triangle uniforms.");
                     return;
                 }
 
@@ -270,10 +270,10 @@ namespace kera
                 const std::size_t descriptorIndex = (uniformOffset / sizeof(Uniforms)) % m_uniformDescriptorSets.size();
                 DescriptorSetHandle uniformDescriptorSet = m_uniformDescriptorSets[descriptorIndex];
                 if (!m_renderer.updateDescriptors(uniformDescriptorSet)
-                         .uniform<Uniforms>(InstancedTriangleShader::GlobalParams.name, m_uniformBuffer, uniformOffset)
+                         .uniform<Uniforms>(InstancedTriangleShader::GlobalParams, m_uniformBuffer, uniformOffset)
                          .ok())
                 {
-                    Logger::getInstance().error("Failed to update instanced triangle uniform descriptor.");
+                    sampleLogError("Failed to update instanced triangle uniform descriptor.");
                     return;
                 }
 
@@ -288,7 +288,7 @@ namespace kera
 
     void InstancedTriangleSample::cleanup()
     {
-        Logger::getInstance().info("Cleaning up " + std::string(getName()));
+        sampleLogInfo("Cleaning up " + std::string(getName()));
         for (DescriptorSetHandle descriptorSet : m_uniformDescriptorSets)
         {
             if (descriptorSet.isValid())

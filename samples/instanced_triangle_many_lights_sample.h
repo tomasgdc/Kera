@@ -1,6 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include "kera/renderer/interfaces.h"
+#include "kera/renderer/api.h"
 #include "samples.h"
 
 #include <array>
@@ -12,7 +15,7 @@ namespace kera
     class InstancedTriangleManyLightsSample : public Sample
     {
     public:
-        explicit InstancedTriangleManyLightsSample(IRenderer& renderer);
+        explicit InstancedTriangleManyLightsSample(Renderer& renderer);
 
         void initialize() override;
         void update(float deltaTime) override;
@@ -32,7 +35,7 @@ namespace kera
         void updateGeometryUniforms();
         void updateLightingUniforms(float angleRadians);
 
-        IRenderer& m_renderer;
+        Renderer& m_renderer;
         ShaderProgramHandle m_geometryShaderProgram;
         ShaderProgramHandle m_lightingShaderProgram;
         BufferHandle m_vertexBuffer;

@@ -1,4 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
+
+#include "kera/renderer/api.h"
 
 #include <glm/glm.hpp>
 
@@ -16,6 +21,12 @@ namespace kera
 
     std::string resolveShaderPath(const std::string& shaderPath);
     std::string resolveSampleAssetPath(const std::string& assetPath);
+    KeraStringView sampleStringView(const std::string& text);
+    void sampleLog(KeraLogLevel level, const std::string& message);
+    void sampleLogDebug(const std::string& message);
+    void sampleLogInfo(const std::string& message);
+    void sampleLogWarning(const std::string& message);
+    void sampleLogError(const std::string& message);
     const std::array<FullscreenTriangleVertex, 3>& fullscreenTriangleVertices();
     const std::array<uint16_t, 3>& fullscreenTriangleIndices();
 

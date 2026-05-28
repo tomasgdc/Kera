@@ -1,6 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include "kera/renderer/interfaces.h"
+#include "kera/renderer/api.h"
 #include "samples.h"
 
 #include <cstdint>
@@ -12,7 +15,7 @@ namespace kera
     class InstancedTriangleSample : public Sample
     {
     public:
-        explicit InstancedTriangleSample(IRenderer& renderer);
+        explicit InstancedTriangleSample(Renderer& renderer);
 
         void initialize() override;
         void update(float deltaTime) override;
@@ -24,7 +27,7 @@ namespace kera
         bool createGeometry();
         bool createPipeline();
 
-        IRenderer& m_renderer;
+        Renderer& m_renderer;
         ShaderProgramHandle m_shaderProgram;
         BufferHandle m_vertexBuffer;
         BufferHandle m_indexBuffer;

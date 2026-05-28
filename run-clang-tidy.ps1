@@ -1,3 +1,6 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 $buildDir = "build/clang-tidy"
 $runLocal = $false
 

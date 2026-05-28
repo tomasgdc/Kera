@@ -1,6 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include "kera/renderer/interfaces.h"
+#include "kera/renderer/api.h"
 #include "samples.h"
 
 namespace kera
@@ -9,7 +12,7 @@ namespace kera
     class BasicTriangleSample : public Sample
     {
     public:
-        explicit BasicTriangleSample(IRenderer& renderer);
+        explicit BasicTriangleSample(Renderer& renderer);
 
         void initialize() override;
         void update(float deltaTime) override;
@@ -21,7 +24,7 @@ namespace kera
         bool createGeometry();
         bool createPipeline();
 
-        IRenderer& m_renderer;
+        Renderer& m_renderer;
         ShaderProgramHandle m_shaderProgram;
         BufferHandle m_vertexBuffer;
         BufferHandle m_indexBuffer;

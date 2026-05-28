@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "kera/renderer/backend/vulkan/vulkan_renderer.h"
 
 #include "kera/core/window.h"
@@ -520,7 +523,14 @@ namespace kera
     bool VulkanRenderer::initialize(Window& window)
     {
         m_window = &window;
+        return initialize(window.getSDLWindow(), static_cast<uint32_t>(window.getWidth()),
+                          static_cast<uint32_t>(window.getHeight()));
+    }
 
+    bool VulkanRenderer::initialize(SDL_Window* window, uint32_t width, uint32_t height)
+    {
+        m_sdlWindow = window;
+        m_windowExtent = {width, height};
         m_instance = std::make_shared<Instance>();
         if (!m_instance->initialize("Kera Sample", VK_MAKE_VERSION(0, 1, 0), true))
         {
@@ -568,8 +578,7 @@ namespace kera
             return false;
         }
 
-        if (!recreateSwapchainResources(static_cast<uint32_t>(window.getWidth()),
-                                        static_cast<uint32_t>(window.getHeight())))
+        if (!recreateSwapchainResources(width, height))
         {
             Logger::getInstance().error("Failed to create Vulkan swapchain resources");
             return false;
@@ -641,6 +650,8 @@ namespace kera
             m_instance.reset();
         }
         m_window = nullptr;
+        m_sdlWindow = nullptr;
+        m_windowExtent = {};
         m_stats = {};
     }
 
@@ -678,7 +689,7 @@ namespace kera
             return true;
         }
 
-        if (!m_window || !m_instance || !m_device || !m_swapchain)
+        if (!m_sdlWindow || !m_instance || !m_device || !m_swapchain)
         {
             Logger::getInstance().warning("Cannot initialize ImGui before Vulkan renderer resources are ready.");
             return false;
@@ -696,7 +707,7 @@ namespace kera
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
 
-        if (!ImGui_ImplSDL3_InitForVulkan(m_window->getSDLWindow()))
+        if (!ImGui_ImplSDL3_InitForVulkan(m_sdlWindow))
         {
             Logger::getInstance().warning("Failed to initialize ImGui SDL3 backend.");
             ImGui::DestroyContext();
@@ -820,6 +831,7 @@ namespace kera
 
     bool VulkanRenderer::resize(Extent2D newExtent)
     {
+        m_windowExtent = newExtent;
         if (!m_device || !m_surface || !m_physicalDevice || !m_swapchain)
         {
             Logger::getInstance().error("Renderer is not initialized.");
@@ -2241,7 +2253,7 @@ namespace kera
             Logger::getInstance().error("Renderer frame resources are not initialized.");
             return {};
         }
-        if (m_swapchainRecreateRequested && m_window && (m_window->getWidth() <= 0 || m_window->getHeight() <= 0))
+        if (m_swapchainRecreateRequested && m_windowExtent.width == 0 && m_windowExtent.height == 0)
         {
             return {};
         }
@@ -2976,14 +2988,19 @@ namespace kera
 
     bool VulkanRenderer::recreateSwapchainFromWindow()
     {
-        if (!m_window)
+        if (!m_sdlWindow)
         {
             Logger::getInstance().error("Cannot recreate Vulkan swapchain without a window.");
             return false;
         }
 
-        const int width = m_window->getWidth();
-        const int height = m_window->getHeight();
+        int width = static_cast<int>(m_windowExtent.width);
+        int height = static_cast<int>(m_windowExtent.height);
+        if (m_window)
+        {
+            width = m_window->getWidth();
+            height = m_window->getHeight();
+        }
         if (width <= 0 || height <= 0)
         {
             m_swapchainRecreateRequested = true;

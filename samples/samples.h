@@ -1,6 +1,9 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
-#include "kera/renderer/interfaces.h"
+#include "kera/renderer/api.h"
 
 #include <memory>
 #include <string>
@@ -10,8 +13,6 @@ namespace kera
 {
 
     class Sample;
-    class IRenderer;
-    class Window;
     class RenderContext;
     class StatsOverlay;
 
@@ -45,8 +46,9 @@ namespace kera
 
         std::vector<std::unique_ptr<Sample>> m_samples;
         int m_activeSampleIndex;
-        std::unique_ptr<Window> m_window;
-        std::unique_ptr<IRenderer> m_renderer;
+        struct SampleWindow;
+        std::unique_ptr<SampleWindow> m_window;
+        std::unique_ptr<Renderer> m_renderer;
         std::unique_ptr<StatsOverlay> m_statsOverlay;
     };
 

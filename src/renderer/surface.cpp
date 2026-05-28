@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "kera/renderer/surface.h"
 
 #include "kera/core/window.h"
@@ -39,6 +42,11 @@ namespace kera
 
     bool Surface::create(VkInstance instance, const Window& window)
     {
+        return create(instance, window.getSDLWindow());
+    }
+
+    bool Surface::create(VkInstance instance, SDL_Window* window)
+    {
         if (surface_)
         {
             destroy();
@@ -47,7 +55,7 @@ namespace kera
         instance_ = instance;
 
         // Create Vulkan surface from SDL window
-        if (!SDL_Vulkan_CreateSurface(window.getSDLWindow(), instance, nullptr, &surface_))
+        if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface_))
         {
             Logger::getInstance().error("Failed to create Vulkan surface: " + std::string(SDL_GetError()));
             return false;

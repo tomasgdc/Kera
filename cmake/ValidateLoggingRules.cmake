@@ -1,3 +1,6 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 if(NOT DEFINED KERA_SOURCE_DIR)
     message(FATAL_ERROR "KERA_SOURCE_DIR must be provided")
 endif()

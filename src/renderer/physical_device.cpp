@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "kera/renderer/physical_device.h"
 
 #include "kera/utilities/logger.h"

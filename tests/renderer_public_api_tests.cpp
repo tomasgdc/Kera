@@ -1,3 +1,6 @@
+// Copyright 2026 Tomas Mikalauskas
+// SPDX-License-Identifier: Apache-2.0
+
 #include "kera/renderer/api.h"
 
 #include <cassert>
@@ -42,6 +45,8 @@ int main()
     KeraRendererApiV1 api{};
     api.abiVersion = KERA_RENDERER_ABI_VERSION;
     assert(api.abiVersion == 1u);
+    assert(keraGetRendererApiV1() != nullptr);
+    assert(keraGetRendererApiV1()->abiVersion == KERA_RENDERER_ABI_VERSION);
 
     return 0;
 }
