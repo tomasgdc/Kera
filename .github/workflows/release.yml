@@ -1,3 +1,6 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 name: Release
 
 on:
@@ -137,9 +140,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - preset: windows-release
-            package_suffix: release
-            build_dir: build/windows-release
+          - preset: windows-release-static
+            package_suffix: release-static
+            build_dir: build/windows-release-static
           - preset: windows-release-shared
             package_suffix: release-shared
             build_dir: build/windows-release-shared

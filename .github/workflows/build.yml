@@ -1,3 +1,6 @@
+# Copyright 2026 Tomas Mikalauskas
+# SPDX-License-Identifier: Apache-2.0
+
 name: Build
 
 on:
@@ -39,17 +42,10 @@ jobs:
         run: |
           .\run-clang-tidy.ps1 --local
 
-  build_windows:
-    name: Windows ${{ matrix.preset }}
+  windows_unit_tests:
+    name: Windows release static unit tests
     needs: style_windows
     runs-on: [self-hosted, Windows]
-
-    strategy:
-      fail-fast: false
-      matrix:
-        preset:
-          - windows-release
-          - windows-release-shared
 
     steps:
       - name: Checkout
@@ -60,9 +56,54 @@ jobs:
       - name: Configure CMake
         shell: powershell
         run: |
-          cmake --preset ${{ matrix.preset }}
+          cmake --preset windows-release-static
 
-      - name: Build
+      - name: Build GoogleTest unit binary
         shell: powershell
         run: |
-          cmake --build --preset ${{ matrix.preset }} --config Release
+          cmake --build --preset windows-release-static --target kera_unit_tests --config Release -- /m:1
+
+      - name: Run quick validation
+        shell: powershell
+        run: |
+          ctest --test-dir build/windows-release-static -C Release -L quick --output-on-failure
+
+  windows_vulkan_smoke:
+    name: Windows release shared Vulkan smoke
+    needs: windows_unit_tests
+    runs-on: [self-hosted, Windows]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure CMake
+        shell: powershell
+        run: |
+          cmake --preset windows-release-shared
+
+      - name: Build samples
+        shell: powershell
+        run: |
+          cmake --build --preset windows-release-shared --target kera_samples --config Release -- /m:1
+          cmake --build --preset windows-release-shared --target kera_ppm_metrics --config Release -- /m:1
+
+      - name: Run Vulkan smoke tests
+        shell: powershell
+        env:
+          KERA_RUN_GPU_SMOKE: "1"
+        run: |
+          ctest --test-dir build/windows-release-shared -C Release -L vulkan --output-on-failure
+
+      - name: Upload Vulkan smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-vulkan-smoke-diagnostics
+          path: |
+            build/windows-release-shared/samples/Release/*.log
+            build/windows-release-shared/samples/Release/visual_regression/**
+          if-no-files-found: ignore
+          retention-days: 7
