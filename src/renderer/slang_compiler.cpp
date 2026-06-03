@@ -370,6 +370,7 @@ namespace kera
         {
             return false;
         }
+
         for (SlangReflectionBinding& binding : outReflection.bindings)
         {
             binding.stage = request.shaderType;
