@@ -8,6 +8,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -58,7 +60,7 @@ namespace
         return reflection;
     }
 
-    kera::PipelineReflectionContract makeValidContract()
+    kera::PipelineReflectionBuilder makeValidBuilder()
     {
         return kera::PipelineReflectionBuilder{}
             .debugName("Reflection Contract Test")
@@ -66,8 +68,20 @@ namespace
             .vertexBinding<Vertex>("meshVertex", 0)
             .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
             .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
-            .uniform<Uniforms>("globalParams")
-            .build();
+            .uniform<Uniforms>("globalParams");
+    }
+
+    kera::PipelineReflectionContract makeValidContract(const kera::SlangReflectionMetadata& reflection)
+    {
+        kera::PipelineReflectionBuildResult result = makeValidBuilder().build(reflection);
+        EXPECT_TRUE(result.ok()) << result.errorMessage();
+        return result.contract();
+    }
+
+    kera::PipelineReflectionBuildResult build(kera::PipelineReflectionBuilder builder,
+                                              const kera::SlangReflectionMetadata& reflection)
+    {
+        return std::move(builder).build(reflection);
     }
 
     class FakeRenderer final : public kera::IRenderer
@@ -271,40 +285,18 @@ namespace
 TEST(KeraReflectionContracts, BuildsValidatedPipelineContractsAndDescriptorUpdates)
 {
     const kera::SlangReflectionMetadata reflection = makeReflection();
-    const kera::PipelineReflectionContract validContract = makeValidContract();
-    const kera::ReflectedPipelineContract validContractView = validContract.view();
+    const kera::PipelineReflectionContract validContract = makeValidContract(reflection);
+    const kera::PipelineReflectionView validContractView = validContract.view();
     EXPECT_TRUE(validContractView.debugName == "Reflection Contract Test");
     EXPECT_TRUE(validContractView.vertexBindings.size() == 1);
     EXPECT_TRUE(validContractView.vertexBindings.front().stride == sizeof(Vertex));
 
     kera::VertexLayoutDesc layout{};
-    EXPECT_TRUE(kera::appendValidatedReflectedPipelineContract(layout, &reflection, validContract));
+    EXPECT_TRUE(kera::appendValidatedPipelineReflectionContract(layout, validContract));
     EXPECT_TRUE(layout.bindings.size() == 1);
     EXPECT_TRUE(layout.attributes.size() == 2);
-
-    kera::VertexLayoutDesc unusedLayout{};
-    const auto unusedContract =
-        kera::PipelineReflectionBuilder{}
-            .debugName("Unused Semantic Test")
-            .vertexEntry("vertexMain")
-            .vertexBinding<Vertex>("meshVertex", 0)
-            .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
-            .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
-            .semantic("TEXCOORD0", "meshVertex", 0, kera::VertexFormat::Float2)
-            .uniform<Uniforms>("globalParams")
-            .build();
-    EXPECT_TRUE(!kera::appendValidatedReflectedPipelineContract(unusedLayout, &reflection, unusedContract));
-
-    kera::VertexLayoutDesc duplicateLayout{};
-    const auto duplicateContract =
-        kera::PipelineReflectionBuilder{}
-            .vertexEntry("vertexMain")
-            .vertexBinding<Vertex>("meshVertex", 0)
-            .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
-            .semantic("POSITION", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
-            .uniform<Uniforms>("globalParams")
-            .build();
-    EXPECT_TRUE(!kera::appendValidatedReflectedPipelineContract(duplicateLayout, &reflection, duplicateContract));
+    EXPECT_TRUE(validContract.vertexLayout().bindings.size() == 1);
+    EXPECT_TRUE(validContract.vertexLayout().attributes.size() == 2);
 
     FakeRenderer renderer;
     const kera::DescriptorSetHandle descriptorSet{0, 1};
@@ -329,4 +321,141 @@ TEST(KeraReflectionContracts, BuildsValidatedPipelineContractsAndDescriptorUpdat
     EXPECT_TRUE(!renderer.tryCreateGraphicsShaderProgram({}).ok());
     EXPECT_TRUE(!renderer.tryCreateGraphicsPipeline({}).ok());
     EXPECT_TRUE(!renderer.tryCreateDescriptorSet({0, 1}).ok());
+}
+
+TEST(KeraReflectionContracts, BuildRejectsInvalidPipelineContracts)
+{
+    const kera::SlangReflectionMetadata reflection = makeReflection();
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .debugName("Missing Entry Test")
+                           .vertexEntry("missingMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .uniform<Uniforms>("globalParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .vertexBinding<Vertex>("meshVertex", 1)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .uniform<Uniforms>("globalParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .vertexBinding<Vertex>("instanceVertex", 0)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .uniform<Uniforms>("globalParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("", 0)
+                           .semantic("POSITION", "", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .uniform<Uniforms>("globalParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(
+        build(kera::PipelineReflectionBuilder{}
+                  .vertexEntry("vertexMain")
+                  .vertexBinding<Vertex>("meshVertex", 0)
+                  .semantic("POSITION", "missingVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                  .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                  .uniform<Uniforms>("globalParams"),
+              reflection)
+            .ok());
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .uniform<Uniforms>("globalParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .debugName("Unused Semantic Test")
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .semantic("TEXCOORD0", "meshVertex", 0, kera::VertexFormat::Float2)
+                           .uniform<Uniforms>("globalParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .uniform<Uniforms>("missingParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .sampledImage("globalParams"),
+                       reflection)
+                     .ok());
+
+    struct WrongUniforms
+    {
+        float matrix[4];
+    };
+    EXPECT_FALSE(build(kera::PipelineReflectionBuilder{}
+                           .vertexEntry("vertexMain")
+                           .vertexBinding<Vertex>("meshVertex", 0)
+                           .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                           .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                           .uniform<WrongUniforms>("globalParams"),
+                       reflection)
+                     .ok());
+
+    EXPECT_FALSE(
+        build(kera::PipelineReflectionBuilder{}
+                  .vertexEntry("vertexMain")
+                  .vertexBinding<Vertex>("meshVertex", 0)
+                  .semantic("POSITION", "meshVertex", offsetof(Vertex, position), static_cast<kera::VertexFormat>(999))
+                  .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
+                  .uniform<Uniforms>("globalParams"),
+              reflection)
+            .ok());
+}
+
+TEST(KeraReflectionContracts, BuildExpandsMultiLocationInputs)
+{
+    kera::SlangReflectionMetadata reflection = makeReflection();
+    reflection.entryPoints.front().inputs.front().locationCount = 2;
+    reflection.entryPoints.front().inputs.erase(reflection.entryPoints.front().inputs.begin() + 1);
+
+    const kera::PipelineReflectionBuildResult result =
+        build(kera::PipelineReflectionBuilder{}
+                  .vertexEntry("vertexMain")
+                  .vertexBinding<Vertex>("meshVertex", 0)
+                  .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
+                  .uniform<Uniforms>("globalParams"),
+              reflection);
+
+    EXPECT_TRUE(result.ok()) << result.errorMessage();
+    ASSERT_EQ(result.contract().vertexLayout().attributes.size(), 2u);
+    EXPECT_EQ(result.contract().vertexLayout().attributes[0].location, 0u);
+    EXPECT_EQ(result.contract().vertexLayout().attributes[0].offset, offsetof(Vertex, position));
+    EXPECT_EQ(result.contract().vertexLayout().attributes[1].location, 1u);
+    EXPECT_EQ(result.contract().vertexLayout().attributes[1].offset, offsetof(Vertex, position) + sizeof(float) * 3);
 }

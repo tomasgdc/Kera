@@ -236,6 +236,40 @@ namespace
                                                 std::move(bindings), std::move(semantics), std::move(descriptors));
     }
 
+    bool emptyReflectionContract(const KeraPipelineReflectionContract& contract)
+    {
+        return contract.debugName.size == 0 && contract.vertexEntryPoint.size == 0 &&
+               contract.vertexBindingCount == 0 && contract.vertexSemanticCount == 0 && contract.descriptorCount == 0;
+    }
+
+    kera::PipelineReflectionBuildResult buildPipelineReflectionContractFromKera(
+        const KeraPipelineReflectionContract& contract, const kera::SlangReflectionMetadata& reflection)
+    {
+        kera::PipelineReflectionBuilder builder;
+        builder.debugName(toString(contract.debugName)).vertexEntry(toString(contract.vertexEntryPoint));
+
+        for (size_t i = 0; i < contract.vertexBindingCount; ++i)
+        {
+            const KeraReflectedVertexBindingDesc& binding = contract.vertexBindings[i];
+            builder.vertexBinding(toString(binding.name), binding.binding, binding.stride, fromKera(binding.inputRate));
+        }
+
+        for (size_t i = 0; i < contract.vertexSemanticCount; ++i)
+        {
+            const KeraReflectedVertexSemanticDesc& semantic = contract.vertexSemantics[i];
+            builder.semantic(toString(semantic.semanticName), toString(semantic.bindingName), semantic.offset,
+                             fromKera(semantic.format));
+        }
+
+        for (size_t i = 0; i < contract.descriptorCount; ++i)
+        {
+            const KeraReflectedDescriptorBindingDesc& descriptor = contract.descriptors[i];
+            builder.descriptor(toString(descriptor.name), fromKera(descriptor.type), descriptor.uniformSize);
+        }
+
+        return std::move(builder).build(reflection);
+    }
+
     kera::GraphicsPipelineCreateDesc fromKera(const KeraGraphicsPipelineCreateDesc& desc)
     {
         return {
@@ -555,9 +589,35 @@ namespace
     KeraGraphicsPipelineHandle createGraphicsPipeline(KeraRenderer* renderer,
                                                       const KeraGraphicsPipelineCreateDesc* desc)
     {
-        return renderer && renderer->renderer && desc
-                   ? toKera(renderer->renderer->createGraphicsPipeline(fromKera(*desc)))
-                   : KeraGraphicsPipelineHandle{};
+        if (!renderer || !renderer->renderer || !desc)
+        {
+            return {};
+        }
+
+        kera::GraphicsPipelineCreateDesc pipelineDesc = fromKera(*desc);
+        if (!emptyReflectionContract(desc->reflectionContract))
+        {
+            const kera::ShaderProgramHandle shaderProgram = fromKera<kera::ShaderProgramHandle>(desc->shaderProgram);
+            const kera::SlangReflectionMetadata* reflection =
+                renderer->renderer->getShaderProgramReflection(shaderProgram);
+            if (!reflection)
+            {
+                kera::Logger::getInstance().error(
+                    "Shader program reflection is missing while building pipeline reflection contract.");
+                return {};
+            }
+
+            kera::PipelineReflectionBuildResult buildResult =
+                buildPipelineReflectionContractFromKera(desc->reflectionContract, *reflection);
+            if (!buildResult)
+            {
+                kera::Logger::getInstance().error(buildResult.errorMessage());
+                return {};
+            }
+            pipelineDesc.reflectionContract = buildResult.contract();
+        }
+
+        return toKera(renderer->renderer->createGraphicsPipeline(pipelineDesc));
     }
 
     int destroyGraphicsPipeline(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline)

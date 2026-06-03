@@ -4,12 +4,14 @@
 #pragma once
 
 #include "kera/renderer/descriptors.h"
+#include "kera/renderer/result.h"
 #include "kera/renderer/slang_reflection.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -47,10 +49,10 @@ namespace kera
         std::size_t uniformSize = 0;
     };
 
-    struct ReflectedPipelineContract
+    struct PipelineReflectionView
     {
-        std::string debugName;
-        std::string vertexEntryPoint;
+        std::string_view debugName;
+        std::string_view vertexEntryPoint;
         std::span<const ReflectedVertexBindingDesc> vertexBindings;
         std::span<const ReflectedVertexSemanticDesc> vertexSemantics;
         std::span<const ReflectedDescriptorBindingDesc> descriptors;
@@ -63,13 +65,11 @@ namespace kera
         PipelineReflectionContract(std::string debugName, std::string vertexEntryPoint,
                                    std::vector<ReflectedVertexBindingDesc> vertexBindings,
                                    std::vector<ReflectedVertexSemanticDesc> vertexSemantics,
-                                   std::vector<ReflectedDescriptorBindingDesc> descriptors);
+                                   std::vector<ReflectedDescriptorBindingDesc> descriptors,
+                                   VertexLayoutDesc vertexLayout = {});
 
-        ReflectedPipelineContract view() const;
-        operator ReflectedPipelineContract() const
-        {
-            return view();
-        }
+        PipelineReflectionView view() const;
+        const VertexLayoutDesc& vertexLayout() const;
         bool empty() const
         {
             return m_debugName.empty() && m_vertexEntryPoint.empty() && m_vertexBindings.empty() &&
@@ -82,10 +82,30 @@ namespace kera
         std::vector<ReflectedVertexBindingDesc> m_vertexBindings;
         std::vector<ReflectedVertexSemanticDesc> m_vertexSemantics;
         std::vector<ReflectedDescriptorBindingDesc> m_descriptors;
+        VertexLayoutDesc m_vertexLayout;
     };
 
-    // Compatibility alias for older sample code; prefer PipelineReflectionContract.
-    using BuiltReflectedPipelineContract = PipelineReflectionContract;
+    class PipelineReflectionBuildResult
+    {
+    public:
+        static PipelineReflectionBuildResult success(PipelineReflectionContract contract);
+        static PipelineReflectionBuildResult failure(RendererValidationReport report);
+
+        bool ok() const noexcept;
+        explicit operator bool() const noexcept
+        {
+            return ok();
+        }
+        const PipelineReflectionContract& contract() const noexcept;
+        const RendererValidationReport& report() const noexcept;
+        std::span<const RendererValidationIssue> issues() const noexcept;
+        const std::string& errorMessage() const noexcept;
+
+    private:
+        PipelineReflectionContract m_contract;
+        RendererValidationReport m_report;
+        bool m_ok = false;
+    };
 
     struct GraphicsPipelineCreateDesc
     {
@@ -103,33 +123,34 @@ namespace kera
         std::string debugName;
     };
 
-    class ReflectedPipelineContractBuilder
+    class PipelineReflectionBuilder
     {
     public:
-        ReflectedPipelineContractBuilder& debugName(std::string name);
-        ReflectedPipelineContractBuilder& vertexEntry(std::string entryPoint);
-        ReflectedPipelineContractBuilder& vertexBinding(std::string name, uint32_t binding, uint32_t stride,
-                                                        VertexInputRate inputRate = VertexInputRate::Vertex);
+        PipelineReflectionBuilder& debugName(std::string name);
+        PipelineReflectionBuilder& vertexEntry(std::string entryPoint);
+        PipelineReflectionBuilder& vertexBinding(std::string name, uint32_t binding, uint32_t stride,
+                                                 VertexInputRate inputRate = VertexInputRate::Vertex);
         template <typename VertexT>
-        ReflectedPipelineContractBuilder& vertexBinding(std::string name, uint32_t binding,
-                                                        VertexInputRate inputRate = VertexInputRate::Vertex)
+        PipelineReflectionBuilder& vertexBinding(std::string name, uint32_t binding,
+                                                 VertexInputRate inputRate = VertexInputRate::Vertex)
         {
             return vertexBinding(std::move(name), binding, static_cast<uint32_t>(sizeof(VertexT)), inputRate);
         }
-        ReflectedPipelineContractBuilder& semantic(std::string semanticName, std::string bindingName, uint32_t offset,
-                                                   VertexFormat format);
-        ReflectedPipelineContractBuilder& descriptor(std::string name, DescriptorType type,
-                                                     std::size_t uniformSize = 0);
+        // Semantic matching first tries the exact shader semantic, then falls back to a unique base name match
+        // with trailing digits stripped (for example, POSITION0 can match POSITION).
+        PipelineReflectionBuilder& semantic(std::string semanticName, std::string bindingName, uint32_t offset,
+                                            VertexFormat format);
+        PipelineReflectionBuilder& descriptor(std::string name, DescriptorType type, std::size_t uniformSize = 0);
 
         template <typename UniformT>
-        ReflectedPipelineContractBuilder& uniform(std::string name)
+        PipelineReflectionBuilder& uniform(std::string name)
         {
             return descriptor(std::move(name), DescriptorType::UniformBuffer, sizeof(UniformT));
         }
 
-        ReflectedPipelineContractBuilder& sampledImage(std::string name);
-        ReflectedPipelineContractBuilder& sampler(std::string name);
-        PipelineReflectionContract build() const;
+        PipelineReflectionBuilder& sampledImage(std::string name);
+        PipelineReflectionBuilder& sampler(std::string name);
+        PipelineReflectionBuildResult build(const SlangReflectionMetadata& reflection) &&;
 
     private:
         std::string m_debugName;
@@ -139,14 +160,11 @@ namespace kera
         std::vector<ReflectedDescriptorBindingDesc> m_descriptors;
     };
 
-    // Public spelling for application code; ReflectedPipelineContractBuilder remains available.
-    using PipelineReflectionBuilder = ReflectedPipelineContractBuilder;
-
     ShaderProgramDesc makeShaderProgramDesc(std::span<const ShaderStageContract> stages);
     const SlangReflectionBinding* requireReflectedDescriptorBinding(const SlangReflectionMetadata* reflection,
                                                                     const std::string& name, DescriptorType type);
     bool validateReflectedUniformSize(const SlangReflectionBinding& binding, std::size_t expectedSize);
-    bool appendValidatedReflectedPipelineContract(VertexLayoutDesc& layout, const SlangReflectionMetadata* reflection,
-                                                  const ReflectedPipelineContract& contract);
+    bool appendValidatedPipelineReflectionContract(VertexLayoutDesc& layout,
+                                                   const PipelineReflectionContract& contract);
 
 }  // namespace kera

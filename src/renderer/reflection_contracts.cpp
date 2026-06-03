@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,18 +35,18 @@ namespace kera
             }
         }
 
-        uint32_t vertexFormatSize(VertexFormat format)
+        std::optional<uint32_t> vertexFormatSize(VertexFormat format)
         {
             switch (format)
             {
                 case VertexFormat::Float2:
-                    return sizeof(float) * 2;
+                    return static_cast<uint32_t>(sizeof(float) * 2);
                 case VertexFormat::Float3:
-                    return sizeof(float) * 3;
+                    return static_cast<uint32_t>(sizeof(float) * 3);
                 case VertexFormat::Float4:
-                    return sizeof(float) * 4;
+                    return static_cast<uint32_t>(sizeof(float) * 4);
                 default:
-                    return sizeof(float) * 3;
+                    return std::nullopt;
             }
         }
 
@@ -70,6 +71,7 @@ namespace kera
 
         const ReflectedVertexSemanticDesc* findUniqueSemantic(std::span<const ReflectedVertexSemanticDesc> semantics,
                                                               const std::string& semanticName, std::size_t& outIndex,
+                                                              RendererValidationReport& report,
                                                               const std::string& prefix)
         {
             const ReflectedVertexSemanticDesc* match = nullptr;
@@ -90,9 +92,8 @@ namespace kera
             }
             if (matchCount > 1)
             {
-                Logger::getInstance().error(prefix +
-                                            "Multiple C++ vertex semantic mappings matched reflected semantic '" +
-                                            semanticName + "'.");
+                report.addIssue(prefix + "Multiple C++ vertex semantic mappings matched reflected semantic '" +
+                                semanticName + "'.");
                 return nullptr;
             }
 
@@ -113,26 +114,30 @@ namespace kera
             }
             if (matchCount > 1)
             {
-                Logger::getInstance().error(prefix +
-                                            "Multiple C++ vertex semantic mappings matched reflected semantic base '" +
-                                            reflectedBaseName + "'.");
+                report.addIssue(prefix + "Multiple C++ vertex semantic mappings matched reflected semantic base '" +
+                                reflectedBaseName + "'.");
                 return nullptr;
             }
 
-            Logger::getInstance().error(
-                prefix + "No C++ vertex semantic mapping was provided for reflected semantic '" + semanticName + "'.");
+            report.addIssue(prefix + "No C++ vertex semantic mapping was provided for reflected semantic '" +
+                            semanticName + "'.");
             return nullptr;
         }
 
         bool appendVertexBindings(VertexLayoutDesc& layout, std::span<const ReflectedVertexBindingDesc> bindings,
-                                  const std::string& prefix)
+                                  RendererValidationReport& report, const std::string& prefix)
         {
             for (const ReflectedVertexBindingDesc& binding : bindings)
             {
                 if (binding.name.empty())
                 {
-                    Logger::getInstance().error(prefix +
-                                                "Reflected vertex binding contract contains an unnamed binding.");
+                    report.addIssue(prefix + "Reflected vertex binding contract contains an unnamed binding.");
+                    return false;
+                }
+                if (binding.stride == 0)
+                {
+                    report.addIssue(prefix + "Reflected vertex binding contract contains a zero-stride binding '" +
+                                    binding.name + "'.");
                     return false;
                 }
 
@@ -144,8 +149,8 @@ namespace kera
                                   { return other.binding == binding.binding; });
                 if (duplicateName != 1 || duplicateSlot != 1)
                 {
-                    Logger::getInstance().error(
-                        prefix + "Reflected vertex binding contract contains duplicate binding names or slots.");
+                    report.addIssue(prefix +
+                                    "Reflected vertex binding contract contains duplicate binding names or slots.");
                     return false;
                 }
 
@@ -162,25 +167,158 @@ namespace kera
             return true;
         }
 
-        std::string diagnosticPrefix(const ReflectedPipelineContract& contract)
+        std::string diagnosticPrefix(const PipelineReflectionView& contract)
         {
-            return contract.debugName.empty() ? std::string{} : contract.debugName + ": ";
+            return contract.debugName.empty() ? std::string{} : std::string(contract.debugName) + ": ";
+        }
+
+        bool validateDescriptorBinding(const SlangReflectionMetadata& reflection,
+                                       const ReflectedDescriptorBindingDesc& descriptor,
+                                       RendererValidationReport& report, const std::string& prefix)
+        {
+            if (descriptor.name.empty())
+            {
+                report.addIssue(RendererValidationCategory::Descriptor,
+                                prefix + "Reflected descriptor contract contains an unnamed binding.");
+                return false;
+            }
+
+            const SlangReflectionBinding* binding = reflection.findBinding(descriptor.name);
+            if (!binding)
+            {
+                report.addIssue(
+                    RendererValidationCategory::Descriptor,
+                    prefix + "Shader reflection did not expose descriptor binding '" + descriptor.name + "'.", 0, 0,
+                    descriptor.name);
+                return false;
+            }
+
+            DescriptorType reflectedType = DescriptorType::UniformBuffer;
+            if (!descriptorTypeFromReflectionKind(binding->kind, reflectedType) || reflectedType != descriptor.type)
+            {
+                report.addIssue(RendererValidationCategory::Descriptor,
+                                prefix + "Shader reflection descriptor binding '" + descriptor.name +
+                                    "' does not match the expected resource type.",
+                                binding->space, binding->binding, descriptor.name);
+                return false;
+            }
+
+            if (descriptor.uniformSize != 0 && binding->uniformSize != 0 &&
+                binding->uniformSize != descriptor.uniformSize)
+            {
+                report.addIssue(RendererValidationCategory::Descriptor,
+                                prefix + "Shader reflection uniform binding '" + binding->name + "' has size " +
+                                    std::to_string(binding->uniformSize) + ", but the C++ struct is " +
+                                    std::to_string(descriptor.uniformSize) + " bytes.",
+                                binding->space, binding->binding, descriptor.name);
+                return false;
+            }
+
+            return true;
+        }
+
+        bool buildValidatedVertexLayout(VertexLayoutDesc& layout, const SlangReflectionMetadata& reflection,
+                                        const PipelineReflectionView& contract, RendererValidationReport& report)
+        {
+            const std::string prefix = diagnosticPrefix(contract);
+            if (!appendVertexBindings(layout, contract.vertexBindings, report, prefix))
+            {
+                return false;
+            }
+
+            const std::string entryPointName(contract.vertexEntryPoint);
+            if (entryPointName.empty())
+            {
+                report.addIssue(prefix + "Pipeline reflection contract does not declare a vertex entry point.");
+                return false;
+            }
+
+            const SlangReflectionEntryPoint* entryPoint = reflection.findEntryPoint(entryPointName);
+            if (!entryPoint)
+            {
+                report.addIssue(prefix + "Shader reflection did not expose entry point '" + entryPointName + "'.");
+                return false;
+            }
+
+            std::vector<bool> usedSemantics(contract.vertexSemantics.size(), false);
+            for (const SlangReflectionInput& input : entryPoint->inputs)
+            {
+                std::size_t semanticIndex = 0;
+                const ReflectedVertexSemanticDesc* semantic =
+                    findUniqueSemantic(contract.vertexSemantics, input.semanticName, semanticIndex, report, prefix);
+                if (!semantic)
+                {
+                    return false;
+                }
+                usedSemantics[semanticIndex] = true;
+
+                if (semantic->semanticName.empty())
+                {
+                    report.addIssue(prefix + "Reflected vertex semantic contract contains an unnamed semantic.");
+                    return false;
+                }
+
+                const ReflectedVertexBindingDesc* binding =
+                    findVertexBinding(contract.vertexBindings, semantic->bindingName);
+                if (!binding)
+                {
+                    report.addIssue(prefix + "Vertex semantic '" + semantic->semanticName +
+                                    "' references unknown vertex binding '" + semantic->bindingName + "'.");
+                    return false;
+                }
+
+                const std::optional<uint32_t> formatSize = vertexFormatSize(semantic->format);
+                if (!formatSize)
+                {
+                    report.addIssue(prefix + "Vertex semantic '" + semantic->semanticName +
+                                    "' uses an unsupported vertex format.");
+                    return false;
+                }
+
+                for (uint32_t index = 0; index < input.locationCount; ++index)
+                {
+                    layout.attributes.push_back({
+                        .location = input.location + index,
+                        .binding = binding->binding,
+                        .offset = semantic->offset + *formatSize * index,
+                        .format = semantic->format,
+                    });
+                }
+            }
+
+            for (std::size_t index = 0; index < usedSemantics.size(); ++index)
+            {
+                if (!usedSemantics[index])
+                {
+                    report.addIssue(prefix + "C++ vertex semantic mapping '" +
+                                    contract.vertexSemantics[index].semanticName +
+                                    "' was not used by reflected shader inputs.");
+                    return false;
+                }
+            }
+
+            std::sort(layout.attributes.begin(), layout.attributes.end(),
+                      [](const VertexAttributeDesc& lhs, const VertexAttributeDesc& rhs)
+                      { return lhs.location < rhs.location; });
+            return true;
         }
     }  // namespace
 
     PipelineReflectionContract::PipelineReflectionContract(std::string debugName, std::string vertexEntryPoint,
                                                            std::vector<ReflectedVertexBindingDesc> vertexBindings,
                                                            std::vector<ReflectedVertexSemanticDesc> vertexSemantics,
-                                                           std::vector<ReflectedDescriptorBindingDesc> descriptors)
+                                                           std::vector<ReflectedDescriptorBindingDesc> descriptors,
+                                                           VertexLayoutDesc vertexLayout)
         : m_debugName(std::move(debugName))
         , m_vertexEntryPoint(std::move(vertexEntryPoint))
         , m_vertexBindings(std::move(vertexBindings))
         , m_vertexSemantics(std::move(vertexSemantics))
         , m_descriptors(std::move(descriptors))
+        , m_vertexLayout(std::move(vertexLayout))
     {
     }
 
-    ReflectedPipelineContract PipelineReflectionContract::view() const
+    PipelineReflectionView PipelineReflectionContract::view() const
     {
         return {
             .debugName = m_debugName,
@@ -191,21 +329,65 @@ namespace kera
         };
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::debugName(std::string name)
+    const VertexLayoutDesc& PipelineReflectionContract::vertexLayout() const
+    {
+        return m_vertexLayout;
+    }
+
+    PipelineReflectionBuildResult PipelineReflectionBuildResult::success(PipelineReflectionContract contract)
+    {
+        PipelineReflectionBuildResult result;
+        result.m_contract = std::move(contract);
+        result.m_ok = true;
+        return result;
+    }
+
+    PipelineReflectionBuildResult PipelineReflectionBuildResult::failure(RendererValidationReport report)
+    {
+        PipelineReflectionBuildResult result;
+        result.m_report = std::move(report);
+        return result;
+    }
+
+    bool PipelineReflectionBuildResult::ok() const noexcept
+    {
+        return m_ok;
+    }
+
+    const PipelineReflectionContract& PipelineReflectionBuildResult::contract() const noexcept
+    {
+        return m_contract;
+    }
+
+    const RendererValidationReport& PipelineReflectionBuildResult::report() const noexcept
+    {
+        return m_report;
+    }
+
+    std::span<const RendererValidationIssue> PipelineReflectionBuildResult::issues() const noexcept
+    {
+        return m_report.issues;
+    }
+
+    const std::string& PipelineReflectionBuildResult::errorMessage() const noexcept
+    {
+        return m_report.errorMessage();
+    }
+
+    PipelineReflectionBuilder& PipelineReflectionBuilder::debugName(std::string name)
     {
         m_debugName = std::move(name);
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::vertexEntry(std::string entryPoint)
+    PipelineReflectionBuilder& PipelineReflectionBuilder::vertexEntry(std::string entryPoint)
     {
         m_vertexEntryPoint = std::move(entryPoint);
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::vertexBinding(std::string name,
-                                                                                      uint32_t binding, uint32_t stride,
-                                                                                      VertexInputRate inputRate)
+    PipelineReflectionBuilder& PipelineReflectionBuilder::vertexBinding(std::string name, uint32_t binding,
+                                                                        uint32_t stride, VertexInputRate inputRate)
     {
         m_vertexBindings.push_back({
             .name = std::move(name),
@@ -216,9 +398,8 @@ namespace kera
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::semantic(std::string semanticName,
-                                                                                 std::string bindingName,
-                                                                                 uint32_t offset, VertexFormat format)
+    PipelineReflectionBuilder& PipelineReflectionBuilder::semantic(std::string semanticName, std::string bindingName,
+                                                                   uint32_t offset, VertexFormat format)
     {
         m_vertexSemantics.push_back({
             .semanticName = std::move(semanticName),
@@ -229,9 +410,8 @@ namespace kera
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::descriptor(std::string name,
-                                                                                   DescriptorType type,
-                                                                                   std::size_t uniformSize)
+    PipelineReflectionBuilder& PipelineReflectionBuilder::descriptor(std::string name, DescriptorType type,
+                                                                     std::size_t uniformSize)
     {
         m_descriptors.push_back({
             .name = std::move(name),
@@ -241,19 +421,45 @@ namespace kera
         return *this;
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::sampledImage(std::string name)
+    PipelineReflectionBuilder& PipelineReflectionBuilder::sampledImage(std::string name)
     {
         return descriptor(std::move(name), DescriptorType::SampledImage);
     }
 
-    ReflectedPipelineContractBuilder& ReflectedPipelineContractBuilder::sampler(std::string name)
+    PipelineReflectionBuilder& PipelineReflectionBuilder::sampler(std::string name)
     {
         return descriptor(std::move(name), DescriptorType::Sampler);
     }
 
-    PipelineReflectionContract ReflectedPipelineContractBuilder::build() const
+    PipelineReflectionBuildResult PipelineReflectionBuilder::build(const SlangReflectionMetadata& reflection) &&
     {
-        return {m_debugName, m_vertexEntryPoint, m_vertexBindings, m_vertexSemantics, m_descriptors};
+        RendererValidationReport report;
+        PipelineReflectionView view{
+            .debugName = m_debugName,
+            .vertexEntryPoint = m_vertexEntryPoint,
+            .vertexBindings = m_vertexBindings,
+            .vertexSemantics = m_vertexSemantics,
+            .descriptors = m_descriptors,
+        };
+
+        VertexLayoutDesc vertexLayout;
+        if (!buildValidatedVertexLayout(vertexLayout, reflection, view, report))
+        {
+            return PipelineReflectionBuildResult::failure(std::move(report));
+        }
+
+        const std::string prefix = diagnosticPrefix(view);
+        for (const ReflectedDescriptorBindingDesc& descriptor : m_descriptors)
+        {
+            if (!validateDescriptorBinding(reflection, descriptor, report, prefix))
+            {
+                return PipelineReflectionBuildResult::failure(std::move(report));
+            }
+        }
+
+        return PipelineReflectionBuildResult::success({std::move(m_debugName), std::move(m_vertexEntryPoint),
+                                                       std::move(m_vertexBindings), std::move(m_vertexSemantics),
+                                                       std::move(m_descriptors), std::move(vertexLayout)});
     }
 
     ShaderProgramDesc makeShaderProgramDesc(std::span<const ShaderStageContract> stages)
@@ -318,94 +524,12 @@ namespace kera
         return true;
     }
 
-    bool appendValidatedReflectedPipelineContract(VertexLayoutDesc& layout, const SlangReflectionMetadata* reflection,
-                                                  const ReflectedPipelineContract& contract)
+    bool appendValidatedPipelineReflectionContract(VertexLayoutDesc& layout, const PipelineReflectionContract& contract)
     {
-        const std::string prefix = diagnosticPrefix(contract);
-        if (!reflection)
-        {
-            Logger::getInstance().error(prefix +
-                                        "Shader program reflection is missing while building reflected vertex layout.");
-            return false;
-        }
-
-        if (!appendVertexBindings(layout, contract.vertexBindings, prefix))
-        {
-            return false;
-        }
-
-        const std::string entryPointName = contract.vertexEntryPoint;
-        const SlangReflectionEntryPoint* entryPoint = reflection->findEntryPoint(entryPointName);
-        if (!entryPoint)
-        {
-            Logger::getInstance().error(prefix + "Shader reflection did not expose entry point '" + entryPointName +
-                                        "'.");
-            return false;
-        }
-
-        std::vector<bool> usedSemantics(contract.vertexSemantics.size(), false);
-        for (const SlangReflectionInput& input : entryPoint->inputs)
-        {
-            std::size_t semanticIndex = 0;
-            const ReflectedVertexSemanticDesc* semantic =
-                findUniqueSemantic(contract.vertexSemantics, input.semanticName, semanticIndex, prefix);
-            if (!semantic)
-            {
-                return false;
-            }
-            usedSemantics[semanticIndex] = true;
-
-            const ReflectedVertexBindingDesc* binding =
-                findVertexBinding(contract.vertexBindings, semantic->bindingName);
-            if (!binding)
-            {
-                Logger::getInstance().error(prefix + "Vertex semantic '" + semantic->semanticName +
-                                            "' references unknown vertex binding '" + semantic->bindingName + "'.");
-                return false;
-            }
-
-            const uint32_t formatSize = vertexFormatSize(semantic->format);
-            for (uint32_t index = 0; index < input.locationCount; ++index)
-            {
-                layout.attributes.push_back({
-                    .location = input.location + index,
-                    .binding = binding->binding,
-                    .offset = semantic->offset + formatSize * index,
-                    .format = semantic->format,
-                });
-            }
-        }
-
-        for (std::size_t index = 0; index < usedSemantics.size(); ++index)
-        {
-            if (!usedSemantics[index])
-            {
-                Logger::getInstance().error(prefix + "C++ vertex semantic mapping '" +
-                                            contract.vertexSemantics[index].semanticName +
-                                            "' was not used by reflected shader inputs.");
-                return false;
-            }
-        }
-
-        std::sort(layout.attributes.begin(), layout.attributes.end(),
-                  [](const VertexAttributeDesc& lhs, const VertexAttributeDesc& rhs)
-                  { return lhs.location < rhs.location; });
-
-        for (const ReflectedDescriptorBindingDesc& descriptor : contract.descriptors)
-        {
-            const SlangReflectionBinding* binding =
-                requireReflectedDescriptorBinding(reflection, descriptor.name, descriptor.type);
-            if (!binding)
-            {
-                return false;
-            }
-
-            if (descriptor.uniformSize != 0 && !validateReflectedUniformSize(*binding, descriptor.uniformSize))
-            {
-                return false;
-            }
-        }
-
+        const VertexLayoutDesc& reflectedLayout = contract.vertexLayout();
+        layout.bindings.insert(layout.bindings.end(), reflectedLayout.bindings.begin(), reflectedLayout.bindings.end());
+        layout.attributes.insert(layout.attributes.end(), reflectedLayout.attributes.begin(),
+                                 reflectedLayout.attributes.end());
         return true;
     }
 

@@ -1700,9 +1700,7 @@ namespace kera
 
         if (!desc.reflectionContract.empty())
         {
-            const SlangReflectionMetadata* reflection = getShaderProgramReflection(desc.shaderProgram);
-            if (!appendValidatedReflectedPipelineContract(pipelineDesc.vertexLayout, reflection,
-                                                          desc.reflectionContract.view()))
+            if (!appendValidatedPipelineReflectionContract(pipelineDesc.vertexLayout, desc.reflectionContract))
             {
                 Logger::getInstance().error("Failed to apply graphics pipeline reflection contract.");
                 return {};
