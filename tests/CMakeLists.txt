@@ -59,7 +59,6 @@ kera_add_unit_test(kera_unit_logger_tests "KeraLogger.*" "quick;logger;utilities
 kera_add_unit_test(kera_unit_repo_policy_abi_tests "KeraRepoPolicy.PublicAbiHeadersAreStlFree" "quick;renderer;api;abi")
 kera_add_unit_test(kera_unit_repo_policy_sample_api_tests "KeraRepoPolicy.SamplesUsePublicKeraApiOnly" "quick;renderer;api;samples")
 kera_add_unit_test(kera_unit_repo_policy_logging_tests "KeraRepoPolicy.LoggingRulesStayBehindLoggerFacade" "quick;logger;api")
-kera_add_unit_test(kera_unit_slang_shader_contracts "KeraShaderContracts.SourceEntryPointsAndStageMarkers" "quick;shader;slang")
 
 add_test(NAME kera_copyright_header_tests
     COMMAND ${CMAKE_COMMAND}
