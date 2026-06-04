@@ -41,23 +41,42 @@ auto program = renderer.createGraphicsShaderProgram({
 });
 ```
 
-Use `PipelineReflectionBuilder` to declare the host vertex layout and reflected descriptors without
-STL containers:
+Use `VertexInputLayoutBuilder` to declare the host vertex memory layout without STL containers.
+Descriptors and shader entry points come from the Slang shader program reflection:
 
 ```cpp
-const auto contract =
-    kera::PipelineReflectionBuilder{}
-        .debugName("Triangle Pipeline")
-        .vertexEntry("vertexMain")
-        .vertexBinding<Vertex>("meshVertex", 0)
-        .semantic("POSITION", "meshVertex", offsetof(Vertex, position), kera::VertexFormat::Float3)
-        .semantic("COLOR", "meshVertex", offsetof(Vertex, color), kera::VertexFormat::Float3)
-        .uniform<Uniforms>("globalParams")
-        .build();
+const auto vertexInput =
+    kera::VertexInputLayoutBuilder{}
+        .vertexBinding<Vertex>(0)
+        .field(KERA_VERTEX_FIELD(Vertex, position, 0, kera::VertexFormat::Float3))
+        .field(KERA_VERTEX_FIELD(Vertex, color, 0, kera::VertexFormat::Float3))
+        .layout();
 ```
 
-`createGraphicsPipeline()` validates that contract against Slang reflection and derives descriptor
-layouts from reflected names and bindings.
+Fields are matched against reflected Slang vertex input struct field names, not shader semantic
+strings. `parameterName` is optional and only needed when two vertex entry parameters expose the
+same field name. `createGraphicsPipeline()` validates the layout against the reflected vertex entry
+point stored on the shader program, including missing fields, unknown fields, duplicate mappings,
+wrong formats, zero strides, duplicate binding slots, and matrix expansion such as `float4x4` to
+four `Float4` locations.
+
+Use the preflight API when you want diagnostics before creating a pipeline:
+
+```cpp
+KeraRendererValidationReport report =
+    renderer.validateVertexInputLayout(program, vertexInput);
+```
+
+Descriptor set layouts are derived from reflected descriptor names, kinds, sets, and bindings.
+
+Descriptors are updated only by reflected shader variable name:
+
+```cpp
+renderer.updateDescriptors(descriptorSet)
+    .uniform<Uniforms>("globalParams", uniformBuffer)
+    .sampledImage("sceneTexture", texture)
+    .sampler("sceneSampler", sampler);
+```
 
 ## Resources And Frames
 

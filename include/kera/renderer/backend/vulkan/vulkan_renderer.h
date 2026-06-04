@@ -208,7 +208,6 @@ namespace kera
     {
         Pipeline m_pipeline;
         GraphicsPipelineDesc m_desc;
-        PipelineReflectionContract m_reflectionContract;
         ShaderProgramHandle m_program;
     };
 
@@ -354,8 +353,6 @@ namespace kera
         std::vector<DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
             GraphicsPipelineHandle pipeline) const override;
         VertexLayoutDesc getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipeline) const override;
-        PipelineReflectionContract getGraphicsPipelineReflectionContract(
-            GraphicsPipelineHandle pipeline) const override;
         bool destroyGraphicsPipeline(GraphicsPipelineHandle pipeline) override;
         DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline) override;
         DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline, uint32_t set) override;

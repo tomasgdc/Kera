@@ -104,7 +104,6 @@ namespace kera
         virtual std::vector<DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
             GraphicsPipelineHandle pipeline) const = 0;
         virtual VertexLayoutDesc getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipeline) const;
-        virtual PipelineReflectionContract getGraphicsPipelineReflectionContract(GraphicsPipelineHandle pipeline) const;
         virtual bool destroyGraphicsPipeline(GraphicsPipelineHandle pipeline) = 0;
         virtual DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline) = 0;
         virtual DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline, uint32_t set) = 0;
@@ -257,11 +256,6 @@ namespace kera
     }
 
     inline VertexLayoutDesc IRenderer::getGraphicsPipelineVertexLayout(GraphicsPipelineHandle) const
-    {
-        return {};
-    }
-
-    inline PipelineReflectionContract IRenderer::getGraphicsPipelineReflectionContract(GraphicsPipelineHandle) const
     {
         return {};
     }

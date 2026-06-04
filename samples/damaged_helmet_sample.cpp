@@ -38,8 +38,6 @@ namespace kera
             constexpr const char* MeshFragmentEntryPoint = "helmetFragmentMain";
             constexpr const char* FullscreenVertexEntryPoint = "fullscreenVertexMain";
             constexpr const char* FullscreenFragmentEntryPoint = "fullscreenFragmentMain";
-            constexpr const char* MeshVertexBinding = "meshVertex";
-            constexpr const char* FullscreenVertexBinding = "fullscreenVertex";
             constexpr const char* HelmetParams = "helmetParams";
             constexpr const char* BaseColorTexture = "baseColorTexture";
             constexpr const char* MetalRoughnessTexture = "metalRoughnessTexture";
@@ -237,30 +235,18 @@ namespace kera
 
     bool DamagedHelmetSample::createPipelinesAndDescriptors()
     {
-        const PipelineReflectionContract meshContract =
-            PipelineReflectionBuilder{}
-                .debugName("DamagedHelmet Mesh Pipeline")
-                .vertexEntry(DamagedHelmetShader::MeshVertexEntryPoint)
-                .vertexBinding<GltfVertex>(DamagedHelmetShader::MeshVertexBinding, 0)
-                .semantic("POSITION", DamagedHelmetShader::MeshVertexBinding, 0, VertexFormat::Float3)
-                .semantic("NORMAL", DamagedHelmetShader::MeshVertexBinding,
-                          static_cast<uint32_t>(offsetof(GltfVertex, normal)), VertexFormat::Float3)
-                .semantic("TEXCOORD0", DamagedHelmetShader::MeshVertexBinding,
-                          static_cast<uint32_t>(offsetof(GltfVertex, uv)), VertexFormat::Float2)
-                .semantic("TANGENT", DamagedHelmetShader::MeshVertexBinding,
-                          static_cast<uint32_t>(offsetof(GltfVertex, tangent)), VertexFormat::Float4)
-                .uniform<HelmetUniforms>(DamagedHelmetShader::HelmetParams)
-                .sampledImage(DamagedHelmetShader::BaseColorTexture)
-                .sampledImage(DamagedHelmetShader::MetalRoughnessTexture)
-                .sampledImage(DamagedHelmetShader::EmissiveTexture)
-                .sampledImage(DamagedHelmetShader::OcclusionTexture)
-                .sampledImage(DamagedHelmetShader::NormalTexture)
-                .sampler(DamagedHelmetShader::MaterialSampler)
-                .build();
+        const VertexInputLayout meshVertexInput =
+            VertexInputLayoutBuilder{}
+                .vertexBinding<GltfVertex>(0)
+                .field(KERA_VERTEX_FIELD(GltfVertex, position, 0, VertexFormat::Float3))
+                .field(KERA_VERTEX_FIELD(GltfVertex, normal, 0, VertexFormat::Float3))
+                .field(KERA_VERTEX_FIELD(GltfVertex, uv, 0, VertexFormat::Float2))
+                .field(KERA_VERTEX_FIELD(GltfVertex, tangent, 0, VertexFormat::Float4))
+                .layout();
 
         m_meshPipeline = m_renderer.createGraphicsPipeline({
             .shaderProgram = m_meshShaderProgram,
-            .reflectionContract = meshContract,
+            .vertexInput = meshVertexInput,
             .renderTarget = m_sceneRenderTarget,
             .cullMode = m_model.materialFactors.doubleSided ? CullModeKind::None : CullModeKind::Back,
             .frontFace = FrontFaceKind::Clockwise,
@@ -301,21 +287,16 @@ namespace kera
             m_meshDescriptorSets.push_back(descriptorSet);
         }
 
-        const PipelineReflectionContract displayContract =
-            PipelineReflectionBuilder{}
-                .debugName("DamagedHelmet Display Pipeline")
-                .vertexEntry(DamagedHelmetShader::FullscreenVertexEntryPoint)
-                .vertexBinding<FullscreenTriangleVertex>(DamagedHelmetShader::FullscreenVertexBinding, 0)
-                .semantic("POSITION", DamagedHelmetShader::FullscreenVertexBinding, 0, VertexFormat::Float2)
-                .semantic("TEXCOORD0", DamagedHelmetShader::FullscreenVertexBinding,
-                          static_cast<uint32_t>(offsetof(FullscreenTriangleVertex, uv)), VertexFormat::Float2)
-                .sampledImage(DamagedHelmetShader::SceneTexture)
-                .sampler(DamagedHelmetShader::MaterialSampler)
-                .build();
+        const VertexInputLayout displayVertexInput =
+            VertexInputLayoutBuilder{}
+                .vertexBinding<FullscreenTriangleVertex>(0)
+                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, position, 0, VertexFormat::Float2))
+                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, uv, 0, VertexFormat::Float2))
+                .layout();
 
         m_displayPipeline = m_renderer.createGraphicsPipeline({
             .shaderProgram = m_displayShaderProgram,
-            .reflectionContract = displayContract,
+            .vertexInput = displayVertexInput,
             .cullMode = CullModeKind::None,
             .debugName = stringView("DamagedHelmet Display Pipeline"),
         });

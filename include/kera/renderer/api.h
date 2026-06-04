@@ -5,6 +5,8 @@
 
 #include "kera/renderer/abi.h"
 
+#include <cstddef>
+
 #ifdef __cplusplus
 namespace kera
 {
@@ -147,53 +149,40 @@ namespace kera
     using SamplerDesc = KeraSamplerDesc;
     using RenderTargetDesc = KeraRenderTargetDesc;
     using GraphicsShaderProgramDesc = KeraGraphicsShaderProgramDesc;
-    using ReflectedVertexBindingDesc = KeraReflectedVertexBindingDesc;
-    using ReflectedVertexSemanticDesc = KeraReflectedVertexSemanticDesc;
-    using ReflectedDescriptorBindingDesc = KeraReflectedDescriptorBindingDesc;
+    using VertexInputBindingDesc = KeraVertexInputBindingDesc;
+    using VertexInputFieldDesc = KeraVertexInputFieldDesc;
     using GltfLoadDesc = KeraGltfLoadDesc;
 
-    struct PipelineReflectionContract
-    {
-        KeraStringView debugName{};
-        KeraStringView vertexEntryPoint{};
-        KeraReflectedVertexBindingDesc vertexBindings[16]{};
-        size_t vertexBindingCount = 0;
-        KeraReflectedVertexSemanticDesc vertexSemantics[32]{};
-        size_t vertexSemanticCount = 0;
-        KeraReflectedDescriptorBindingDesc descriptors[32]{};
-        size_t descriptorCount = 0;
+#define KERA_VERTEX_FIELD(VertexType, member, bindingIndex, vertexFormat) \
+    #member, bindingIndex, static_cast<uint32_t>(offsetof(VertexType, member)), vertexFormat
 
-        KeraPipelineReflectionContract view() const noexcept
+    struct VertexInputLayout
+    {
+        KeraVertexInputBindingDesc bindings[16]{};
+        size_t bindingCount = 0;
+        KeraVertexInputFieldDesc fields[32]{};
+        size_t fieldCount = 0;
+
+        KeraVertexInputLayout view() const noexcept
         {
             return {
-                debugName,       vertexEntryPoint,    vertexBindings, vertexBindingCount,
-                vertexSemantics, vertexSemanticCount, descriptors,    descriptorCount,
+                bindings,
+                bindingCount,
+                fields,
+                fieldCount,
             };
         }
     };
 
-    class PipelineReflectionBuilder
+    class VertexInputLayoutBuilder
     {
     public:
-        PipelineReflectionBuilder& debugName(const char* name) noexcept
+        VertexInputLayoutBuilder& vertexBinding(uint32_t binding, uint32_t stride,
+                                                KeraVertexInputRate inputRate = KERA_VERTEX_INPUT_RATE_VERTEX) noexcept
         {
-            m_contract.debugName = stringView(name);
-            return *this;
-        }
-
-        PipelineReflectionBuilder& vertexEntry(const char* entryPoint) noexcept
-        {
-            m_contract.vertexEntryPoint = stringView(entryPoint);
-            return *this;
-        }
-
-        PipelineReflectionBuilder& vertexBinding(const char* name, uint32_t binding, uint32_t stride,
-                                                 KeraVertexInputRate inputRate = KERA_VERTEX_INPUT_RATE_VERTEX) noexcept
-        {
-            if (m_contract.vertexBindingCount < 16)
+            if (m_layout.bindingCount < 16)
             {
-                m_contract.vertexBindings[m_contract.vertexBindingCount++] = {
-                    stringView(name),
+                m_layout.bindings[m_layout.bindingCount++] = {
                     binding,
                     stride,
                     inputRate,
@@ -203,70 +192,49 @@ namespace kera
         }
 
         template <typename VertexT>
-        PipelineReflectionBuilder& vertexBinding(const char* name, uint32_t binding,
-                                                 KeraVertexInputRate inputRate = KERA_VERTEX_INPUT_RATE_VERTEX) noexcept
+        VertexInputLayoutBuilder& vertexBinding(uint32_t binding,
+                                                KeraVertexInputRate inputRate = KERA_VERTEX_INPUT_RATE_VERTEX) noexcept
         {
-            return vertexBinding(name, binding, static_cast<uint32_t>(sizeof(VertexT)), inputRate);
+            return vertexBinding(binding, static_cast<uint32_t>(sizeof(VertexT)), inputRate);
         }
 
-        PipelineReflectionBuilder& semantic(const char* semanticName, const char* bindingName, uint32_t offset,
-                                            KeraVertexFormat format) noexcept
+        VertexInputLayoutBuilder& field(const char* fieldName, uint32_t binding, uint32_t offset,
+                                        KeraVertexFormat format) noexcept
         {
-            if (m_contract.vertexSemanticCount < 32)
+            if (m_layout.fieldCount < 32)
             {
-                m_contract.vertexSemantics[m_contract.vertexSemanticCount++] = {
-                    stringView(semanticName),
-                    stringView(bindingName),
-                    offset,
-                    format,
+                m_layout.fields[m_layout.fieldCount++] = {
+                    {}, stringView(fieldName), binding, offset, format,
                 };
             }
             return *this;
         }
 
-        PipelineReflectionBuilder& descriptor(const char* name, KeraDescriptorType type,
-                                              size_t uniformSize = 0) noexcept
+        VertexInputLayoutBuilder& fieldIn(const char* parameterName, const char* fieldName, uint32_t binding,
+                                          uint32_t offset, KeraVertexFormat format) noexcept
         {
-            if (m_contract.descriptorCount < 32)
+            if (m_layout.fieldCount < 32)
             {
-                m_contract.descriptors[m_contract.descriptorCount++] = {
-                    stringView(name),
-                    type,
-                    uniformSize,
+                m_layout.fields[m_layout.fieldCount++] = {
+                    stringView(parameterName), stringView(fieldName), binding, offset, format,
                 };
             }
             return *this;
         }
 
-        template <typename UniformT>
-        PipelineReflectionBuilder& uniform(const char* name) noexcept
+        VertexInputLayout layout() const noexcept
         {
-            return descriptor(name, KERA_DESCRIPTOR_TYPE_UNIFORM_BUFFER, sizeof(UniformT));
-        }
-
-        PipelineReflectionBuilder& sampledImage(const char* name) noexcept
-        {
-            return descriptor(name, KERA_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
-        }
-
-        PipelineReflectionBuilder& sampler(const char* name) noexcept
-        {
-            return descriptor(name, KERA_DESCRIPTOR_TYPE_SAMPLER);
-        }
-
-        PipelineReflectionContract build() const noexcept
-        {
-            return m_contract;
+            return m_layout;
         }
 
     private:
-        PipelineReflectionContract m_contract{};
+        VertexInputLayout m_layout{};
     };
 
     struct GraphicsPipelineCreateDesc
     {
         KeraShaderProgramHandle shaderProgram{};
-        PipelineReflectionContract reflectionContract{};
+        VertexInputLayout vertexInput{};
         KeraRenderTargetHandle renderTarget{};
         KeraPrimitiveTopologyKind topology = KERA_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         KeraCullModeKind cullMode = KERA_CULL_MODE_BACK;
@@ -487,7 +455,7 @@ namespace kera
             if (!isValid()) return {};
             const KeraGraphicsPipelineCreateDesc abiDesc{
                 desc.shaderProgram,
-                desc.reflectionContract.view(),
+                desc.vertexInput.view(),
                 desc.renderTarget,
                 desc.topology,
                 desc.cullMode,
@@ -498,6 +466,13 @@ namespace kera
                 desc.debugName,
             };
             return m_api->createGraphicsPipeline(m_renderer, &abiDesc);
+        }
+
+        KeraRendererValidationReport validateVertexInputLayout(KeraShaderProgramHandle shaderProgram,
+                                                               const VertexInputLayout& vertexInput) const noexcept
+        {
+            return isValid() ? m_api->validateVertexInputLayout(m_renderer, shaderProgram, vertexInput.view())
+                             : KeraRendererValidationReport{};
         }
 
         bool destroyGraphicsPipeline(KeraGraphicsPipelineHandle pipeline) noexcept

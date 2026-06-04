@@ -118,20 +118,24 @@ ShaderProgramHandle program = renderer.createGraphicsShaderProgram({
     .source = KERA_SHADER_SOURCE_SLANG_FILE,
 });
 
-const PipelineReflectionContract contract =
-    PipelineReflectionBuilder{}
-        .debugName("Triangle Pipeline")
-        .vertexEntry("vertexMain")
-        .vertexBinding<Vertex>("meshVertex", 0)
-        .semantic("POSITION", "meshVertex", offsetof(Vertex, position), VertexFormat::Float3)
-        .semantic("COLOR", "meshVertex", offsetof(Vertex, color), VertexFormat::Float3)
-        .build();
+const auto vertexInput =
+    kera::VertexInputLayoutBuilder{}
+        .vertexBinding<Vertex>(0)
+        .field(KERA_VERTEX_FIELD(Vertex, position, 0, kera::VertexFormat::Float3))
+        .field(KERA_VERTEX_FIELD(Vertex, color, 0, kera::VertexFormat::Float3))
+        .layout();
+
+KeraRendererValidationReport validation = renderer.validateVertexInputLayout(program, vertexInput);
 
 GraphicsPipelineHandle pipeline = renderer.createGraphicsPipeline({
     .shaderProgram = program,
-    .reflectionContract = contract,
+    .vertexInput = vertexInput,
 });
 ```
+
+`createGraphicsPipeline()` performs the same validation internally. Descriptor layouts and shader
+entry points come from Slang reflection; the host only supplies vertex buffer slots, strides, and
+field offsets that reflection cannot infer.
 
 Descriptor updates use reflected shader variable names:
 

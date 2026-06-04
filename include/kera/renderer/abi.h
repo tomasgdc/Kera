@@ -267,45 +267,34 @@ extern "C"
         KeraStringView debugName;
     } KeraGraphicsShaderProgramDesc;
 
-    typedef struct KeraReflectedVertexBindingDesc
+    typedef struct KeraVertexInputBindingDesc
     {
-        KeraStringView name;
         uint32_t binding;
         uint32_t stride;
         KeraVertexInputRate inputRate;
-    } KeraReflectedVertexBindingDesc;
+    } KeraVertexInputBindingDesc;
 
-    typedef struct KeraReflectedVertexSemanticDesc
+    typedef struct KeraVertexInputFieldDesc
     {
-        KeraStringView semanticName;
-        KeraStringView bindingName;
+        KeraStringView parameterName;
+        KeraStringView fieldName;
+        uint32_t binding;
         uint32_t offset;
         KeraVertexFormat format;
-    } KeraReflectedVertexSemanticDesc;
+    } KeraVertexInputFieldDesc;
 
-    typedef struct KeraReflectedDescriptorBindingDesc
+    typedef struct KeraVertexInputLayout
     {
-        KeraStringView name;
-        KeraDescriptorType type;
-        size_t uniformSize;
-    } KeraReflectedDescriptorBindingDesc;
-
-    typedef struct KeraPipelineReflectionContract
-    {
-        KeraStringView debugName;
-        KeraStringView vertexEntryPoint;
-        const KeraReflectedVertexBindingDesc* vertexBindings;
-        size_t vertexBindingCount;
-        const KeraReflectedVertexSemanticDesc* vertexSemantics;
-        size_t vertexSemanticCount;
-        const KeraReflectedDescriptorBindingDesc* descriptors;
-        size_t descriptorCount;
-    } KeraPipelineReflectionContract;
+        const KeraVertexInputBindingDesc* bindings;
+        size_t bindingCount;
+        const KeraVertexInputFieldDesc* fields;
+        size_t fieldCount;
+    } KeraVertexInputLayout;
 
     typedef struct KeraGraphicsPipelineCreateDesc
     {
         KeraShaderProgramHandle shaderProgram;
-        KeraPipelineReflectionContract reflectionContract;
+        KeraVertexInputLayout vertexInput;
         KeraRenderTargetHandle renderTarget;
         KeraPrimitiveTopologyKind topology;
         KeraCullModeKind cullMode;
@@ -465,6 +454,9 @@ extern "C"
         int (*destroySampler)(KeraRenderer* renderer, KeraSamplerHandle sampler);
         KeraRenderTargetHandle (*createRenderTarget)(KeraRenderer* renderer, const KeraRenderTargetDesc* desc);
         int (*destroyRenderTarget)(KeraRenderer* renderer, KeraRenderTargetHandle target);
+        KeraRendererValidationReport (*validateVertexInputLayout)(const KeraRenderer* renderer,
+                                                                  KeraShaderProgramHandle shaderProgram,
+                                                                  KeraVertexInputLayout vertexInput);
         KeraGraphicsPipelineHandle (*createGraphicsPipeline)(KeraRenderer* renderer,
                                                              const KeraGraphicsPipelineCreateDesc* desc);
         int (*destroyGraphicsPipeline)(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline);

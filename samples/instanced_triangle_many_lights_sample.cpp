@@ -57,9 +57,6 @@ namespace kera
             constexpr const char* GeometryFragmentEntryPoint = "geometryFragmentMain";
             constexpr const char* FullscreenVertexEntryPoint = "fullscreenVertexMain";
             constexpr const char* LightingFragmentEntryPoint = "lightingFragmentMain";
-            constexpr const char* MeshVertexBinding = "meshVertex";
-            constexpr const char* InstanceVertexBinding = "instanceData";
-            constexpr const char* FullscreenVertexBinding = "fullscreenVertex";
 
             constexpr const char* GeometryParams = "geometryParams";
             constexpr const char* LightingParams = "lightingParams";
@@ -274,22 +271,18 @@ namespace kera
 
     bool InstancedTriangleManyLightsSample::createPipelinesAndDescriptors()
     {
-        const PipelineReflectionContract geometryContract =
-            PipelineReflectionBuilder{}
-                .debugName("Many Lights Geometry Pipeline")
-                .vertexEntry(ManyLightsShader::GeometryVertexEntryPoint)
-                .vertexBinding<Vertex>(ManyLightsShader::MeshVertexBinding, 0)
-                .vertexBinding<InstanceData>(ManyLightsShader::InstanceVertexBinding, 1, VertexInputRate::Instance)
-                .semantic("POSITION", ManyLightsShader::MeshVertexBinding, 0, VertexFormat::Float3)
-                .semantic("COLOR", ManyLightsShader::MeshVertexBinding, static_cast<uint32_t>(offsetof(Vertex, color)),
-                          VertexFormat::Float3)
-                .semantic("TRANSFORM", ManyLightsShader::InstanceVertexBinding, 0, VertexFormat::Float4)
-                .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams)
-                .build();
+        const VertexInputLayout geometryVertexInput =
+            VertexInputLayoutBuilder{}
+                .vertexBinding<Vertex>(0)
+                .vertexBinding<InstanceData>(1, VertexInputRate::Instance)
+                .field(KERA_VERTEX_FIELD(Vertex, position, 0, VertexFormat::Float3))
+                .field(KERA_VERTEX_FIELD(Vertex, color, 0, VertexFormat::Float3))
+                .field(KERA_VERTEX_FIELD(InstanceData, modelMatrix, 1, VertexFormat::Float4))
+                .layout();
 
         m_geometryPipeline = m_renderer.createGraphicsPipeline({
             .shaderProgram = m_geometryShaderProgram,
-            .reflectionContract = geometryContract,
+            .vertexInput = geometryVertexInput,
             .renderTarget = m_sceneRenderTarget,
             .cullMode = CullModeKind::None,
             .depthTest = true,
@@ -309,22 +302,16 @@ namespace kera
             return false;
         }
 
-        const PipelineReflectionContract lightingContract =
-            PipelineReflectionBuilder{}
-                .debugName("Many Lights Lighting Pipeline")
-                .vertexEntry(ManyLightsShader::FullscreenVertexEntryPoint)
-                .vertexBinding<FullscreenTriangleVertex>(ManyLightsShader::FullscreenVertexBinding, 0)
-                .semantic("POSITION", ManyLightsShader::FullscreenVertexBinding, 0, VertexFormat::Float2)
-                .semantic("TEXCOORD0", ManyLightsShader::FullscreenVertexBinding,
-                          static_cast<uint32_t>(offsetof(FullscreenTriangleVertex, uv)), VertexFormat::Float2)
-                .uniform<LightingUniforms>(ManyLightsShader::LightingParams)
-                .sampledImage(ManyLightsShader::SceneTexture)
-                .sampler(ManyLightsShader::SceneSampler)
-                .build();
+        const VertexInputLayout lightingVertexInput =
+            VertexInputLayoutBuilder{}
+                .vertexBinding<FullscreenTriangleVertex>(0)
+                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, position, 0, VertexFormat::Float2))
+                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, uv, 0, VertexFormat::Float2))
+                .layout();
 
         m_lightingPipeline = m_renderer.createGraphicsPipeline({
             .shaderProgram = m_lightingShaderProgram,
-            .reflectionContract = lightingContract,
+            .vertexInput = lightingVertexInput,
             .cullMode = CullModeKind::None,
         });
         if (!m_lightingPipeline.isValid())

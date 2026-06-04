@@ -39,8 +39,6 @@ namespace kera
             constexpr const char* Path = "shaders/instanced_triangle.slang";
             constexpr const char* VertexEntryPoint = "vertexMain";
             constexpr const char* FragmentEntryPoint = "fragmentMain";
-            constexpr const char* MeshVertexBinding = "meshVertex";
-            constexpr const char* InstanceVertexBinding = "instanceData";
             constexpr const char* GlobalParams = "globalParams";
         }  // namespace InstancedTriangleShader
 
@@ -154,23 +152,18 @@ namespace kera
 
     bool InstancedTriangleSample::createPipeline()
     {
-        const PipelineReflectionContract pipelineContract =
-            PipelineReflectionBuilder{}
-                .debugName("Instanced Triangle Pipeline")
-                .vertexEntry(InstancedTriangleShader::VertexEntryPoint)
-                .vertexBinding<Vertex>(InstancedTriangleShader::MeshVertexBinding, 0)
-                .vertexBinding<BasicInstanceData>(InstancedTriangleShader::InstanceVertexBinding, 1,
-                                                  VertexInputRate::Instance)
-                .semantic("POSITION", InstancedTriangleShader::MeshVertexBinding, 0, VertexFormat::Float3)
-                .semantic("COLOR", InstancedTriangleShader::MeshVertexBinding,
-                          static_cast<uint32_t>(offsetof(Vertex, color)), VertexFormat::Float3)
-                .semantic("TRANSFORM", InstancedTriangleShader::InstanceVertexBinding, 0, VertexFormat::Float4)
-                .uniform<Uniforms>(InstancedTriangleShader::GlobalParams)
-                .build();
+        const VertexInputLayout vertexInput =
+            VertexInputLayoutBuilder{}
+                .vertexBinding<Vertex>(0)
+                .vertexBinding<BasicInstanceData>(1, VertexInputRate::Instance)
+                .field(KERA_VERTEX_FIELD(Vertex, position, 0, VertexFormat::Float3))
+                .field(KERA_VERTEX_FIELD(Vertex, color, 0, VertexFormat::Float3))
+                .field(KERA_VERTEX_FIELD(BasicInstanceData, modelMatrix, 1, VertexFormat::Float4))
+                .layout();
 
         m_pipeline = m_renderer.createGraphicsPipeline({
             .shaderProgram = m_shaderProgram,
-            .reflectionContract = pipelineContract,
+            .vertexInput = vertexInput,
             .topology = PrimitiveTopologyKind::TriangleList,
             .cullMode = CullModeKind::None,
         });

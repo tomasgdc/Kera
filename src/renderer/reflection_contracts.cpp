@@ -6,7 +6,6 @@
 #include "kera/utilities/logger.h"
 
 #include <algorithm>
-#include <cctype>
 #include <optional>
 #include <string>
 #include <utility>
@@ -50,37 +49,60 @@ namespace kera
             }
         }
 
-        std::string semanticBaseName(const std::string& semanticName)
-        {
-            std::string baseName = semanticName;
-            while (!baseName.empty() && std::isdigit(static_cast<unsigned char>(baseName.back())))
-            {
-                baseName.pop_back();
-            }
-            return baseName;
-        }
-
         const ReflectedVertexBindingDesc* findVertexBinding(std::span<const ReflectedVertexBindingDesc> bindings,
-                                                            const std::string& name)
+                                                            uint32_t bindingSlot)
         {
             const auto found =
-                std::find_if(bindings.begin(), bindings.end(),
-                             [&name](const ReflectedVertexBindingDesc& binding) { return binding.name == name; });
+                std::find_if(bindings.begin(), bindings.end(), [bindingSlot](const ReflectedVertexBindingDesc& binding)
+                             { return binding.binding == bindingSlot; });
             return found != bindings.end() ? &(*found) : nullptr;
         }
 
-        const ReflectedVertexSemanticDesc* findUniqueSemantic(std::span<const ReflectedVertexSemanticDesc> semantics,
-                                                              const std::string& semanticName, std::size_t& outIndex,
-                                                              RendererValidationReport& report,
-                                                              const std::string& prefix)
+        std::string reflectedFieldLabel(const SlangReflectionInput& input)
         {
-            const ReflectedVertexSemanticDesc* match = nullptr;
+            if (!input.parameterName.empty())
+            {
+                return input.parameterName + "." + input.fieldName;
+            }
+            return input.fieldName;
+        }
+
+        bool fieldNamesEqual(const ReflectedVertexFieldDesc& field, const SlangReflectionInput& input)
+        {
+            return field.fieldName == input.fieldName;
+        }
+
+        bool fieldParametersEqual(const ReflectedVertexFieldDesc& field, const SlangReflectionInput& input)
+        {
+            return field.parameterName.empty() || field.parameterName == input.parameterName;
+        }
+
+        bool reflectedFieldNameIsAmbiguous(const SlangReflectionEntryPoint& entryPoint,
+                                           const SlangReflectionInput& input)
+        {
+            std::size_t matches = 0;
+            for (const SlangReflectionInput& reflectedInput : entryPoint.inputs)
+            {
+                if (reflectedInput.fieldName == input.fieldName)
+                {
+                    ++matches;
+                }
+            }
+            return matches > 1;
+        }
+
+        const ReflectedVertexFieldDesc* findUniqueField(std::span<const ReflectedVertexFieldDesc> fields,
+                                                        const SlangReflectionEntryPoint& entryPoint,
+                                                        const SlangReflectionInput& input, std::size_t& outIndex,
+                                                        RendererValidationReport& report, const std::string& prefix)
+        {
+            const ReflectedVertexFieldDesc* match = nullptr;
             std::size_t matchCount = 0;
-            for (std::size_t index = 0; index < semantics.size(); ++index)
+            for (std::size_t index = 0; index < fields.size(); ++index)
             {
-                if (semantics[index].semanticName == semanticName)
+                if (fieldNamesEqual(fields[index], input) && fieldParametersEqual(fields[index], input))
                 {
-                    match = &semantics[index];
+                    match = &fields[index];
                     outIndex = index;
                     ++matchCount;
                 }
@@ -92,35 +114,21 @@ namespace kera
             }
             if (matchCount > 1)
             {
-                report.addIssue(prefix + "Multiple C++ vertex semantic mappings matched reflected semantic '" +
-                                semanticName + "'.");
+                report.addIssue(prefix + "Multiple C++ vertex field mappings matched reflected shader field '" +
+                                reflectedFieldLabel(input) + "'.");
                 return nullptr;
             }
 
-            const std::string reflectedBaseName = semanticBaseName(semanticName);
-            for (std::size_t index = 0; index < semantics.size(); ++index)
+            if (reflectedFieldNameIsAmbiguous(entryPoint, input))
             {
-                if (semanticBaseName(semantics[index].semanticName) == reflectedBaseName)
-                {
-                    match = &semantics[index];
-                    outIndex = index;
-                    ++matchCount;
-                }
-            }
-
-            if (matchCount == 1)
-            {
-                return match;
-            }
-            if (matchCount > 1)
-            {
-                report.addIssue(prefix + "Multiple C++ vertex semantic mappings matched reflected semantic base '" +
-                                reflectedBaseName + "'.");
+                report.addIssue(prefix + "Reflected shader field '" + input.fieldName +
+                                "' is ambiguous across vertex input parameters; provide parameterName '" +
+                                input.parameterName + "'.");
                 return nullptr;
             }
 
-            report.addIssue(prefix + "No C++ vertex semantic mapping was provided for reflected semantic '" +
-                            semanticName + "'.");
+            report.addIssue(prefix + "No C++ vertex field mapping was provided for reflected shader field '" +
+                            reflectedFieldLabel(input) + "' (semantic '" + input.semanticName + "').");
             return nullptr;
         }
 
@@ -129,28 +137,20 @@ namespace kera
         {
             for (const ReflectedVertexBindingDesc& binding : bindings)
             {
-                if (binding.name.empty())
-                {
-                    report.addIssue(prefix + "Reflected vertex binding contract contains an unnamed binding.");
-                    return false;
-                }
                 if (binding.stride == 0)
                 {
-                    report.addIssue(prefix + "Reflected vertex binding contract contains a zero-stride binding '" +
-                                    binding.name + "'.");
+                    report.addIssue(prefix + "Vertex input layout contains zero-stride binding slot " +
+                                    std::to_string(binding.binding) + ".");
                     return false;
                 }
 
-                const auto duplicateName =
-                    std::count_if(bindings.begin(), bindings.end(), [&binding](const ReflectedVertexBindingDesc& other)
-                                  { return other.name == binding.name; });
                 const auto duplicateSlot =
                     std::count_if(bindings.begin(), bindings.end(), [&binding](const ReflectedVertexBindingDesc& other)
                                   { return other.binding == binding.binding; });
-                if (duplicateName != 1 || duplicateSlot != 1)
+                if (duplicateSlot != 1)
                 {
-                    report.addIssue(prefix +
-                                    "Reflected vertex binding contract contains duplicate binding names or slots.");
+                    report.addIssue(prefix + "Vertex input layout contains duplicate binding slot " +
+                                    std::to_string(binding.binding) + ".");
                     return false;
                 }
 
@@ -167,110 +167,105 @@ namespace kera
             return true;
         }
 
-        std::string diagnosticPrefix(const PipelineReflectionView& contract)
+        std::string diagnosticPrefix(const VertexInputLayoutView& vertexInput)
         {
-            return contract.debugName.empty() ? std::string{} : std::string(contract.debugName) + ": ";
+            return vertexInput.debugName.empty() ? std::string{} : std::string(vertexInput.debugName) + ": ";
         }
 
-        bool validateDescriptorBinding(const SlangReflectionMetadata& reflection,
-                                       const ReflectedDescriptorBindingDesc& descriptor,
-                                       RendererValidationReport& report, const std::string& prefix)
+        const SlangReflectionEntryPoint* findVertexEntryPoint(const SlangReflectionMetadata& reflection,
+                                                              RendererValidationReport& report,
+                                                              const std::string& prefix)
         {
-            if (descriptor.name.empty())
+            const SlangReflectionEntryPoint* vertexEntryPoint = nullptr;
+            for (const SlangReflectionEntryPoint& entryPoint : reflection.entryPoints)
             {
-                report.addIssue(RendererValidationCategory::Descriptor,
-                                prefix + "Reflected descriptor contract contains an unnamed binding.");
-                return false;
+                if (entryPoint.stage != ShaderType::Vertex)
+                {
+                    continue;
+                }
+                if (vertexEntryPoint)
+                {
+                    report.addIssue(prefix +
+                                    "Shader reflection exposed multiple vertex entry points; create one shader "
+                                    "program per graphics vertex entry point.");
+                    return nullptr;
+                }
+                vertexEntryPoint = &entryPoint;
             }
 
-            const SlangReflectionBinding* binding = reflection.findBinding(descriptor.name);
-            if (!binding)
+            if (!vertexEntryPoint)
             {
-                report.addIssue(
-                    RendererValidationCategory::Descriptor,
-                    prefix + "Shader reflection did not expose descriptor binding '" + descriptor.name + "'.", 0, 0,
-                    descriptor.name);
-                return false;
+                report.addIssue(prefix + "Shader reflection did not expose a vertex entry point.");
+                return nullptr;
             }
-
-            DescriptorType reflectedType = DescriptorType::UniformBuffer;
-            if (!descriptorTypeFromReflectionKind(binding->kind, reflectedType) || reflectedType != descriptor.type)
-            {
-                report.addIssue(RendererValidationCategory::Descriptor,
-                                prefix + "Shader reflection descriptor binding '" + descriptor.name +
-                                    "' does not match the expected resource type.",
-                                binding->space, binding->binding, descriptor.name);
-                return false;
-            }
-
-            if (descriptor.uniformSize != 0 && binding->uniformSize != 0 &&
-                binding->uniformSize != descriptor.uniformSize)
-            {
-                report.addIssue(RendererValidationCategory::Descriptor,
-                                prefix + "Shader reflection uniform binding '" + binding->name + "' has size " +
-                                    std::to_string(binding->uniformSize) + ", but the C++ struct is " +
-                                    std::to_string(descriptor.uniformSize) + " bytes.",
-                                binding->space, binding->binding, descriptor.name);
-                return false;
-            }
-
-            return true;
+            return vertexEntryPoint;
         }
 
         bool buildValidatedVertexLayout(VertexLayoutDesc& layout, const SlangReflectionMetadata& reflection,
-                                        const PipelineReflectionView& contract, RendererValidationReport& report)
+                                        const VertexInputLayoutView& vertexInput, RendererValidationReport& report)
         {
-            const std::string prefix = diagnosticPrefix(contract);
-            if (!appendVertexBindings(layout, contract.vertexBindings, report, prefix))
+            const std::string prefix = diagnosticPrefix(vertexInput);
+            if (!appendVertexBindings(layout, vertexInput.bindings, report, prefix))
             {
                 return false;
             }
 
-            const std::string entryPointName(contract.vertexEntryPoint);
-            if (entryPointName.empty())
-            {
-                report.addIssue(prefix + "Pipeline reflection contract does not declare a vertex entry point.");
-                return false;
-            }
-
-            const SlangReflectionEntryPoint* entryPoint = reflection.findEntryPoint(entryPointName);
+            const SlangReflectionEntryPoint* entryPoint = findVertexEntryPoint(reflection, report, prefix);
             if (!entryPoint)
             {
-                report.addIssue(prefix + "Shader reflection did not expose entry point '" + entryPointName + "'.");
                 return false;
             }
 
-            std::vector<bool> usedSemantics(contract.vertexSemantics.size(), false);
+            std::vector<bool> usedFields(vertexInput.fields.size(), false);
             for (const SlangReflectionInput& input : entryPoint->inputs)
             {
-                std::size_t semanticIndex = 0;
-                const ReflectedVertexSemanticDesc* semantic =
-                    findUniqueSemantic(contract.vertexSemantics, input.semanticName, semanticIndex, report, prefix);
-                if (!semantic)
+                if (!input.hasFormat)
                 {
-                    return false;
-                }
-                usedSemantics[semanticIndex] = true;
-
-                if (semantic->semanticName.empty())
-                {
-                    report.addIssue(prefix + "Reflected vertex semantic contract contains an unnamed semantic.");
+                    report.addIssue(prefix + "Reflected shader field '" + reflectedFieldLabel(input) +
+                                    "' uses an unsupported vertex input type.");
                     return false;
                 }
 
-                const ReflectedVertexBindingDesc* binding =
-                    findVertexBinding(contract.vertexBindings, semantic->bindingName);
+                std::size_t fieldIndex = 0;
+                const ReflectedVertexFieldDesc* field =
+                    findUniqueField(vertexInput.fields, *entryPoint, input, fieldIndex, report, prefix);
+                if (!field)
+                {
+                    return false;
+                }
+                if (usedFields[fieldIndex])
+                {
+                    report.addIssue(prefix + "C++ vertex field mapping '" + field->fieldName +
+                                    "' was matched by more than one reflected shader input; provide parameterName.");
+                    return false;
+                }
+                usedFields[fieldIndex] = true;
+
+                if (field->fieldName.empty())
+                {
+                    report.addIssue(prefix + "Vertex input layout contains an unnamed field mapping.");
+                    return false;
+                }
+
+                if (field->format != input.format)
+                {
+                    report.addIssue(prefix + "Vertex field '" + reflectedFieldLabel(input) +
+                                    "' has the wrong format for the reflected shader input.");
+                    return false;
+                }
+
+                const ReflectedVertexBindingDesc* binding = findVertexBinding(vertexInput.bindings, field->binding);
                 if (!binding)
                 {
-                    report.addIssue(prefix + "Vertex semantic '" + semantic->semanticName +
-                                    "' references unknown vertex binding '" + semantic->bindingName + "'.");
+                    report.addIssue(prefix + "Vertex field '" + reflectedFieldLabel(input) +
+                                    "' references unknown vertex binding slot " + std::to_string(field->binding) + ".");
                     return false;
                 }
 
-                const std::optional<uint32_t> formatSize = vertexFormatSize(semantic->format);
+                const std::optional<uint32_t> formatSize = vertexFormatSize(field->format);
                 if (!formatSize)
                 {
-                    report.addIssue(prefix + "Vertex semantic '" + semantic->semanticName +
+                    report.addIssue(prefix + "Vertex field '" + reflectedFieldLabel(input) +
                                     "' uses an unsupported vertex format.");
                     return false;
                 }
@@ -280,18 +275,17 @@ namespace kera
                     layout.attributes.push_back({
                         .location = input.location + index,
                         .binding = binding->binding,
-                        .offset = semantic->offset + *formatSize * index,
-                        .format = semantic->format,
+                        .offset = field->offset + *formatSize * index,
+                        .format = field->format,
                     });
                 }
             }
 
-            for (std::size_t index = 0; index < usedSemantics.size(); ++index)
+            for (std::size_t index = 0; index < usedFields.size(); ++index)
             {
-                if (!usedSemantics[index])
+                if (!usedFields[index])
                 {
-                    report.addIssue(prefix + "C++ vertex semantic mapping '" +
-                                    contract.vertexSemantics[index].semanticName +
+                    report.addIssue(prefix + "C++ vertex field mapping '" + vertexInput.fields[index].fieldName +
                                     "' was not used by reflected shader inputs.");
                     return false;
                 }
@@ -304,93 +298,56 @@ namespace kera
         }
     }  // namespace
 
-    PipelineReflectionContract::PipelineReflectionContract(std::string debugName, std::string vertexEntryPoint,
-                                                           std::vector<ReflectedVertexBindingDesc> vertexBindings,
-                                                           std::vector<ReflectedVertexSemanticDesc> vertexSemantics,
-                                                           std::vector<ReflectedDescriptorBindingDesc> descriptors,
-                                                           VertexLayoutDesc vertexLayout)
-        : m_debugName(std::move(debugName))
-        , m_vertexEntryPoint(std::move(vertexEntryPoint))
-        , m_vertexBindings(std::move(vertexBindings))
-        , m_vertexSemantics(std::move(vertexSemantics))
-        , m_descriptors(std::move(descriptors))
-        , m_vertexLayout(std::move(vertexLayout))
+    VertexInputLayoutBuildResult VertexInputLayoutBuildResult::success(VertexLayoutDesc layout)
     {
-    }
-
-    PipelineReflectionView PipelineReflectionContract::view() const
-    {
-        return {
-            .debugName = m_debugName,
-            .vertexEntryPoint = m_vertexEntryPoint,
-            .vertexBindings = m_vertexBindings,
-            .vertexSemantics = m_vertexSemantics,
-            .descriptors = m_descriptors,
-        };
-    }
-
-    const VertexLayoutDesc& PipelineReflectionContract::vertexLayout() const
-    {
-        return m_vertexLayout;
-    }
-
-    PipelineReflectionBuildResult PipelineReflectionBuildResult::success(PipelineReflectionContract contract)
-    {
-        PipelineReflectionBuildResult result;
-        result.m_contract = std::move(contract);
+        VertexInputLayoutBuildResult result;
+        result.m_layout = std::move(layout);
         result.m_ok = true;
         return result;
     }
 
-    PipelineReflectionBuildResult PipelineReflectionBuildResult::failure(RendererValidationReport report)
+    VertexInputLayoutBuildResult VertexInputLayoutBuildResult::failure(RendererValidationReport report)
     {
-        PipelineReflectionBuildResult result;
+        VertexInputLayoutBuildResult result;
         result.m_report = std::move(report);
         return result;
     }
 
-    bool PipelineReflectionBuildResult::ok() const noexcept
+    bool VertexInputLayoutBuildResult::ok() const noexcept
     {
         return m_ok;
     }
 
-    const PipelineReflectionContract& PipelineReflectionBuildResult::contract() const noexcept
+    const VertexLayoutDesc& VertexInputLayoutBuildResult::layout() const noexcept
     {
-        return m_contract;
+        return m_layout;
     }
 
-    const RendererValidationReport& PipelineReflectionBuildResult::report() const noexcept
+    const RendererValidationReport& VertexInputLayoutBuildResult::report() const noexcept
     {
         return m_report;
     }
 
-    std::span<const RendererValidationIssue> PipelineReflectionBuildResult::issues() const noexcept
+    std::span<const RendererValidationIssue> VertexInputLayoutBuildResult::issues() const noexcept
     {
         return m_report.issues;
     }
 
-    const std::string& PipelineReflectionBuildResult::errorMessage() const noexcept
+    const std::string& VertexInputLayoutBuildResult::errorMessage() const noexcept
     {
         return m_report.errorMessage();
     }
 
-    PipelineReflectionBuilder& PipelineReflectionBuilder::debugName(std::string name)
+    VertexInputLayoutBuilder& VertexInputLayoutBuilder::debugName(std::string name)
     {
         m_debugName = std::move(name);
         return *this;
     }
 
-    PipelineReflectionBuilder& PipelineReflectionBuilder::vertexEntry(std::string entryPoint)
-    {
-        m_vertexEntryPoint = std::move(entryPoint);
-        return *this;
-    }
-
-    PipelineReflectionBuilder& PipelineReflectionBuilder::vertexBinding(std::string name, uint32_t binding,
-                                                                        uint32_t stride, VertexInputRate inputRate)
+    VertexInputLayoutBuilder& VertexInputLayoutBuilder::vertexBinding(uint32_t binding, uint32_t stride,
+                                                                      VertexInputRate inputRate)
     {
         m_vertexBindings.push_back({
-            .name = std::move(name),
             .binding = binding,
             .stride = stride,
             .inputRate = inputRate,
@@ -398,68 +355,41 @@ namespace kera
         return *this;
     }
 
-    PipelineReflectionBuilder& PipelineReflectionBuilder::semantic(std::string semanticName, std::string bindingName,
-                                                                   uint32_t offset, VertexFormat format)
+    VertexInputLayoutBuilder& VertexInputLayoutBuilder::field(std::string fieldName, uint32_t binding, uint32_t offset,
+                                                              VertexFormat format)
     {
-        m_vertexSemantics.push_back({
-            .semanticName = std::move(semanticName),
-            .bindingName = std::move(bindingName),
+        return fieldIn({}, std::move(fieldName), binding, offset, format);
+    }
+
+    VertexInputLayoutBuilder& VertexInputLayoutBuilder::fieldIn(std::string parameterName, std::string fieldName,
+                                                                uint32_t binding, uint32_t offset, VertexFormat format)
+    {
+        m_vertexFields.push_back({
+            .parameterName = std::move(parameterName),
+            .fieldName = std::move(fieldName),
+            .binding = binding,
             .offset = offset,
             .format = format,
         });
         return *this;
     }
 
-    PipelineReflectionBuilder& PipelineReflectionBuilder::descriptor(std::string name, DescriptorType type,
-                                                                     std::size_t uniformSize)
-    {
-        m_descriptors.push_back({
-            .name = std::move(name),
-            .type = type,
-            .uniformSize = uniformSize,
-        });
-        return *this;
-    }
-
-    PipelineReflectionBuilder& PipelineReflectionBuilder::sampledImage(std::string name)
-    {
-        return descriptor(std::move(name), DescriptorType::SampledImage);
-    }
-
-    PipelineReflectionBuilder& PipelineReflectionBuilder::sampler(std::string name)
-    {
-        return descriptor(std::move(name), DescriptorType::Sampler);
-    }
-
-    PipelineReflectionBuildResult PipelineReflectionBuilder::build(const SlangReflectionMetadata& reflection) &&
+    VertexInputLayoutBuildResult VertexInputLayoutBuilder::build(const SlangReflectionMetadata& reflection) &&
     {
         RendererValidationReport report;
-        PipelineReflectionView view{
+        VertexInputLayoutView view{
             .debugName = m_debugName,
-            .vertexEntryPoint = m_vertexEntryPoint,
-            .vertexBindings = m_vertexBindings,
-            .vertexSemantics = m_vertexSemantics,
-            .descriptors = m_descriptors,
+            .bindings = m_vertexBindings,
+            .fields = m_vertexFields,
         };
 
         VertexLayoutDesc vertexLayout;
         if (!buildValidatedVertexLayout(vertexLayout, reflection, view, report))
         {
-            return PipelineReflectionBuildResult::failure(std::move(report));
+            return VertexInputLayoutBuildResult::failure(std::move(report));
         }
 
-        const std::string prefix = diagnosticPrefix(view);
-        for (const ReflectedDescriptorBindingDesc& descriptor : m_descriptors)
-        {
-            if (!validateDescriptorBinding(reflection, descriptor, report, prefix))
-            {
-                return PipelineReflectionBuildResult::failure(std::move(report));
-            }
-        }
-
-        return PipelineReflectionBuildResult::success({std::move(m_debugName), std::move(m_vertexEntryPoint),
-                                                       std::move(m_vertexBindings), std::move(m_vertexSemantics),
-                                                       std::move(m_descriptors), std::move(vertexLayout)});
+        return VertexInputLayoutBuildResult::success(std::move(vertexLayout));
     }
 
     ShaderProgramDesc makeShaderProgramDesc(std::span<const ShaderStageContract> stages)
@@ -524,13 +454,16 @@ namespace kera
         return true;
     }
 
-    bool appendValidatedPipelineReflectionContract(VertexLayoutDesc& layout, const PipelineReflectionContract& contract)
+    VertexInputLayoutBuildResult buildValidatedVertexInputLayout(const SlangReflectionMetadata& reflection,
+                                                                 VertexInputLayoutView vertexInput)
     {
-        const VertexLayoutDesc& reflectedLayout = contract.vertexLayout();
-        layout.bindings.insert(layout.bindings.end(), reflectedLayout.bindings.begin(), reflectedLayout.bindings.end());
-        layout.attributes.insert(layout.attributes.end(), reflectedLayout.attributes.begin(),
-                                 reflectedLayout.attributes.end());
-        return true;
+        RendererValidationReport report;
+        VertexLayoutDesc layout;
+        if (!buildValidatedVertexLayout(layout, reflection, vertexInput, report))
+        {
+            return VertexInputLayoutBuildResult::failure(std::move(report));
+        }
+        return VertexInputLayoutBuildResult::success(std::move(layout));
     }
 
 }  // namespace kera

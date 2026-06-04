@@ -27,13 +27,24 @@ The installed ABI uses:
 
 - `KeraStringView` and `KeraByteView` borrowed views.
 - `KeraHandle` plus typed renderer handles for resources.
-- POD descriptors for buffers, textures, samplers, render targets, shader programs, reflected
-  pipeline contracts, render passes, stats, validation reports, and glTF-loaded models.
+- POD descriptors for buffers, textures, samplers, render targets, shader programs, vertex input
+  layouts, render passes, stats, validation reports, and glTF-loaded models.
 - Opaque `KeraRenderer`.
 - `KeraRendererApiV1` for create/destroy, resources, descriptors, frame lifecycle, UI forwarding,
   resize, stats, logging, validation, and glTF loading.
 
 The ABI does not expose STL types, C++ ownership types, or virtual interfaces.
+
+Graphics pipeline creation uses `KeraVertexInputLayout` for the one piece Slang reflection cannot
+infer: host vertex-buffer memory layout. `KeraVertexInputBindingDesc` declares numeric vertex buffer
+slots and strides. `KeraVertexInputFieldDesc` maps reflected Slang vertex input field names to host
+binding slots, byte offsets, and formats; `parameterName` is only needed when a field name is
+ambiguous across vertex entry parameters. Shader entry points and descriptor set layouts come from
+the shader program reflection produced by `createGraphicsShaderProgram()`.
+
+`KeraRendererApiV1::validateVertexInputLayout` can be called before pipeline creation to get a
+`KeraRendererValidationReport`. `createGraphicsPipeline` performs the same validation internally and
+rejects invalid vertex input layouts.
 
 ## Lifetime Rules
 

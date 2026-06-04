@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "kera/renderer/descriptors.h"
 #include "kera/renderer/shader.h"
 
 #include <cstddef>
@@ -37,9 +38,13 @@ namespace kera
     struct SlangReflectionInput
     {
         std::string name;
+        std::string parameterName;
+        std::string fieldName;
         std::string semanticName;
         uint32_t location = 0;
         uint32_t locationCount = 1;
+        VertexFormat format = VertexFormat::Float3;
+        bool hasFormat = false;
     };
 
     struct SlangReflectionEntryPoint

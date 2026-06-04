@@ -151,6 +151,9 @@ TEST(KeraRepoPolicy, SamplesUsePublicKeraApiOnly)
     for (const std::filesystem::path& source : sampleFiles)
     {
         const std::string content = readTextFile(source);
+        EXPECT_FALSE(contains(content, ".semantic("))
+            << "Sample source " << source.string()
+            << " must map vertex inputs by reflected field names, not shader semantic strings.";
         for (std::string_view pattern : forbiddenHeaders)
         {
             EXPECT_FALSE(contains(content, pattern))
@@ -203,44 +206,5 @@ TEST(KeraRepoPolicy, LoggingRulesStayBehindLoggerFacade)
         const std::string content = readTextFile(header);
         EXPECT_FALSE(hasRawSpdlogUsage(content))
             << "Installed public header " << header.string() << " must not expose spdlog.";
-    }
-}
-
-TEST(KeraShaderContracts, SourceEntryPointsAndStageMarkers)
-{
-    struct ShaderEntry
-    {
-        const char* relativePath;
-        const char* entryPoint;
-        const char* stage;
-    };
-
-    const std::filesystem::path shaderRoot = sourceRoot() / "samples/shaders";
-    const ShaderEntry entries[]{
-        {"triangle.slang", "vertexMain", "vertex"},
-        {"triangle.slang", "fragmentMain", "fragment"},
-        {"instanced_triangle.slang", "vertexMain", "vertex"},
-        {"instanced_triangle.slang", "fragmentMain", "fragment"},
-        {"instanced_triangle_many_lights.slang", "geometryVertexMain", "vertex"},
-        {"instanced_triangle_many_lights.slang", "geometryFragmentMain", "fragment"},
-        {"instanced_triangle_many_lights.slang", "fullscreenVertexMain", "vertex"},
-        {"instanced_triangle_many_lights.slang", "lightingFragmentMain", "fragment"},
-        {"damaged_helmet.slang", "helmetVertexMain", "vertex"},
-        {"damaged_helmet.slang", "helmetFragmentMain", "fragment"},
-        {"damaged_helmet.slang", "fullscreenVertexMain", "vertex"},
-        {"damaged_helmet.slang", "fullscreenFragmentMain", "fragment"},
-    };
-
-    for (const ShaderEntry& entry : entries)
-    {
-        const std::filesystem::path shaderPath = shaderRoot / entry.relativePath;
-        const std::string source = readTextFile(shaderPath);
-        ASSERT_FALSE(source.empty()) << "Missing or empty Slang shader: " << shaderPath.string();
-
-        EXPECT_TRUE(contains(source, entry.entryPoint))
-            << "Missing Slang entry point '" << entry.entryPoint << "' in " << entry.relativePath;
-        const std::string stageMarker = std::string("[shader(\"") + entry.stage + "\")]";
-        EXPECT_TRUE(contains(source, stageMarker))
-            << "Missing Slang stage marker '" << stageMarker << "' in " << entry.relativePath;
     }
 }

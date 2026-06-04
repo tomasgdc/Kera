@@ -26,7 +26,6 @@ namespace kera
             constexpr const char* Path = "shaders/triangle.slang";
             constexpr const char* VertexEntryPoint = "vertexMain";
             constexpr const char* FragmentEntryPoint = "fragmentMain";
-            constexpr const char* MeshVertexBinding = "meshVertex";
         }  // namespace BasicTriangleShader
     }  // namespace
 
@@ -116,19 +115,15 @@ namespace kera
 
     bool BasicTriangleSample::createPipeline()
     {
-        const PipelineReflectionContract pipelineContract =
-            PipelineReflectionBuilder{}
-                .debugName("Basic Triangle Pipeline")
-                .vertexEntry(BasicTriangleShader::VertexEntryPoint)
-                .vertexBinding<Vertex>(BasicTriangleShader::MeshVertexBinding, 0)
-                .semantic("POSITION", BasicTriangleShader::MeshVertexBinding, 0, VertexFormat::Float3)
-                .semantic("COLOR", BasicTriangleShader::MeshVertexBinding,
-                          static_cast<uint32_t>(offsetof(Vertex, color)), VertexFormat::Float3)
-                .build();
+        const VertexInputLayout vertexInput = VertexInputLayoutBuilder{}
+                                                  .vertexBinding<Vertex>(0)
+                                                  .field(KERA_VERTEX_FIELD(Vertex, position, 0, VertexFormat::Float3))
+                                                  .field(KERA_VERTEX_FIELD(Vertex, color, 0, VertexFormat::Float3))
+                                                  .layout();
 
         m_pipeline = m_renderer.createGraphicsPipeline({
             .shaderProgram = m_shaderProgram,
-            .reflectionContract = pipelineContract,
+            .vertexInput = vertexInput,
             .topology = PrimitiveTopologyKind::TriangleList,
         });
         return static_cast<bool>(m_pipeline.isValid());

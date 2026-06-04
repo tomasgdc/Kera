@@ -5,6 +5,7 @@
 #include "kera/renderer/backend/vulkan/vulkan_renderer.h"
 #include "kera/renderer/gltf_loader.h"
 #include "kera/renderer/interfaces.h"
+#include "kera/renderer/reflection_contracts.h"
 #include "kera/utilities/logger.h"
 
 #include <memory>
@@ -192,89 +193,44 @@ namespace
         };
     }
 
-    kera::PipelineReflectionContract fromKera(const KeraPipelineReflectionContract& contract)
+    std::vector<kera::ReflectedVertexBindingDesc> fromKeraVertexBindings(const KeraVertexInputLayout& layout)
     {
         std::vector<kera::ReflectedVertexBindingDesc> bindings;
-        bindings.reserve(contract.vertexBindingCount);
-        for (size_t i = 0; i < contract.vertexBindingCount; ++i)
+        bindings.reserve(layout.bindingCount);
+        for (size_t i = 0; i < layout.bindingCount; ++i)
         {
-            const KeraReflectedVertexBindingDesc& binding = contract.vertexBindings[i];
+            const KeraVertexInputBindingDesc& binding = layout.bindings[i];
             bindings.push_back({
-                .name = toString(binding.name),
                 .binding = binding.binding,
                 .stride = binding.stride,
                 .inputRate = fromKera(binding.inputRate),
             });
         }
-
-        std::vector<kera::ReflectedVertexSemanticDesc> semantics;
-        semantics.reserve(contract.vertexSemanticCount);
-        for (size_t i = 0; i < contract.vertexSemanticCount; ++i)
-        {
-            const KeraReflectedVertexSemanticDesc& semantic = contract.vertexSemantics[i];
-            semantics.push_back({
-                .semanticName = toString(semantic.semanticName),
-                .bindingName = toString(semantic.bindingName),
-                .offset = semantic.offset,
-                .format = fromKera(semantic.format),
-            });
-        }
-
-        std::vector<kera::ReflectedDescriptorBindingDesc> descriptors;
-        descriptors.reserve(contract.descriptorCount);
-        for (size_t i = 0; i < contract.descriptorCount; ++i)
-        {
-            const KeraReflectedDescriptorBindingDesc& descriptor = contract.descriptors[i];
-            descriptors.push_back({
-                .name = toString(descriptor.name),
-                .type = fromKera(descriptor.type),
-                .uniformSize = descriptor.uniformSize,
-            });
-        }
-
-        return kera::PipelineReflectionContract(toString(contract.debugName), toString(contract.vertexEntryPoint),
-                                                std::move(bindings), std::move(semantics), std::move(descriptors));
+        return bindings;
     }
 
-    bool emptyReflectionContract(const KeraPipelineReflectionContract& contract)
+    std::vector<kera::ReflectedVertexFieldDesc> fromKeraVertexFields(const KeraVertexInputLayout& layout)
     {
-        return contract.debugName.size == 0 && contract.vertexEntryPoint.size == 0 &&
-               contract.vertexBindingCount == 0 && contract.vertexSemanticCount == 0 && contract.descriptorCount == 0;
-    }
-
-    kera::PipelineReflectionBuildResult buildPipelineReflectionContractFromKera(
-        const KeraPipelineReflectionContract& contract, const kera::SlangReflectionMetadata& reflection)
-    {
-        kera::PipelineReflectionBuilder builder;
-        builder.debugName(toString(contract.debugName)).vertexEntry(toString(contract.vertexEntryPoint));
-
-        for (size_t i = 0; i < contract.vertexBindingCount; ++i)
+        std::vector<kera::ReflectedVertexFieldDesc> fields;
+        fields.reserve(layout.fieldCount);
+        for (size_t i = 0; i < layout.fieldCount; ++i)
         {
-            const KeraReflectedVertexBindingDesc& binding = contract.vertexBindings[i];
-            builder.vertexBinding(toString(binding.name), binding.binding, binding.stride, fromKera(binding.inputRate));
+            const KeraVertexInputFieldDesc& field = layout.fields[i];
+            fields.push_back({
+                .parameterName = toString(field.parameterName),
+                .fieldName = toString(field.fieldName),
+                .binding = field.binding,
+                .offset = field.offset,
+                .format = fromKera(field.format),
+            });
         }
-
-        for (size_t i = 0; i < contract.vertexSemanticCount; ++i)
-        {
-            const KeraReflectedVertexSemanticDesc& semantic = contract.vertexSemantics[i];
-            builder.semantic(toString(semantic.semanticName), toString(semantic.bindingName), semantic.offset,
-                             fromKera(semantic.format));
-        }
-
-        for (size_t i = 0; i < contract.descriptorCount; ++i)
-        {
-            const KeraReflectedDescriptorBindingDesc& descriptor = contract.descriptors[i];
-            builder.descriptor(toString(descriptor.name), fromKera(descriptor.type), descriptor.uniformSize);
-        }
-
-        return std::move(builder).build(reflection);
+        return fields;
     }
 
     kera::GraphicsPipelineCreateDesc fromKera(const KeraGraphicsPipelineCreateDesc& desc)
     {
         return {
             .shaderProgram = fromKera<kera::ShaderProgramHandle>(desc.shaderProgram),
-            .reflectionContract = fromKera(desc.reflectionContract),
             .renderTarget = fromKera<kera::RenderTargetHandle>(desc.renderTarget),
             .topology = fromKera(desc.topology),
             .cullMode = fromKera(desc.cullMode),
@@ -282,7 +238,38 @@ namespace
             .blendMode = fromKera(desc.blendMode),
             .depthTest = desc.depthTest != 0,
             .depthWrite = desc.depthWrite != 0,
+            .vertexBindings = fromKeraVertexBindings(desc.vertexInput),
+            .vertexFields = fromKeraVertexFields(desc.vertexInput),
             .debugName = toString(desc.debugName),
+        };
+    }
+
+    KeraRendererValidationReport storeValidationReport(const KeraRenderer* renderer,
+                                                       const kera::RendererValidationReport& report)
+    {
+        renderer->validationIssues.clear();
+        renderer->validationMessages.clear();
+        renderer->validationNames.clear();
+
+        renderer->validationIssues.reserve(report.issues.size());
+        renderer->validationMessages.reserve(report.issues.size());
+        renderer->validationNames.reserve(report.issues.size());
+
+        for (const kera::RendererValidationIssue& issue : report.issues)
+        {
+            renderer->validationMessages.push_back(issue.message);
+            renderer->validationNames.push_back(issue.name);
+            renderer->validationIssues.push_back({
+                .message = toView(renderer->validationMessages.back()),
+                .name = toView(renderer->validationNames.back()),
+                .set = issue.set,
+                .binding = issue.binding,
+            });
+        }
+
+        return {
+            .issues = renderer->validationIssues.data(),
+            .issueCount = renderer->validationIssues.size(),
         };
     }
 
@@ -594,30 +581,41 @@ namespace
             return {};
         }
 
-        kera::GraphicsPipelineCreateDesc pipelineDesc = fromKera(*desc);
-        if (!emptyReflectionContract(desc->reflectionContract))
-        {
-            const kera::ShaderProgramHandle shaderProgram = fromKera<kera::ShaderProgramHandle>(desc->shaderProgram);
-            const kera::SlangReflectionMetadata* reflection =
-                renderer->renderer->getShaderProgramReflection(shaderProgram);
-            if (!reflection)
-            {
-                kera::Logger::getInstance().error(
-                    "Shader program reflection is missing while building pipeline reflection contract.");
-                return {};
-            }
+        return toKera(renderer->renderer->createGraphicsPipeline(fromKera(*desc)));
+    }
 
-            kera::PipelineReflectionBuildResult buildResult =
-                buildPipelineReflectionContractFromKera(desc->reflectionContract, *reflection);
-            if (!buildResult)
-            {
-                kera::Logger::getInstance().error(buildResult.errorMessage());
-                return {};
-            }
-            pipelineDesc.reflectionContract = buildResult.contract();
+    KeraRendererValidationReport validateVertexInputLayout(const KeraRenderer* renderer,
+                                                           KeraShaderProgramHandle shaderProgram,
+                                                           KeraVertexInputLayout vertexInput)
+    {
+        if (!renderer || !renderer->renderer)
+        {
+            return {};
         }
 
-        return toKera(renderer->renderer->createGraphicsPipeline(pipelineDesc));
+        kera::RendererValidationReport report;
+        const kera::SlangReflectionMetadata* reflection =
+            renderer->renderer->getShaderProgramReflection(fromKera<kera::ShaderProgramHandle>(shaderProgram));
+        if (!reflection)
+        {
+            report.addIssue("Shader program reflection is missing while validating vertex input layout.");
+            return storeValidationReport(renderer, report);
+        }
+
+        const std::vector<kera::ReflectedVertexBindingDesc> bindings = fromKeraVertexBindings(vertexInput);
+        const std::vector<kera::ReflectedVertexFieldDesc> fields = fromKeraVertexFields(vertexInput);
+        const kera::VertexInputLayoutBuildResult result =
+            kera::buildValidatedVertexInputLayout(*reflection, {
+                                                                   .debugName = {},
+                                                                   .bindings = bindings,
+                                                                   .fields = fields,
+                                                               });
+        if (!result)
+        {
+            return storeValidationReport(renderer, result.report());
+        }
+
+        return storeValidationReport(renderer, report);
     }
 
     int destroyGraphicsPipeline(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline)
@@ -684,30 +682,7 @@ namespace
         const kera::RendererValidationReport report =
             renderer->renderer->validateDescriptorSetDetailed(fromKera<kera::DescriptorSetHandle>(set));
 
-        renderer->validationIssues.clear();
-        renderer->validationMessages.clear();
-        renderer->validationNames.clear();
-
-        renderer->validationIssues.reserve(report.issues.size());
-        renderer->validationMessages.reserve(report.issues.size());
-        renderer->validationNames.reserve(report.issues.size());
-
-        for (const kera::RendererValidationIssue& issue : report.issues)
-        {
-            renderer->validationMessages.push_back(issue.message);
-            renderer->validationNames.push_back(issue.name);
-            renderer->validationIssues.push_back({
-                .message = toView(renderer->validationMessages.back()),
-                .name = toView(renderer->validationNames.back()),
-                .set = issue.set,
-                .binding = issue.binding,
-            });
-        }
-
-        return {
-            .issues = renderer->validationIssues.data(),
-            .issueCount = renderer->validationIssues.size(),
-        };
+        return storeValidationReport(renderer, report);
     }
 
     int setDebugName(KeraRenderer*, KeraHandle, KeraStringView)
@@ -867,6 +842,7 @@ namespace
         .destroySampler = destroySampler,
         .createRenderTarget = createRenderTarget,
         .destroyRenderTarget = destroyRenderTarget,
+        .validateVertexInputLayout = validateVertexInputLayout,
         .createGraphicsPipeline = createGraphicsPipeline,
         .destroyGraphicsPipeline = destroyGraphicsPipeline,
         .createDescriptorSet = createDescriptorSet,

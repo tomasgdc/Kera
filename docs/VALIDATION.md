@@ -121,10 +121,8 @@ Expected first capture target:
 
 ## Shader Contract Lane
 
-Kera uses Slang shader sources, with validation split into three layers:
+Kera uses Slang shader sources, with validation split into two useful layers:
 
-- `kera_unit_slang_shader_contracts` checks static source contracts, such as entry point names and
-  `[shader(...)]` stage annotations.
 - `kera_slang_reflection_tests` owns external `slangc` orchestration. It emits reflection JSON and
   SPIR-V, checks key JSON tokens, then invokes `kera_unit_tests` with
   `KeraSlangReflectionMetadata.GeneratedJsonContracts`.
@@ -133,7 +131,8 @@ Kera uses Slang shader sources, with validation split into three layers:
 
 The runtime reflection path keeps the linked-program session, module, entry point, and composite
 component alive while calling `getLayout()` and `toJson()`. The JSON is parsed into
-`SlangReflectionMetadata`, which renderer validation uses for descriptor and vertex-input contracts.
+`SlangReflectionMetadata`, which renderer validation uses for descriptor layouts and vertex-input
+mapping.
 
 Pipeline creation can derive descriptor set layouts from shader-program reflection when samples
 leave descriptor sets empty. This keeps descriptor names, bindings, and descriptor kinds owned by
@@ -142,15 +141,17 @@ the Slang source instead of duplicated in sample code.
 The common STL-free sample path is:
 
 - `createGraphicsShaderProgram()` builds a two-stage graphics program from one Slang file.
-- `PipelineReflectionBuilder` declares host vertex bindings and required shader resources.
-- `createGraphicsPipeline(GraphicsPipelineCreateDesc)` applies the contract using stored reflection
-  metadata.
+- `VertexInputLayoutBuilder` declares only host vertex bindings and reflected shader field mapping.
+- `createGraphicsPipeline(GraphicsPipelineCreateDesc)` validates that vertex input layout against
+  stored shader-program reflection and derives descriptor layouts from Slang metadata.
+- `validateVertexInputLayout()` can run the same field-layout validation as a preflight diagnostic
+  before pipeline creation.
 - `updateDescriptors()` updates descriptors by reflected shader variable name and returns an
   accumulated `ok()` result.
 
 This lane proves that samples do not need private renderer reflection headers, that reflected vertex
-attributes map cleanly to host bindings, and that missing, ambiguous, duplicate, or unused semantic
-mappings are rejected.
+attributes map cleanly to host bindings, and that missing, ambiguous, duplicate, unused, wrong-format,
+zero-stride, or duplicate-binding field mappings are rejected.
 
 The sample shaders avoid manual `register(...)` bindings where Slang reflection can supply layout
 data, and single-set reflected pipelines can allocate and bind descriptor sets without repeating the

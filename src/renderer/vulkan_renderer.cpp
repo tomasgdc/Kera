@@ -1698,21 +1698,30 @@ namespace kera
         pipelineDesc.depthWrite = desc.depthWrite;
         pipelineDesc.debugName = desc.debugName;
 
-        if (!desc.reflectionContract.empty())
+        if (!desc.vertexBindings.empty() || !desc.vertexFields.empty())
         {
-            if (!appendValidatedPipelineReflectionContract(pipelineDesc.vertexLayout, desc.reflectionContract))
+            const SlangReflectionMetadata* reflection = getShaderProgramReflection(desc.shaderProgram);
+            if (!reflection)
             {
-                Logger::getInstance().error("Failed to apply graphics pipeline reflection contract.");
+                Logger::getInstance().error("Shader program reflection is missing while validating vertex input.");
                 return {};
             }
+
+            const VertexInputLayoutBuildResult vertexInput =
+                buildValidatedVertexInputLayout(*reflection, {
+                                                                 .debugName = desc.debugName,
+                                                                 .bindings = desc.vertexBindings,
+                                                                 .fields = desc.vertexFields,
+                                                             });
+            if (!vertexInput)
+            {
+                Logger::getInstance().error(vertexInput.errorMessage());
+                return {};
+            }
+            pipelineDesc.vertexLayout = vertexInput.layout();
         }
 
-        GraphicsPipelineHandle pipeline = createGraphicsPipeline(pipelineDesc, desc.shaderProgram);
-        if (VulkanGraphicsPipelineResource* resource = m_graphicsPipelines.get(pipeline))
-        {
-            resource->m_reflectionContract = desc.reflectionContract;
-        }
-        return pipeline;
+        return createGraphicsPipeline(pipelineDesc, desc.shaderProgram);
     }
 
     std::vector<DescriptorSetLayoutDesc> VulkanRenderer::getGraphicsPipelineDescriptorSets(
@@ -1739,20 +1748,6 @@ namespace kera
         }
 
         return pipeline->m_desc.vertexLayout;
-    }
-
-    PipelineReflectionContract VulkanRenderer::getGraphicsPipelineReflectionContract(
-        GraphicsPipelineHandle pipelineHandle) const
-    {
-        const VulkanGraphicsPipelineResource* pipeline = m_graphicsPipelines.get(pipelineHandle);
-        if (!pipeline)
-        {
-            Logger::getInstance().error(
-                "Invalid graphics pipeline handle passed to getGraphicsPipelineReflectionContract.");
-            return {};
-        }
-
-        return pipeline->m_reflectionContract;
     }
 
     bool VulkanRenderer::destroyGraphicsPipeline(GraphicsPipelineHandle pipeline)
