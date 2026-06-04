@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace kera
 {
@@ -144,6 +145,51 @@ namespace kera
             return 0;
         }
 
+        bool isFloat32Scalar(const JsonValue& type)
+        {
+            return stringItem(type, "kind") == "scalar" && stringItem(type, "scalarType") == "float32";
+        }
+
+        bool isFloat32ElementType(const JsonValue& type)
+        {
+            const JsonValue* elementType = objectItem(type, "elementType");
+            return elementType && elementType->isObject() && isFloat32Scalar(*elementType);
+        }
+
+        std::optional<VertexFormat> reflectedVertexFormat(const JsonValue& type, uint32_t& outLocationCount)
+        {
+            const std::string kind = stringItem(type, "kind");
+            outLocationCount = 1;
+
+            if (kind == "vector" && isFloat32ElementType(type))
+            {
+                switch (numberItem(type, "elementCount"))
+                {
+                    case 2:
+                        return VertexFormat::Float2;
+                    case 3:
+                        return VertexFormat::Float3;
+                    case 4:
+                        return VertexFormat::Float4;
+                    default:
+                        return std::nullopt;
+                }
+            }
+
+            if (kind == "matrix" && isFloat32ElementType(type))
+            {
+                const uint32_t rows = numberItem(type, "rowCount");
+                const uint32_t columns = numberItem(type, "columnCount");
+                if (rows == 4 && columns == 4)
+                {
+                    outLocationCount = 4;
+                    return VertexFormat::Float4;
+                }
+            }
+
+            return std::nullopt;
+        }
+
         void parseBinding(const JsonValue& parameter, SlangReflectionMetadata& metadata)
         {
             const JsonValue* type = typeObject(parameter);
@@ -193,6 +239,7 @@ namespace kera
                 return;
             }
 
+            const std::string parameterName = stringItem(parameter, "name");
             const JsonValue* parameterBinding = bindingObject(parameter);
             const uint32_t baseLocation =
                 parameterBinding && parameterBinding->isObject() ? numberItem(*parameterBinding, "index") : 0;
@@ -211,18 +258,33 @@ namespace kera
                 }
 
                 SlangReflectionInput input{};
-                input.name = stringItem(field, "name");
+                input.parameterName = parameterName;
+                input.fieldName = stringItem(field, "name");
+                input.name = input.fieldName;
                 input.semanticName = stringItem(field, "semanticName");
                 input.location = baseLocation;
+
+                const JsonValue* fieldType = typeObject(field);
+                uint32_t reflectedLocationCount = 1;
+                if (fieldType)
+                {
+                    if (const std::optional<VertexFormat> format =
+                            reflectedVertexFormat(*fieldType, reflectedLocationCount))
+                    {
+                        input.format = *format;
+                        input.hasFormat = true;
+                        input.locationCount = reflectedLocationCount;
+                    }
+                }
 
                 const JsonValue* fieldBinding = bindingObject(field);
                 if (fieldBinding && fieldBinding->isObject())
                 {
                     input.location += numberItem(*fieldBinding, "index");
-                    input.locationCount = numberItem(*fieldBinding, "count", 1);
+                    input.locationCount = numberItem(*fieldBinding, "count", input.locationCount);
                 }
 
-                if (!input.name.empty())
+                if (!input.fieldName.empty())
                 {
                     entryPoint.inputs.push_back(std::move(input));
                 }

@@ -71,13 +71,25 @@ TEST(KeraSlangReflectionMetadata, GeneratedJsonContracts)
     ASSERT_NE(vertexMain, nullptr);
     EXPECT_EQ(vertexMain->stage, kera::ShaderType::Vertex);
     ASSERT_EQ(vertexMain->inputs.size(), 3u);
+    EXPECT_EQ(vertexMain->inputs[0].parameterName, "vertex");
+    EXPECT_EQ(vertexMain->inputs[0].fieldName, "position");
     EXPECT_EQ(vertexMain->inputs[0].semanticName, "POSITION");
     EXPECT_EQ(vertexMain->inputs[0].location, 0u);
+    EXPECT_EQ(vertexMain->inputs[0].format, kera::VertexFormat::Float3);
+    EXPECT_TRUE(vertexMain->inputs[0].hasFormat);
+    EXPECT_EQ(vertexMain->inputs[1].parameterName, "vertex");
+    EXPECT_EQ(vertexMain->inputs[1].fieldName, "color");
     EXPECT_EQ(vertexMain->inputs[1].semanticName, "COLOR");
     EXPECT_EQ(vertexMain->inputs[1].location, 1u);
+    EXPECT_EQ(vertexMain->inputs[1].format, kera::VertexFormat::Float3);
+    EXPECT_TRUE(vertexMain->inputs[1].hasFormat);
+    EXPECT_EQ(vertexMain->inputs[2].parameterName, "instance");
+    EXPECT_EQ(vertexMain->inputs[2].fieldName, "modelMatrix");
     EXPECT_EQ(vertexMain->inputs[2].semanticName, "TRANSFORM");
     EXPECT_EQ(vertexMain->inputs[2].location, 2u);
     EXPECT_EQ(vertexMain->inputs[2].locationCount, 4u);
+    EXPECT_EQ(vertexMain->inputs[2].format, kera::VertexFormat::Float4);
+    EXPECT_TRUE(vertexMain->inputs[2].hasFormat);
 
     const kera::SlangReflectionMetadata lighting = parseMetadata(lightingJson);
     const kera::SlangReflectionBinding* sceneTexture = lighting.findBinding("sceneTexture");
