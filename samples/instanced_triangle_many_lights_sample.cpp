@@ -112,6 +112,7 @@ namespace kera
             .source = KERA_SHADER_SOURCE_SLANG_FILE,
             .debugName = {},
         });
+
         if (!m_geometryShaderProgram.isValid())
         {
             return false;
@@ -124,6 +125,7 @@ namespace kera
             .source = KERA_SHADER_SOURCE_SLANG_FILE,
             .debugName = {},
         });
+
         return m_lightingShaderProgram.isValid();
     }
 
@@ -153,6 +155,7 @@ namespace kera
             .usage = BufferUsageKind::Index,
             .memoryAccess = MemoryAccess::CpuWrite,
         });
+
         if (!m_indexBuffer.isValid() ||
             !m_renderer.uploadBuffer(m_indexBuffer, indices.data(), indices.size() * sizeof(uint16_t)))
         {
@@ -166,6 +169,7 @@ namespace kera
             .usage = BufferUsageKind::Vertex,
             .memoryAccess = MemoryAccess::CpuWrite,
         });
+
         if (!m_instanceBuffer.isValid())
         {
             return false;
@@ -180,6 +184,7 @@ namespace kera
             .usage = BufferUsageKind::Vertex,
             .memoryAccess = MemoryAccess::CpuWrite,
         });
+
         if (!m_fullscreenVertexBuffer.isValid() ||
             !m_renderer.uploadBuffer(m_fullscreenVertexBuffer, fullscreenVertices.data(),
                                      fullscreenVertices.size() * sizeof(FullscreenTriangleVertex)))
@@ -192,6 +197,7 @@ namespace kera
             .usage = BufferUsageKind::Index,
             .memoryAccess = MemoryAccess::CpuWrite,
         });
+
         if (!m_fullscreenIndexBuffer.isValid() ||
             !m_renderer.uploadBuffer(m_fullscreenIndexBuffer, fullscreenIndices.data(),
                                      fullscreenIndices.size() * sizeof(uint16_t)))
@@ -204,6 +210,7 @@ namespace kera
             .usage = BufferUsageKind::Uniform,
             .memoryAccess = MemoryAccess::CpuWrite,
         });
+
         m_lightingUniformBuffer = m_renderer.createBuffer({
             .size = sizeof(LightingUniforms),
             .usage = BufferUsageKind::Uniform,
@@ -230,6 +237,7 @@ namespace kera
             .renderTarget = true,
             .sampled = true,
         });
+
         if (!m_sceneTexture.isValid())
         {
             return false;
@@ -243,6 +251,7 @@ namespace kera
             .sampled = false,
             .depthStencil = true,
         });
+
         if (!m_sceneDepthTexture.isValid())
         {
             return false;
@@ -252,6 +261,7 @@ namespace kera
             .colorTexture = m_sceneTexture,
             .depthTexture = m_sceneDepthTexture,
         });
+
         if (!m_sceneRenderTarget.isValid())
         {
             return false;
@@ -288,6 +298,7 @@ namespace kera
             .depthTest = true,
             .depthWrite = true,
         });
+
         if (!m_geometryPipeline.isValid())
         {
             return false;
@@ -314,6 +325,7 @@ namespace kera
             .vertexInput = lightingVertexInput,
             .cullMode = CullModeKind::None,
         });
+
         if (!m_lightingPipeline.isValid())
         {
             return false;
@@ -484,31 +496,37 @@ namespace kera
             m_renderer.destroyDescriptorSet(m_lightingDescriptorSet);
             m_lightingDescriptorSet = {};
         }
+
         if (m_geometryDescriptorSet.isValid())
         {
             m_renderer.destroyDescriptorSet(m_geometryDescriptorSet);
             m_geometryDescriptorSet = {};
         }
+
         if (m_lightingPipeline.isValid())
         {
             m_renderer.destroyGraphicsPipeline(m_lightingPipeline);
             m_lightingPipeline = {};
         }
+
         if (m_geometryPipeline.isValid())
         {
             m_renderer.destroyGraphicsPipeline(m_geometryPipeline);
             m_geometryPipeline = {};
         }
+
         if (m_sceneRenderTarget.isValid())
         {
             m_renderer.destroyRenderTarget(m_sceneRenderTarget);
             m_sceneRenderTarget = {};
         }
+
         if (m_sceneTexture.isValid())
         {
             m_renderer.destroyTexture(m_sceneTexture);
             m_sceneTexture = {};
         }
+
         if (m_sceneDepthTexture.isValid())
         {
             m_renderer.destroyTexture(m_sceneDepthTexture);
@@ -528,46 +546,55 @@ namespace kera
             m_renderer.destroySampler(m_sceneSampler);
             m_sceneSampler = {};
         }
+
         if (m_lightingUniformBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_lightingUniformBuffer);
             m_lightingUniformBuffer = {};
         }
+
         if (m_geometryUniformBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_geometryUniformBuffer);
             m_geometryUniformBuffer = {};
         }
+
         if (m_fullscreenIndexBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_fullscreenIndexBuffer);
             m_fullscreenIndexBuffer = {};
         }
+
         if (m_fullscreenVertexBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_fullscreenVertexBuffer);
             m_fullscreenVertexBuffer = {};
         }
+
         if (m_instanceBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_instanceBuffer);
             m_instanceBuffer = {};
         }
+
         if (m_indexBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_indexBuffer);
             m_indexBuffer = {};
         }
+
         if (m_vertexBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_vertexBuffer);
             m_vertexBuffer = {};
         }
+
         if (m_lightingShaderProgram.isValid())
         {
             m_renderer.destroyShaderProgram(m_lightingShaderProgram);
             m_lightingShaderProgram = {};
         }
+
         if (m_geometryShaderProgram.isValid())
         {
             m_renderer.destroyShaderProgram(m_geometryShaderProgram);

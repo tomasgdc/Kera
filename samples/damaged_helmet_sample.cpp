@@ -134,6 +134,7 @@ namespace kera
             .source = KERA_SHADER_SOURCE_SLANG_FILE,
             .debugName = {},
         });
+
         if (!m_meshShaderProgram.isValid())
         {
             return false;
@@ -146,6 +147,7 @@ namespace kera
             .source = KERA_SHADER_SOURCE_SLANG_FILE,
             .debugName = {},
         });
+
         return m_displayShaderProgram.isValid();
     }
 
@@ -180,6 +182,7 @@ namespace kera
             .memoryAccess = MemoryAccess::CpuWrite,
             .debugName = stringView("DamagedHelmet Fullscreen Vertex Buffer"),
         });
+
         m_fullscreenIndexBuffer = m_renderer.createBuffer({
             .size = indices.size() * sizeof(uint16_t),
             .usage = BufferUsageKind::Index,
@@ -211,6 +214,7 @@ namespace kera
             .sampled = true,
             .debugName = stringView("DamagedHelmet Scene Texture"),
         });
+
         m_sceneDepthTexture = m_renderer.createTexture({
             .width = extent.width,
             .height = extent.height,
@@ -220,6 +224,7 @@ namespace kera
             .depthStencil = true,
             .debugName = stringView("DamagedHelmet Depth Texture"),
         });
+
         if (!m_sceneTexture.isValid() || !m_sceneDepthTexture.isValid())
         {
             return false;
@@ -230,6 +235,7 @@ namespace kera
             .depthTexture = m_sceneDepthTexture,
             .debugName = stringView("DamagedHelmet Render Target"),
         });
+
         return m_sceneRenderTarget.isValid() && createPipelinesAndDescriptors();
     }
 
@@ -256,6 +262,7 @@ namespace kera
             .depthWrite = m_model.materialFactors.alphaMode != KERA_GLTF_ALPHA_BLEND,
             .debugName = stringView("DamagedHelmet Mesh Pipeline"),
         });
+
         if (!m_meshPipeline.isValid())
         {
             return false;
@@ -300,6 +307,7 @@ namespace kera
             .cullMode = CullModeKind::None,
             .debugName = stringView("DamagedHelmet Display Pipeline"),
         });
+
         if (!m_displayPipeline.isValid())
         {
             return false;
@@ -341,6 +349,7 @@ namespace kera
         {
             return;
         }
+
         if (!m_meshPipeline.isValid() || !m_displayPipeline.isValid() || !m_sceneRenderTarget.isValid() ||
             m_meshDescriptorSets.empty() || !m_displayDescriptorSet.isValid())
         {
@@ -426,6 +435,7 @@ namespace kera
                 m_renderer.destroyDescriptorSet(descriptorSet);
             }
         }
+
         m_meshDescriptorSets.clear();
 
         if (m_displayPipeline.isValid())
@@ -433,21 +443,25 @@ namespace kera
             m_renderer.destroyGraphicsPipeline(m_displayPipeline);
             m_displayPipeline = {};
         }
+
         if (m_meshPipeline.isValid())
         {
             m_renderer.destroyGraphicsPipeline(m_meshPipeline);
             m_meshPipeline = {};
         }
+
         if (m_sceneRenderTarget.isValid())
         {
             m_renderer.destroyRenderTarget(m_sceneRenderTarget);
             m_sceneRenderTarget = {};
         }
+
         if (m_sceneDepthTexture.isValid())
         {
             m_renderer.destroyTexture(m_sceneDepthTexture);
             m_sceneDepthTexture = {};
         }
+
         if (m_sceneTexture.isValid())
         {
             m_renderer.destroyTexture(m_sceneTexture);
@@ -462,11 +476,13 @@ namespace kera
             m_renderer.destroyBuffer(m_uniformBuffer);
             m_uniformBuffer = {};
         }
+
         if (m_fullscreenIndexBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_fullscreenIndexBuffer);
             m_fullscreenIndexBuffer = {};
         }
+
         if (m_fullscreenVertexBuffer.isValid())
         {
             m_renderer.destroyBuffer(m_fullscreenVertexBuffer);
@@ -488,6 +504,7 @@ namespace kera
             m_renderer.destroyShaderProgram(m_displayShaderProgram);
             m_displayShaderProgram = {};
         }
+
         if (m_meshShaderProgram.isValid())
         {
             m_renderer.destroyShaderProgram(m_meshShaderProgram);
