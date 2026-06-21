@@ -171,7 +171,8 @@ extern "C"
     {
         KERA_TEXTURE_FORMAT_RGBA8 = 0,
         KERA_TEXTURE_FORMAT_RGBA8_SRGB = 1,
-        KERA_TEXTURE_FORMAT_DEPTH32 = 2
+        KERA_TEXTURE_FORMAT_B10G11R11_UFLOAT = 2,
+        KERA_TEXTURE_FORMAT_DEPTH32 = 3
     } KeraTextureFormat;
 
     typedef enum KeraSamplerFilter
@@ -414,6 +415,29 @@ extern "C"
         float tangent[4];
     } KeraGltfVertex;
 
+    typedef struct KeraIblSphericalHarmonics
+    {
+        float coefficients[9][4];
+    } KeraIblSphericalHarmonics;
+
+    typedef struct KeraIblEnvironmentLoadDesc
+    {
+        KeraStringView iblKtxPath;
+        KeraStringView skyboxKtxPath;
+        KeraStringView sphericalHarmonicsPath;
+        KeraStringView debugName;
+    } KeraIblEnvironmentLoadDesc;
+
+    typedef struct KeraIblEnvironment
+    {
+        KeraTextureHandle iblTexture;
+        KeraTextureHandle skyboxTexture;
+        KeraSamplerHandle sampler;
+        KeraIblSphericalHarmonics sphericalHarmonics;
+        uint32_t iblMipLevels;
+        uint32_t skyboxMipLevels;
+    } KeraIblEnvironment;
+
     typedef struct KeraRenderer KeraRenderer;
 
     typedef struct KeraRendererApiV1
@@ -488,6 +512,9 @@ extern "C"
         int (*endFrame)(KeraRenderer* renderer, KeraFrameHandle frame);
         int (*loadGltfModel)(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedModel* outModel);
         void (*destroyGltfModel)(KeraRenderer* renderer, KeraGltfLoadedModel* model);
+        int (*loadIblEnvironment)(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
+                                  KeraIblEnvironment* outEnvironment);
+        void (*destroyIblEnvironment)(KeraRenderer* renderer, KeraIblEnvironment* env);
     } KeraRendererApiV1;
 
     KERA_API const KeraRendererApiV1* keraGetRendererApiV1(void);

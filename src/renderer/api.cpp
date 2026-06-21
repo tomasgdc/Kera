@@ -5,6 +5,7 @@
 #include "kera/renderer/backend/vulkan/vulkan_renderer.h"
 #include "kera/renderer/gltf_loader.h"
 #include "kera/renderer/interfaces.h"
+#include "kera/renderer/ktx_loader.h"
 #include "kera/renderer/reflection_contracts.h"
 #include "kera/utilities/logger.h"
 
@@ -347,6 +348,44 @@ namespace
         out.materialTextures.normal = fromKera<kera::TextureHandle>(model.materialTextures.normal);
         out.materialSampler = fromKera<kera::SamplerHandle>(model.materialSampler);
         return out;
+    }
+
+    KeraIblSphericalHarmonics toKera(const kera::IblSphericalHarmonics& value)
+    {
+        KeraIblSphericalHarmonics result{};
+        std::memcpy(result.coefficients, value.coefficients, sizeof(result.coefficients));
+        return result;
+    }
+
+    KeraIblEnvironment toKera(const kera::IblEnvironment& value)
+    {
+        return {
+            .iblTexture = toKera(value.iblTexture),
+            .skyboxTexture = toKera(value.skyboxTexture),
+            .sampler = toKera(value.sampler),
+            .sphericalHarmonics = toKera(value.sphericalHarmonics),
+            .iblMipLevels = value.iblMiplevels,
+            .skyboxMipLevels = value.skyboxMiplevels,
+        };
+    }
+
+    kera::IblSphericalHarmonics fromKera(const KeraIblSphericalHarmonics& value)
+    {
+        kera::IblSphericalHarmonics result{};
+        std::memcpy(result.coefficients, value.coefficients, sizeof(result.coefficients));
+        return result;
+    }
+
+    kera::IblEnvironment fromKera(const KeraIblEnvironment& value)
+    {
+        return {
+            .iblTexture = fromKera<kera::TextureHandle>(value.iblTexture),
+            .skyboxTexture = fromKera<kera::TextureHandle>(value.skyboxTexture),
+            .sampler = fromKera<kera::SamplerHandle>(value.sampler),
+            .sphericalHarmonics = fromKera(value.sphericalHarmonics),
+            .iblMiplevels = value.iblMipLevels,
+            .skyboxMiplevels = value.skyboxMipLevels,
+        };
     }
 
     KeraRenderer* createRenderer(const KeraRendererCreateDesc* desc)
@@ -809,6 +848,42 @@ namespace
         *model = {};
     }
 
+    int loadIblEnvironment(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
+                           KeraIblEnvironment* outEnvironment)
+    {
+        if (!renderer || !renderer->renderer || !desc || !outEnvironment)
+        {
+            return 0;
+        }
+
+        kera::IblEnvironmentLoadDesc loadDesc{.iblKtxPath = toString(desc->iblKtxPath),
+                                              .skyboxKtxPath = toString(desc->skyboxKtxPath),
+                                              .sphericalHarmonicsPath = toString(desc->sphericalHarmonicsPath),
+                                              .debugName = toString(desc->debugName)};
+
+        kera::RendererResult<kera::IblEnvironment> result = kera::loadIblEnvironment(*renderer->renderer, loadDesc);
+        if (!result)
+        {
+            kera::Logger::getInstance().error("IBL environment load failed: " + result.errorMessage());
+            return 0;
+        }
+
+        *outEnvironment = toKera(result.value());
+        return 1;
+    }
+
+    void destroyIblEnvironment(KeraRenderer* renderer, KeraIblEnvironment* environment)
+    {
+        if (!renderer || !renderer->renderer || !environment)
+        {
+            return;
+        }
+
+        kera::IblEnvironment internalEnv = fromKera(*environment);
+        kera::destroyIblEnvironment(*renderer->renderer, internalEnv);
+        *environment = {};
+    }
+
     const KeraRendererApiV1 g_api{
         .abiVersion = KERA_RENDERER_ABI_VERSION,
         .createRenderer = createRenderer,
@@ -864,6 +939,8 @@ namespace
         .endFrame = endFrame,
         .loadGltfModel = loadGltfModel,
         .destroyGltfModel = destroyGltfModel,
+        .loadIblEnvironment = loadIblEnvironment,
+        .destroyIblEnvironment = destroyIblEnvironment,
     };
 }  // namespace
 

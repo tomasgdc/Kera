@@ -47,6 +47,24 @@ namespace kera
         uint64_t frameIndex = 0;
     };
 
+    struct TextureSubresourceUpload
+    {
+        uint32_t mipLevel = 0;
+        uint32_t arrayLayer = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        std::size_t offset = 0;
+        std::size_t size = 0;
+    };
+
+    struct TexturePrepareUpload
+    {
+        const void* data = nullptr;
+        std::size_t size = 0;
+        const TextureSubresourceUpload* subresources = nullptr;
+        std::size_t subresourceCount = 0;
+    };
+
     class IRenderer
     {
     public:
@@ -92,6 +110,7 @@ namespace kera
 
         virtual TextureHandle createTexture(const TextureDesc& desc) = 0;
         virtual bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) = 0;
+        virtual bool uploadTextureSubresource(TextureHandle texture, const TexturePrepareUpload& upload) = 0;
         virtual bool destroyTexture(TextureHandle texture) = 0;
         virtual SamplerHandle createSampler(const SamplerDesc& desc) = 0;
         virtual bool destroySampler(SamplerHandle sampler) = 0;

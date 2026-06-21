@@ -1,7 +1,7 @@
 // Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
-#include "damaged_helmet_sample.h"
+#include "damaged_helmet_ibl_lighting_sample.h"
 
 #include "render_context.h"
 #include "sample_utils.h"
@@ -46,6 +46,8 @@ namespace kera
             constexpr const char* NormalTexture = "normalTexture";
             constexpr const char* SceneTexture = "sceneTexture";
             constexpr const char* MaterialSampler = "materialSampler";
+            constexpr const char* EnvironmentTexture = "environmentTexture";
+            constexpr const char* EnvironmentSampler = "environmentSampler";
         }  // namespace DamagedHelmetShader
 
         constexpr uint32_t kUniformRingSlots = 3;
@@ -66,20 +68,21 @@ namespace kera
         }
     }  // namespace
 
-    DamagedHelmetSample::DamagedHelmetSample(Renderer& renderer)
-        : Sample("Damaged Helmet Texture Loading"), m_renderer(renderer)
+    DamagedHelmetIBLLightingSample::DamagedHelmetIBLLightingSample(Renderer& renderer)
+        : Sample("Damaged Helmet IBL Lighint"), m_renderer(renderer)
     {
     }
 
-    DamagedHelmetSample::DamagedHelmetSample(Renderer& renderer, uint32_t debugView)
-        : Sample("Damaged Helmet Texture Loading")
+    DamagedHelmetIBLLightingSample::DamagedHelmetIBLLightingSample(Renderer& renderer, uint32_t debugView)
+        : Sample("Damaged Helmet IBL Lighint")
         , m_renderer(renderer)
         , m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
     {
     }
 
-    DamagedHelmetSample::DamagedHelmetSample(Renderer& renderer, uint32_t debugView, bool fixedYaw, float yawRadians)
-        : Sample("Damaged Helmet Texture Loading")
+    DamagedHelmetIBLLightingSample::DamagedHelmetIBLLightingSample(Renderer& renderer, uint32_t debugView,
+                                                                   bool fixedYaw, float yawRadians)
+        : Sample("Damaged Helmet IBL Lighint")
         , m_renderer(renderer)
         , m_initialYawRadians(fixedYaw ? yawRadians : 2.2f)
         , m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
@@ -87,7 +90,7 @@ namespace kera
     {
     }
 
-    void DamagedHelmetSample::initialize()
+    void DamagedHelmetIBLLightingSample::initialize()
     {
         sampleLogInfo("Initializing " + std::string(getName()));
         m_initialized = false;
@@ -102,6 +105,13 @@ namespace kera
         if (!loadGltfModelResources())
         {
             sampleLogError("Failed to load DamagedHelmet glTF model resources.");
+            cleanup();
+            return;
+        }
+
+        if (!loadIblEnvironmentResources())
+        {
+            sampleLogError("Failed to load DamagedHelmet IBL environment resources.");
             cleanup();
             return;
         }
@@ -124,7 +134,7 @@ namespace kera
         sampleLogInfo("DamagedHelmet sample initialized successfully.");
     }
 
-    bool DamagedHelmetSample::createShaderPrograms()
+    bool DamagedHelmetIBLLightingSample::createShaderPrograms()
     {
         const std::string shaderPath = resolveShaderPath(DamagedHelmetShader::Path);
         m_meshShaderProgram = m_renderer.createGraphicsShaderProgram({
@@ -151,7 +161,7 @@ namespace kera
         return m_displayShaderProgram.isValid();
     }
 
-    bool DamagedHelmetSample::loadGltfModelResources()
+    bool DamagedHelmetIBLLightingSample::loadGltfModelResources()
     {
         const std::string assetPath = resolveSampleAssetPath("assets/gltf/DamagedHelmet/DamagedHelmet.gltf");
         if (!m_renderer.loadGltfModel(
@@ -170,7 +180,34 @@ namespace kera
         return m_uniformBuffer.isValid();
     }
 
-    bool DamagedHelmetSample::createFullscreenGeometry()
+    bool DamagedHelmetIBLLightingSample::loadIblEnvironmentResources()
+    {
+        const std::string iblBasePath =
+            resolveSampleAssetPath("assets/ibl/autum_field_puresky/generated/generated_ibl.ktx");
+
+        const std::string skyboxPath =
+            resolveSampleAssetPath("assets/ibl/autum_field_puresky/generated/generated_skybox.ktx");
+
+        const std::string sphericalHarmonicsPath =
+            resolveSampleAssetPath("assets/ibl/autum_field_puresky/generated/sh.txt");
+
+        if (!m_renderer.loadIblEnvironment(
+                {
+                    .iblKtxPath = sampleStringView(iblBasePath),
+                    .skyboxKtxPath = sampleStringView(skyboxPath),
+                    .sphericalHarmonicsPath = sampleStringView(sphericalHarmonicsPath),
+                    .debugName = stringView("DamagedHelmet IBL Environment"),
+                },
+                m_iblEnvironment))
+        {
+            sampleLogError("DamagedHelmet IBL environment load failed.");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool DamagedHelmetIBLLightingSample::createFullscreenGeometry()
     {
         const auto& vertices = fullscreenTriangleVertices();
         const auto& indices = fullscreenTriangleIndices();
@@ -196,7 +233,7 @@ namespace kera
                m_renderer.uploadBuffer(m_fullscreenIndexBuffer, indices.data(), indices.size() * sizeof(uint16_t));
     }
 
-    bool DamagedHelmetSample::recreateRenderResources(Extent2D extent)
+    bool DamagedHelmetIBLLightingSample::recreateRenderResources(Extent2D extent)
     {
         if (extent.width == 0 || extent.height == 0)
         {
@@ -239,7 +276,7 @@ namespace kera
         return m_sceneRenderTarget.isValid() && createPipelinesAndDescriptors();
     }
 
-    bool DamagedHelmetSample::createPipelinesAndDescriptors()
+    bool DamagedHelmetIBLLightingSample::createPipelinesAndDescriptors()
     {
         const VertexInputLayout meshVertexInput =
             VertexInputLayoutBuilder{}
@@ -286,7 +323,9 @@ namespace kera
                      .sampledImage(DamagedHelmetShader::EmissiveTexture, m_model.materialTextures.emissive)
                      .sampledImage(DamagedHelmetShader::OcclusionTexture, m_model.materialTextures.occlusion)
                      .sampledImage(DamagedHelmetShader::NormalTexture, m_model.materialTextures.normal)
+                     .sampledImage(DamagedHelmetShader::EnvironmentTexture, m_iblEnvironment.iblTexture)
                      .sampler(DamagedHelmetShader::MaterialSampler, m_model.materialSampler)
+                     .sampler(DamagedHelmetShader::EnvironmentSampler, m_iblEnvironment.sampler)
                      .ok())
             {
                 return false;
@@ -321,7 +360,7 @@ namespace kera
                    .ok();
     }
 
-    void DamagedHelmetSample::update(float deltaTime)
+    void DamagedHelmetIBLLightingSample::update(float deltaTime)
     {
         if (m_initialized)
         {
@@ -329,7 +368,7 @@ namespace kera
         }
     }
 
-    void DamagedHelmetSample::resize(Extent2D extent)
+    void DamagedHelmetIBLLightingSample::resize(Extent2D extent)
     {
         if (extent == m_renderExtent || extent.width == 0 || extent.height == 0)
         {
@@ -343,7 +382,7 @@ namespace kera
         }
     }
 
-    void DamagedHelmetSample::render(RenderContext& context)
+    void DamagedHelmetIBLLightingSample::render(RenderContext& context)
     {
         if (!m_initialized)
         {
@@ -386,7 +425,8 @@ namespace kera
                     glm::vec4(toShaderAlphaMode(m_model.materialFactors.alphaMode), m_model.materialFactors.alphaCutoff,
                               1.22f, 0.86f);
                 uniforms.debugViewGamma = glm::vec4(static_cast<float>(m_debugView), 2.2f, 1.0f / 2.2f, 0.0f);
-                uniforms.padding2 = glm::vec4(m_model.materialFactors.doubleSided ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
+                uniforms.padding2 = glm::vec4(m_model.materialFactors.doubleSided ? 1.0f : 0.0f,
+                                              static_cast<float>(m_iblEnvironment.iblMipLevels), 0.0f, 0.0f);
 
                 if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(uniforms)))
                 {
@@ -416,12 +456,12 @@ namespace kera
                                    });
     }
 
-    ClearColorValue DamagedHelmetSample::getClearColor() const
+    ClearColorValue DamagedHelmetIBLLightingSample::getClearColor() const
     {
         return {0.9f, 0.9f, 0.88f, 1.0f};
     }
 
-    void DamagedHelmetSample::destroyRenderResources()
+    void DamagedHelmetIBLLightingSample::destroyRenderResources()
     {
         if (m_displayDescriptorSet.isValid())
         {
@@ -469,7 +509,7 @@ namespace kera
         }
     }
 
-    void DamagedHelmetSample::destroyLoadedResources()
+    void DamagedHelmetIBLLightingSample::destroyLoadedResources()
     {
         if (m_uniformBuffer.isValid())
         {
@@ -488,10 +528,12 @@ namespace kera
             m_renderer.destroyBuffer(m_fullscreenVertexBuffer);
             m_fullscreenVertexBuffer = {};
         }
+
         m_renderer.destroyGltfModel(m_model);
+        m_renderer.destroyIblEnvironment(m_iblEnvironment);
     }
 
-    void DamagedHelmetSample::cleanup()
+    void DamagedHelmetIBLLightingSample::cleanup()
     {
         sampleLogInfo("Cleaning up " + std::string(getName()));
         m_initialized = false;

@@ -116,6 +116,7 @@ namespace kera
     {
         inline constexpr KeraTextureFormat RGBA8 = KERA_TEXTURE_FORMAT_RGBA8;
         inline constexpr KeraTextureFormat RGBA8Srgb = KERA_TEXTURE_FORMAT_RGBA8_SRGB;
+        inline constexpr KeraTextureFormat B10G11R11Ufloat = KERA_TEXTURE_FORMAT_B10G11R11_UFLOAT;
         inline constexpr KeraTextureFormat Depth32 = KERA_TEXTURE_FORMAT_DEPTH32;
     }
 
@@ -152,6 +153,9 @@ namespace kera
     using VertexInputBindingDesc = KeraVertexInputBindingDesc;
     using VertexInputFieldDesc = KeraVertexInputFieldDesc;
     using GltfLoadDesc = KeraGltfLoadDesc;
+    using IblEnvironmentLoadDesc = KeraIblEnvironmentLoadDesc;
+    using IblEnvironment = KeraIblEnvironment;
+    using IblSphericalHarmonics = KeraIblSphericalHarmonics;
 
 #define KERA_VERTEX_FIELD(VertexType, member, bindingIndex, vertexFormat) \
     #member, bindingIndex, static_cast<uint32_t>(offsetof(VertexType, member)), vertexFormat
@@ -552,6 +556,16 @@ namespace kera
         void destroyGltfModel(KeraGltfLoadedModel& model) noexcept
         {
             if (isValid()) m_api->destroyGltfModel(m_renderer, &model);
+        }
+
+        bool loadIblEnvironment(const IblEnvironmentLoadDesc& desc, KeraIblEnvironment& outEnvironment) noexcept
+        {
+            return isValid() && m_api->loadIblEnvironment(m_renderer, &desc, &outEnvironment) != 0;
+        }
+
+        void destroyIblEnvironment(KeraIblEnvironment& env) noexcept
+        {
+            if (isValid()) m_api->destroyIblEnvironment(m_renderer, &env);
         }
 
     private:

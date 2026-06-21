@@ -19,12 +19,14 @@ add_executable(kera_samples
     sample_utils.h
     basic_triangle_sample.cpp
     basic_triangle_sample.h
-    damaged_helmet_sample.cpp
-    damaged_helmet_sample.h
     instanced_triangle_sample.cpp
     instanced_triangle_sample.h
     instanced_triangle_many_lights_sample.cpp
     instanced_triangle_many_lights_sample.h
+    damaged_helmet_sample.cpp
+    damaged_helmet_sample.h
+    damaged_helmet_ibl_lighting_sample.cpp
+    damaged_helmet_ibl_lighting_sample.h
     ${SHADER_FILES}
 )
 target_link_libraries(kera_samples PRIVATE kera)

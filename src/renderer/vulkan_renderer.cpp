@@ -99,9 +99,12 @@ namespace kera
                     return VK_FORMAT_D32_SFLOAT;
                 case TextureFormat::RGBA8Srgb:
                     return VK_FORMAT_R8G8B8A8_SRGB;
+                case TextureFormat::B10G11R11Ufloat:
+                    return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
                 case TextureFormat::RGBA8:
-                default:
                     return VK_FORMAT_R8G8B8A8_UNORM;
+                default:
+                    return VK_FORMAT_UNDEFINED;
             }
         }
 
@@ -1319,12 +1322,16 @@ namespace kera
                                                                       : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
                                                  : VK_IMAGE_LAYOUT_UNDEFINED;
 
+        const bool isCube = desc.dimension == TextureDimension::TextureCube;
+        const uint32_t arrayLayers = isCube ? 6 : 1;
+
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.flags = isCube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.extent = {desc.width, desc.height, 1};
         imageInfo.mipLevels = resource.m_mipLevels;
-        imageInfo.arrayLayers = 1;
+        imageInfo.arrayLayers = arrayLayers;
         imageInfo.format = resource.m_format;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1365,13 +1372,13 @@ namespace kera
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = resource.m_image;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.viewType = isCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
         viewInfo.format = resource.m_format;
         viewInfo.subresourceRange.aspectMask = resource.m_aspectMask;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = resource.m_mipLevels;
         viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = 1;
+        viewInfo.subresourceRange.layerCount = arrayLayers;
 
         if (vkCreateImageView(vkDevice, &viewInfo, nullptr, &resource.m_imageView) != VK_SUCCESS)
         {
@@ -1399,6 +1406,7 @@ namespace kera
             Logger::getInstance().error("Renderer is not initialized.");
             return false;
         }
+
         if (!data || size == 0)
         {
             Logger::getInstance().error("Texture upload data must be non-empty.");
@@ -1411,16 +1419,19 @@ namespace kera
             Logger::getInstance().error("Invalid texture handle passed to uploadTexture.");
             return false;
         }
+
         if (!texture->m_sampled || texture->m_descriptorLayout == VK_IMAGE_LAYOUT_UNDEFINED)
         {
             Logger::getInstance().error("Texture upload requires a sampled Vulkan texture.");
             return false;
         }
+
         if (texture->m_depthStencil)
         {
             Logger::getInstance().error("Depth texture upload is not supported by uploadTexture.");
             return false;
         }
+
         if (texture->m_mipLevels > 1 && !texture->m_generateMipmaps)
         {
             Logger::getInstance().error(
@@ -1449,6 +1460,7 @@ namespace kera
             Logger::getInstance().error("Failed to create Vulkan texture staging buffer.");
             return false;
         }
+
         if (!stagingBuffer.copyFrom(data, static_cast<VkDeviceSize>(expectedSize)))
         {
             Logger::getInstance().error("Failed to upload data to Vulkan texture staging buffer.");
@@ -1463,6 +1475,80 @@ namespace kera
 
         ++m_stats.textureUploadsThisFrame;
         return true;
+    }
+
+    bool VulkanRenderer::uploadTextureSubresource(TextureHandle textureHandle, const TexturePrepareUpload& upload)
+    {
+        if (!m_device)
+        {
+            Logger::getInstance().error("Renderer is not initialized.");
+            return false;
+        }
+
+        if (!upload.data || upload.size == 0)
+        {
+            Logger::getInstance().error("Texture upload data must be non-empty.");
+            return false;
+        }
+
+        VulkanTextureResource* texture = m_textures.get(textureHandle);
+        if (!texture)
+        {
+            Logger::getInstance().error("Invalid texture handle passed to uploadTexture.");
+            return false;
+        }
+
+        if (!texture->m_sampled || texture->m_descriptorLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+        {
+            Logger::getInstance().error("Texture upload requires a sampled Vulkan texture.");
+            return false;
+        }
+
+        if (texture->m_depthStencil)
+        {
+            Logger::getInstance().error("Depth texture upload is not supported by uploadTexture.");
+            return false;
+        }
+
+        std::vector<VkBufferImageCopy> copyRegions;
+        copyRegions.reserve(upload.subresourceCount);
+
+        for (std::size_t i = 0; i < upload.subresourceCount; ++i)
+        {
+            const TextureSubresourceUpload& subresource = upload.subresources[i];
+            if (subresource.mipLevel >= texture->m_mipLevels)
+            {
+                Logger::getInstance().error("Texture upload subresource mip level exceeds the texture's mip levels.");
+                return false;
+            }
+
+            VkBufferImageCopy region{};
+            region.bufferOffset = subresource.offset;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
+            region.imageSubresource.aspectMask = texture->m_aspectMask;
+            region.imageSubresource.mipLevel = subresource.mipLevel;
+            region.imageSubresource.baseArrayLayer = subresource.arrayLayer;
+            region.imageSubresource.layerCount = 1;
+            region.imageOffset = {0, 0, 0};
+            region.imageExtent = {subresource.width, subresource.height, 1};
+            copyRegions.push_back(region);
+        }
+
+        Buffer stagingBuffer = acquireStagingBuffer(static_cast<VkDeviceSize>(upload.size));
+        if (!stagingBuffer.isValid())
+        {
+            Logger::getInstance().error("Failed to create Vulkan texture staging buffer.");
+            return false;
+        }
+
+        if (!stagingBuffer.copyFrom(upload.data, static_cast<VkDeviceSize>(upload.size)))
+        {
+            Logger::getInstance().error("Failed to upload data to Vulkan texture staging buffer.");
+            return false;
+        }
+
+        return copyBufferToTextureSubresources(stagingBuffer, *texture, copyRegions);
     }
 
     bool VulkanRenderer::destroyTexture(TextureHandle texture)
@@ -3561,6 +3647,64 @@ namespace kera
         {
             transitionTextureLayout(commandBuffer, texture, texture.m_descriptorLayout);
         }
+        endDebugLabel(m_device->getVulkanDevice(), commandBuffer);
+
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+        {
+            vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            Logger::getInstance().error("Failed to end Vulkan texture upload command buffer.");
+            return false;
+        }
+
+        uint64_t uploadTimelineValue = 0;
+        if (!submitImmediateCommandBuffer(commandBuffer, uploadTimelineValue))
+        {
+            vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            Logger::getInstance().error("Failed to submit Vulkan texture upload command buffer.");
+            return false;
+        }
+
+        VulkanDeferredDeletion deletion{};
+        deletion.m_timelineValue = uploadTimelineValue;
+        deletion.m_buffers.push_back(std::move(stagingBuffer));
+        deletion.m_commandBuffers.push_back(commandBuffer);
+        queueDeferredDeletion(std::move(deletion));
+        return true;
+    }
+
+    bool VulkanRenderer::copyBufferToTextureSubresources(Buffer& stagingBuffer, VulkanTextureResource& texture,
+                                                         const std::vector<VkBufferImageCopy>& regions)
+    {
+        VkCommandBufferAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocateInfo.commandPool = m_device->getCommandPool();
+        allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocateInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        if (vkAllocateCommandBuffers(m_device->getVulkanDevice(), &allocateInfo, &commandBuffer) != VK_SUCCESS)
+        {
+            Logger::getInstance().error("Failed to allocate Vulkan texture upload command buffer.");
+            return false;
+        }
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+        {
+            vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            Logger::getInstance().error("Failed to begin Vulkan texture upload command buffer.");
+            return false;
+        }
+
+        beginDebugLabel(m_device->getVulkanDevice(), commandBuffer, "Kera Texture Upload", 0.9f, 0.6f, 0.2f);
+        transitionTextureLayout(commandBuffer, texture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.getVulkanBuffer(), texture.m_image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(regions.size()),
+                               regions.data());
+
+        transitionTextureLayout(commandBuffer, texture, texture.m_descriptorLayout);
         endDebugLabel(m_device->getVulkanDevice(), commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)

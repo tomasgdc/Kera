@@ -341,6 +341,7 @@ namespace kera
 
         TextureHandle createTexture(const TextureDesc& desc) override;
         bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) override;
+        bool uploadTextureSubresource(TextureHandle texture, const TexturePrepareUpload& upload) override;
         bool destroyTexture(TextureHandle texture) override;
         SamplerHandle createSampler(const SamplerDesc& desc) override;
         bool destroySampler(SamplerHandle sampler) override;
@@ -416,6 +417,8 @@ namespace kera
         void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
                                      VkImageLayout newLayout);
         bool copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture);
+        bool copyBufferToTextureSubresources(Buffer& stagingBuffer, VulkanTextureResource& texture,
+                                             const std::vector<VkBufferImageCopy>& regions);
         bool generateTextureMipmaps(VkCommandBuffer commandBuffer, VulkanTextureResource& texture);
         void clearCompletedFrameResourceUse(uint32_t syncIndex);
         void recordDescriptorSetUse(uint32_t syncIndex, DescriptorSetHandle descriptorSetHandle,

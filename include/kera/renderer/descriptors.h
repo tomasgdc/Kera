@@ -101,7 +101,14 @@ namespace kera
     {
         RGBA8,
         RGBA8Srgb,
+        B10G11R11Ufloat,
         Depth32
+    };
+
+    enum class TextureDimension
+    {
+        Texture2D,
+        TextureCube
     };
 
     inline std::size_t textureFormatBytesPerPixel(TextureFormat format) noexcept
@@ -110,7 +117,7 @@ namespace kera
         {
             case TextureFormat::RGBA8:
             case TextureFormat::RGBA8Srgb:
-                return 4;
+            case TextureFormat::B10G11R11Ufloat:
             case TextureFormat::Depth32:
                 return 4;
             default:
@@ -219,6 +226,7 @@ namespace kera
         uint32_t width = 0;
         uint32_t height = 0;
         TextureFormat format = TextureFormat::RGBA8;
+        TextureDimension dimension = TextureDimension::Texture2D;
         // A value of 1 with generateMipmaps=true requests the full mip chain.
         uint32_t mipLevels = 1;
         // uploadTexture() uploads level 0 and generates the remaining levels when enabled.
@@ -234,8 +242,10 @@ namespace kera
         SamplerFilter minFilter = SamplerFilter::Linear;
         SamplerFilter magFilter = SamplerFilter::Linear;
         SamplerMipFilter mipFilter = SamplerMipFilter::Linear;
+        SamplerMipFilter mipmapMopFilter = SamplerMipFilter::Linear;
         SamplerAddressMode addressModeU = SamplerAddressMode::ClampToEdge;
         SamplerAddressMode addressModeV = SamplerAddressMode::ClampToEdge;
+        SamplerAddressMode addressModeW = SamplerAddressMode::ClampToEdge;
         float minLod = 0.0f;
         float maxLod = 0.0f;
         // Values above one request anisotropic filtering, clamped to device limits by the backend.
