@@ -228,6 +228,7 @@ set(KERA_RENDERER_SOURCES
     src/renderer/slang_reflection.cpp
     src/renderer/reflection_contracts.cpp
     src/renderer/gltf_loader.cpp
+    src/renderer/ktx_loader.cpp
     src/renderer/buffer.cpp
     src/renderer/image.cpp
 )
@@ -260,6 +261,7 @@ set(KERA_RENDERER_INTERNAL_HEADERS
     include/kera/renderer/slang_reflection.h
     include/kera/renderer/reflection_contracts.h
     include/kera/renderer/gltf_loader.h
+    include/kera/renderer/ktx_loader.h
     include/kera/renderer/result.h
     include/kera/renderer/buffer.h
     include/kera/renderer/image.h

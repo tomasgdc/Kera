@@ -33,7 +33,7 @@ namespace kera
 
         namespace DamagedHelmetShader
         {
-            constexpr const char* Path = "shaders/damaged_helmet.slang";
+            constexpr const char* Path = "shaders/damaged_helmet_ibl.slang";
             constexpr const char* MeshVertexEntryPoint = "helmetVertexMain";
             constexpr const char* MeshFragmentEntryPoint = "helmetFragmentMain";
             constexpr const char* FullscreenVertexEntryPoint = "fullscreenVertexMain";

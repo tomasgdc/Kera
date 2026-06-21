@@ -1324,6 +1324,7 @@ namespace kera
 
         const bool isCube = desc.dimension == TextureDimension::TextureCube;
         const uint32_t arrayLayers = isCube ? 6 : 1;
+        resource.m_arrayLayers = arrayLayers;
 
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1519,6 +1520,19 @@ namespace kera
             if (subresource.mipLevel >= texture->m_mipLevels)
             {
                 Logger::getInstance().error("Texture upload subresource mip level exceeds the texture's mip levels.");
+                return false;
+            }
+
+            if (subresource.arrayLayer >= texture->m_arrayLayers)
+            {
+                Logger::getInstance().error(
+                    "Texture upload subresource array layer exceeds the texture's array layers.");
+                return false;
+            }
+
+            if (subresource.offset > upload.size || subresource.size > upload.size - subresource.offset)
+            {
+                Logger::getInstance().error("Texture upload subresource exceeds the provided data size.");
                 return false;
             }
 
@@ -3473,7 +3487,7 @@ namespace kera
         barrier.subresourceRange.baseMipLevel = 0;
         barrier.subresourceRange.levelCount = texture.m_mipLevels;
         barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
+        barrier.subresourceRange.layerCount = texture.m_arrayLayers;
 
         VkDependencyInfo dependencyInfo{};
         dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;

@@ -128,7 +128,7 @@ namespace kera
         std::vector<TextureSubresourceUpload> subresources;
         subresources.reserve(static_cast<size_t>(mipLevels) * KtxFaceCountCube);
 
-        for (uint32_t mip = 0; mipLevels; ++mip)
+        for (uint32_t mip = 0; mip < mipLevels; ++mip)
         {
             if (offset + sizeof(uint32_t) > bytes.size())
             {
@@ -184,13 +184,27 @@ namespace kera
         }
 
         std::vector<float> values;
-        std::string token;
+        std::string line;
 
-        while (file >> token)
+        while (std::getline(file, line))
         {
-            size_t consumed = 0;
-            const float value = std::stof(token, &consumed);
-            if (consumed > 0)
+            const std::size_t commenStart = line.find("//");
+            if (commenStart != std::string::npos)
+            {
+                line.resize(commenStart);
+            }
+
+            for (char& c : line)
+            {
+                if (c == '(' || c == ')' || c == ',' || c == ';')
+                {
+                    c = ' ';
+                }
+            }
+
+            std::stringstream toeknStream(line);
+            float value = 0.0f;
+            while (toeknStream >> value)
             {
                 values.push_back(value);
             }
@@ -198,6 +212,7 @@ namespace kera
 
         if (values.size() < 27)
         {
+            error = "Spherical harmonics file does not contain enough coefficients: " + path.string();
             return false;
         }
 
@@ -303,6 +318,12 @@ namespace kera
 
     void destroyIblEnvironment(IRenderer& renderer, IblEnvironment& environment)
     {
+        if (environment.sampler.isValid())
+        {
+            renderer.destroySampler(environment.sampler);
+            environment.sampler = {};
+        }
+
         if (environment.skyboxTexture.isValid())
         {
             renderer.destroyTexture(environment.skyboxTexture);

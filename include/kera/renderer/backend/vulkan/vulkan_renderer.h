@@ -60,6 +60,7 @@ namespace kera
         TextureFormat m_textureFormat = TextureFormat::RGBA8;
         VkExtent2D m_extent{};
         uint32_t m_mipLevels = 1;
+        uint32_t m_arrayLayers = 1;
         bool m_generateMipmaps = false;
         VkImageAspectFlags m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -87,6 +88,7 @@ namespace kera
             , m_textureFormat(other.m_textureFormat)
             , m_extent(other.m_extent)
             , m_mipLevels(other.m_mipLevels)
+            , m_arrayLayers(other.m_arrayLayers)
             , m_generateMipmaps(other.m_generateMipmaps)
             , m_aspectMask(other.m_aspectMask)
             , m_currentLayout(other.m_currentLayout)
@@ -111,6 +113,7 @@ namespace kera
                 m_textureFormat = other.m_textureFormat;
                 m_extent = other.m_extent;
                 m_mipLevels = other.m_mipLevels;
+                m_arrayLayers = other.m_arrayLayers;
                 m_generateMipmaps = other.m_generateMipmaps;
                 m_aspectMask = other.m_aspectMask;
                 m_currentLayout = other.m_currentLayout;
@@ -144,6 +147,7 @@ namespace kera
             m_textureFormat = TextureFormat::RGBA8;
             m_extent = {};
             m_mipLevels = 1;
+            m_arrayLayers = 1;
             m_generateMipmaps = false;
             m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;

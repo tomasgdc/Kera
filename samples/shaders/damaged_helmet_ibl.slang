@@ -29,7 +29,7 @@ Texture2D<float4> metalRoughnessTexture;
 Texture2D<float4> emissiveTexture;
 Texture2D<float4> occlusionTexture;
 Texture2D<float4> normalTexture;
-Texture2D<float4> environmentTexture;
+TextureCube<float4> environmentTexture;
 SamplerState materialSampler;
 SamplerState environmentSampler;
 
@@ -107,7 +107,7 @@ float studioCard(float3 direction, float3 cardDirection, float exponent, float s
     return pow(saturate(dot(direction, normalize(cardDirection)) * softness + (1.0 - softness)), exponent);
 }
 
-// Sample-local neutral lighting approximation; Kera does not expose renderer-owned IBL in this slice.
+// Renderer-owned prefiltered environment radiance.
 float3 sampleEnvironmentRadiance(float3 direction, float roughness) {
     float mipCount = helmetParams.padding2.y;
     float lod = roughness * max(mipCount - 1.0, 0.0);
