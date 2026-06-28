@@ -37,6 +37,15 @@ namespace kera
     {
         constexpr uint32_t kMaxFramesInFlight = 2;
 
+        std::size_t alignUp(std::size_t value, std::size_t alignement)
+        {
+            if (alignement <= 1)
+            {
+                return value;
+            }
+            return ((value + alignement - 1) / alignement) * alignement;
+        }
+
         bool surfaceWouldUseZeroExtent(const SwapChainSupportDetails& support, uint32_t width, uint32_t height)
         {
             if (support.capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
@@ -1178,10 +1187,25 @@ namespace kera
             slotCount == 0
                 ? static_cast<uint32_t>(m_frameSyncResources.empty() ? kMaxFramesInFlight : m_frameSyncResources.size())
                 : slotCount;
+
+        VkPhysicalDeviceProperties physicalDeviceProperties{};
+        vkGetPhysicalDeviceProperties(m_device->getVulkanPhysicalDevice(), &physicalDeviceProperties);
+        const std::size_t uniformAlignment =
+            static_cast<std::size_t>(physicalDeviceProperties.limits.minUniformBufferOffsetAlignment);
+
+        const std::size_t ringSlotStride = alignUp(elementSize, uniformAlignment);
+        if (ringSlotStride < elementSize ||
+            ringSlotStride > std::numeric_limits<std::size_t>::max() / resolvedSlotCount)
+        {
+            Logger::getInstance().error("Uniform ring buffer size exceeds addresable memory");
+            return {};
+        }
+
         VulkanBufferResource resource{};
         resource.m_ringSlotSize = elementSize;
+        resource.m_ringSlotSize = ringSlotStride;
         resource.m_ringSlotCount = resolvedSlotCount;
-        if (!resource.m_buffer.initialize(*m_device, static_cast<VkDeviceSize>(elementSize * resolvedSlotCount),
+        if (!resource.m_buffer.initialize(*m_device, static_cast<VkDeviceSize>(ringSlotStride * resolvedSlotCount),
                                           BufferUsage::Uniform, toMemoryFlags(MemoryAccess::CpuWrite)))
         {
             Logger::getInstance().error("Failed to create Vulkan uniform ring buffer.");
@@ -1202,16 +1226,19 @@ namespace kera
     {
         VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
         VulkanFrameResource* frame = m_frames.get(frameHandle);
+
         if (!buffer || !frame)
         {
             Logger::getInstance().error("Invalid handle passed to uploadUniformRingBuffer.");
             return false;
         }
-        if (buffer->m_ringSlotSize == 0 || buffer->m_ringSlotCount == 0)
+
+        if (buffer->m_ringSlotSize == 0 || buffer->m_ringSlotStride == 0 || buffer->m_ringSlotCount == 0)
         {
             Logger::getInstance().error("Buffer is not a Vulkan uniform ring buffer.");
             return false;
         }
+
         if (size > buffer->m_ringSlotSize)
         {
             Logger::getInstance().error("Uniform ring buffer upload exceeds slot size.");
@@ -1226,12 +1253,12 @@ namespace kera
     {
         const VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
         const VulkanFrameResource* frame = m_frames.get(frameHandle);
-        if (!buffer || !frame || buffer->m_ringSlotSize == 0 || buffer->m_ringSlotCount == 0)
+        if (!buffer || !frame || buffer->m_ringSlotStride == 0 || buffer->m_ringSlotCount == 0)
         {
             return 0;
         }
 
-        return buffer->m_ringSlotSize * (frame->m_syncIndex % buffer->m_ringSlotCount);
+        return buffer->m_ringSlotStride * (frame->m_syncIndex % buffer->m_ringSlotCount);
     }
 
     TextureHandle VulkanRenderer::createTexture(const TextureDesc& desc)
@@ -1247,6 +1274,7 @@ namespace kera
             Logger::getInstance().error("Texture dimensions must be non-zero.");
             return {};
         }
+
         if (desc.mipLevels == 0)
         {
             Logger::getInstance().error("Texture mip level count must be non-zero.");
@@ -1261,11 +1289,13 @@ namespace kera
             Logger::getInstance().error("Texture mip level count exceeds the texture extent.");
             return {};
         }
+
         if (requestedMipLevels > 1 && (desc.depthStencil || desc.renderTarget))
         {
             Logger::getInstance().error("Mipmapped render-target or depth textures are not supported.");
             return {};
         }
+
         if (desc.generateMipmaps && !desc.sampled)
         {
             Logger::getInstance().error("Generated mipmaps require a sampled texture.");
@@ -1278,6 +1308,7 @@ namespace kera
             usage |=
                 desc.depthStencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         }
+
         if (desc.sampled)
         {
             usage |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -1286,6 +1317,7 @@ namespace kera
                 usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
             }
         }
+
         if (usage == 0)
         {
             Logger::getInstance().error("TextureDesc must request at least one usage.");
@@ -1309,6 +1341,7 @@ namespace kera
                 return {};
             }
         }
+
         resource.m_textureFormat = desc.format;
         resource.m_extent = {desc.width, desc.height};
         resource.m_mipLevels = requestedMipLevels;
@@ -1955,22 +1988,31 @@ namespace kera
             Logger::getInstance().error("Invalid handle passed to updateDescriptorSet.");
             return false;
         }
+
         if (!validateDescriptorBinding(*descriptorSet, binding, DescriptorType::UniformBuffer))
         {
             Logger::getInstance().error("Descriptor binding does not accept a uniform buffer.");
             return false;
         }
 
+        std::size_t descriptorOffset = offset;
+        if (buffer->m_ringSlotSize != 0 && buffer->m_ringSlotStride != 0 && buffer->m_ringSlotCount != 0 &&
+            offset < buffer->m_ringSlotSize * buffer->m_ringSlotCount && offset % buffer->m_ringSlotSize == 0)
+        {
+            const std::size_t ringSlot = offset / buffer->m_ringSlotSize;
+            descriptorOffset = ringSlot * buffer->m_ringSlotStride;
+        }
+
         const VkDeviceSize bufferSize = buffer->m_buffer.getSize();
-        if (offset > bufferSize)
+        if (descriptorOffset > bufferSize)
         {
             Logger::getInstance().error("Descriptor buffer offset exceeds buffer size.");
             return false;
         }
 
         const VkDeviceSize descriptorRange =
-            range == 0 ? bufferSize - static_cast<VkDeviceSize>(offset) : static_cast<VkDeviceSize>(range);
-        if (static_cast<VkDeviceSize>(offset) + descriptorRange > bufferSize)
+            range == 0 ? bufferSize - static_cast<VkDeviceSize>(descriptorOffset) : static_cast<VkDeviceSize>(range);
+        if (static_cast<VkDeviceSize>(descriptorOffset) + descriptorRange > bufferSize)
         {
             Logger::getInstance().error("Descriptor buffer range exceeds buffer size.");
             return false;
@@ -1978,7 +2020,7 @@ namespace kera
 
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = buffer->m_buffer.getVulkanBuffer();
-        bufferInfo.offset = static_cast<VkDeviceSize>(offset);
+        bufferInfo.offset = static_cast<VkDeviceSize>(descriptorOffset);
         bufferInfo.range = descriptorRange;
 
         VkWriteDescriptorSet write{};
@@ -1996,7 +2038,7 @@ namespace kera
             if (reference.m_binding == binding)
             {
                 reference.m_handle = bufferHandle;
-                reference.m_offset = offset;
+                reference.m_offset = descriptorOffset;
                 reference.m_range = static_cast<std::size_t>(descriptorRange);
                 updatedBinding = true;
                 break;
@@ -2005,7 +2047,7 @@ namespace kera
         if (!updatedBinding)
         {
             descriptorSet->m_buffers.push_back(
-                {binding, bufferHandle, offset, static_cast<std::size_t>(descriptorRange)});
+                {binding, bufferHandle, descriptorOffset, static_cast<std::size_t>(descriptorRange)});
         }
         return true;
     }

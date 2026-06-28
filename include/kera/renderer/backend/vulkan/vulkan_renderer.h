@@ -47,6 +47,7 @@ namespace kera
     {
         Buffer m_buffer;
         std::size_t m_ringSlotSize = 0;
+        std::size_t m_ringSlotStride = 0;
         uint32_t m_ringSlotCount = 1;
     };
 
