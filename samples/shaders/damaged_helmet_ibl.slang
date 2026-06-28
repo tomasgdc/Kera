@@ -22,6 +22,7 @@ struct HelmetUniforms {
     float4 alphaModeCutoffReflectionExposure;
     float4 debugViewGamma;
     float4 padding2;
+    float4 shCoefficients[9];
 };
 
 ConstantBuffer<HelmetUniforms> helmetParams;
@@ -114,6 +115,25 @@ float3 sampleEnvironmentRadiance(float3 direction, float roughness) {
     float mipCount = helmetParams.padding2.y;
     float lod = roughness * max(mipCount - 1.0, 0.0);
     return environmentTexture.SampleLevel(environmentSampler, direction, lod).rgb;
+}
+
+float3 evaluateDiffuseIrradiance(float3 n) {
+    float x = n.x;
+    float y = n.y;
+    float z = n.z;
+
+    float3 irradiance = 
+        helmetParams.shCoefficients[0].rgb +
+        helmetParams.shCoefficients[1].rgb * y +
+        helmetParams.shCoefficients[2].rgb * z + 
+        helmetParams.shCoefficients[3].rgb * x + 
+        helmetParams.shCoefficients[4].rgb * (x*y) +
+        helmetParams.shCoefficients[5].rgb * (y*z) + 
+        helmetParams.shCoefficients[6].rgb * (3.0 * z * z - 1.0) +
+        helmetParams.shCoefficients[7].rgb * (x * z) +
+        helmetParams.shCoefficients[8].rgb * (x * x - y * y);
+
+    return max(irradiance, float3(0.0));
 }
 
 float luminance(float3 color) {
@@ -223,8 +243,8 @@ float4 helmetFragmentMain(HelmetVertexOutput input, bool isFrontFace : SV_IsFron
     float3 metalBrdf = metalFresnel * lightSpecular;
     float3 directLight = lerp(dielectricBrdf, metalBrdf, metallic);
 
-    float3 ambientRadiance = sampleEnvironmentRadiance(normal, 1.0) * ambient;
-    float3 ambientDiffuse = albedo * ambientRadiance * ambientOcclusion * (1.0 - metallic);
+    float3 diffuseIradiance = evaluateDiffuseIrradiance(normal) * ambient;
+    float3 ambientDiffuse = albedo * diffuseIradiance * ambientOcclusion * (1.0 - metallic);
 
     float3 dielectricEnvironmentFresnel = F_Schlick(dielectricSpecular, reflectance90, nDotV);
     float3 metalEnvironmentFresnel = F_Schlick(albedo, reflectance90, nDotV);

@@ -31,6 +31,7 @@ namespace kera
             glm::vec4 alphaModeCutoffReflectionExposure;
             glm::vec4 debugViewGamma;
             glm::vec4 padding2;
+            glm::vec4 shCoefficient[9];
         };
 
         namespace DamagedHelmetIBLShader
@@ -493,6 +494,13 @@ namespace kera
                 uniforms.padding2 = glm::vec4(m_model.materialFactors.doubleSided ? 1.0f : 0.0f,
                                               static_cast<float>(m_iblEnvironment.iblMipLevels),
                                               static_cast<float>(m_iblEnvironment.skyboxMipLevels), 0.0f);
+
+                for (uint32_t i = 0; i < 9; ++i)
+                {
+                    uniforms.shCoefficient[i] = glm::vec4(m_iblEnvironment.sphericalHarmonics.coefficients[i][0],
+                                                          m_iblEnvironment.sphericalHarmonics.coefficients[i][1],
+                                                          m_iblEnvironment.sphericalHarmonics.coefficients[i][2], 0.0f);
+                }
 
                 if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(uniforms)))
                 {
