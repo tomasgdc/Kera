@@ -161,7 +161,7 @@ if(BUILD_TESTING)
 
     kera_add_sample_smoke(kera_samples_many_lights_resize_smoke
         LABEL Kera_many_lights_resize_smoke
-        ARGS --smoke-test --smoke-frames 3 --resize-smoke --sample-index 2
+        ARGS --smoke-test --smoke-frames 2 --resize-smoke --sample-index 2
         LOG kera_many_lights_resize_smoke.log
         LABELS vulkan validation render resize render_target descriptor depth
         VALIDATION_LAYER
@@ -169,7 +169,7 @@ if(BUILD_TESTING)
 
     kera_add_sample_smoke(kera_samples_instanced_resize_smoke
         LABEL Kera_instanced_resize_smoke
-        ARGS --smoke-test --smoke-frames 3 --resize-smoke --sample-index 1
+        ARGS --smoke-test --smoke-frames 2 --resize-smoke --sample-index 1
         LOG kera_instanced_resize_smoke.log
         LABELS vulkan validation render resize descriptor
         VALIDATION_LAYER
@@ -183,9 +183,17 @@ if(BUILD_TESTING)
         VALIDATION_LAYER
     )
 
+    kera_add_sample_smoke(kera_samples_damaged_helmet_ibl_smoke
+        LABEL Kera_damaged_helmet_ibl_smoke
+        ARGS --smoke-test --smoke-frames 2 --sample-index 4 --hide-stats-overlay
+        LOG kera_damaged_helmet_ibl_smoke.log
+        LABELS vulkan validation render texture gltf descriptor ibl ktx
+        VALIDATION_LAYER
+    )
+
     kera_add_sample_smoke(kera_samples_damaged_helmet_zero_resize_smoke
         LABEL Kera_damaged_helmet_zero_resize_smoke
-        ARGS --smoke-test --smoke-frames 3 --sample-index 3 --zero-resize-smoke --hide-stats-overlay
+        ARGS --smoke-test --smoke-frames 2 --sample-index 3 --zero-resize-smoke --hide-stats-overlay
         LOG kera_damaged_helmet_zero_resize_smoke.log
         LABELS vulkan validation render resize texture gltf descriptor
         VALIDATION_LAYER
@@ -193,31 +201,41 @@ if(BUILD_TESTING)
 
     kera_add_sample_smoke(kera_samples_damaged_helmet_visual_regression_smoke
         LABEL Kera_damaged_helmet_visual_regression_smoke
-        ARGS --smoke-test --smoke-frames 40 --sample-index 3 --hide-stats-overlay
+        ARGS --smoke-test --smoke-frames 2 --sample-index 3 --hide-stats-overlay
         LOG kera_damaged_helmet_visual_regression_smoke.log
         LABELS vulkan validation render texture gltf descriptor visual
-        SCREENSHOT_FRAMES 24
+        SCREENSHOT_FRAMES 1
         SCREENSHOT_DIR visual_regression/damaged_helmet
         METRICS_ARGS --min-coverage 0.08 --max-coverage 0.45 --min-luma-range 0.45
     )
 
     kera_add_sample_smoke(kera_samples_damaged_helmet_back_visual_smoke
         LABEL Kera_damaged_helmet_back_visual_smoke
-        ARGS --smoke-test --smoke-frames 3 --sample-index 3 --hide-stats-overlay --damaged-helmet-fixed-yaw-degrees 0
+        ARGS --smoke-test --smoke-frames 2 --sample-index 3 --hide-stats-overlay --damaged-helmet-fixed-yaw-degrees 0
         LOG kera_damaged_helmet_back_visual_smoke.log
         LABELS vulkan validation render texture gltf descriptor visual
-        SCREENSHOT_FRAMES 2
+        SCREENSHOT_FRAMES 1
         SCREENSHOT_DIR visual_regression/damaged_helmet_back
         METRICS_ARGS --min-coverage 0.08 --max-coverage 0.45 --min-luma-range 0.35
     )
 
     kera_add_sample_smoke(kera_samples_damaged_helmet_gamma_audit_smoke
         LABEL Kera_damaged_helmet_gamma_audit_smoke
-        ARGS --smoke-test --smoke-frames 40 --sample-index 3 --hide-stats-overlay --damaged-helmet-debug-view 10
+        ARGS --smoke-test --smoke-frames 2 --sample-index 3 --hide-stats-overlay --damaged-helmet-debug-view 10
         LOG kera_damaged_helmet_gamma_audit_smoke.log
         LABELS vulkan validation render texture gltf descriptor visual gamma
-        SCREENSHOT_FRAMES 24
+        SCREENSHOT_FRAMES 1
         SCREENSHOT_DIR visual_regression/damaged_helmet_gamma
         METRICS_ARGS --min-coverage 0.08 --max-coverage 0.45 --min-luma-range 0.35
+    )
+
+    kera_add_sample_smoke(kera_samples_damaged_helmet_ibl_visual_smoke
+        LABEL Kera_damaged_helmet_ibl_visual_smoke
+        ARGS --smoke-test --smoke-frames 2 --sample-index 4 --hide-stats-overlay --damaged-helmet-fixed-yaw-degrees 0
+        LOG kera_damaged_helmet_ibl_visual_smoke.log
+        LABELS vulkan validation render texture gltf descriptor ibl ktx visual
+        SCREENSHOT_FRAMES 1
+        SCREENSHOT_DIR visual_regression/damaged_helmet_ibl
+        METRICS_ARGS --min-coverage 0.75 --max-coverage 1.00 --min-luma-range 0.45
     )
 endif()

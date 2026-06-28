@@ -81,7 +81,8 @@ Sample indices:
 - `0`: Basic Triangle
 - `1`: Instanced Triangle
 - `2`: Instanced Triangle Many Lights
-- `3`: DamagedHelmet Texture Loading
+- `3`: Damaged Helmet Texture Loading
+- `4`: Damaged Helmet IBL Lighting
 
 ## Validation
 

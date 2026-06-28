@@ -83,10 +83,12 @@ When `KERA_RUN_GPU_SMOKE=1` is set, sample smoke logs are written beside the sam
 - `build/windows-debug/samples/Debug/kera_many_lights_resize_smoke.log`
 - `build/windows-debug/samples/Debug/kera_instanced_resize_smoke.log`
 - `build/windows-debug/samples/Debug/kera_damaged_helmet_smoke.log`
+- `build/windows-debug/samples/Debug/kera_damaged_helmet_ibl_smoke.log`
 - `build/windows-debug/samples/Debug/kera_damaged_helmet_zero_resize_smoke.log`
 - `build/windows-debug/samples/Debug/kera_damaged_helmet_visual_regression_smoke.log`
 - `build/windows-debug/samples/Debug/kera_damaged_helmet_back_visual_smoke.log`
 - `build/windows-debug/samples/Debug/kera_damaged_helmet_gamma_audit_smoke.log`
+- `build/windows-debug/samples/Debug/kera_damaged_helmet_ibl_visual_smoke.log`
 
 ## Frame Capture Lane
 
