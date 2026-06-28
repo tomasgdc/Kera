@@ -472,9 +472,9 @@ namespace kera
                 uniforms.model = glm::rotate(glm::mat4(1.0f), yawRadians, glm::vec3(0.0f, 1.0f, 0.0f)) *
                                  glm::make_mat4(m_model.transform);
                 uniforms.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, -0.05f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                uniforms.projection = glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
                 uniforms.inverseView = glm::inverse(uniforms.view);
                 uniforms.inverseProjection = glm::inverse(uniforms.projection);
-                uniforms.projection = glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
                 uniforms.cameraPosition = glm::vec4(cameraPosition, 1.0f);
                 uniforms.lightDirectionAmbient = glm::vec4(glm::normalize(glm::vec3(-0.42f, -0.72f, -0.48f)), 0.08f);
                 uniforms.baseColorFactor =
@@ -491,7 +491,8 @@ namespace kera
                               1.22f, 0.86f);
                 uniforms.debugViewGamma = glm::vec4(static_cast<float>(m_debugView), 2.2f, 1.0f / 2.2f, 0.0f);
                 uniforms.padding2 = glm::vec4(m_model.materialFactors.doubleSided ? 1.0f : 0.0f,
-                                              static_cast<float>(m_iblEnvironment.iblMipLevels), 0.0f, 0.0f);
+                                              static_cast<float>(m_iblEnvironment.iblMipLevels),
+                                              static_cast<float>(m_iblEnvironment.skyboxMipLevels), 0.0f);
 
                 if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(uniforms)))
                 {
