@@ -39,6 +39,7 @@ namespace kera
         Renderer& m_renderer;
         ShaderProgramHandle m_meshShaderProgram;
         ShaderProgramHandle m_displayShaderProgram;
+        ShaderProgramHandle m_skyboxShaderProgram;
         GltfLoadedModel m_model;
         IblEnvironment m_iblEnvironment;
         BufferHandle m_fullscreenVertexBuffer;
@@ -49,7 +50,9 @@ namespace kera
         RenderTargetHandle m_sceneRenderTarget;
         GraphicsPipelineHandle m_meshPipeline;
         GraphicsPipelineHandle m_displayPipeline;
+        GraphicsPipelineHandle m_skyboxPipeline;
         std::vector<DescriptorSetHandle> m_meshDescriptorSets;
+        std::vector<DescriptorSetHandle> m_syboxDescriptorSets;
         DescriptorSetHandle m_displayDescriptorSet;
         Extent2D m_renderExtent;
         uint32_t m_fullscreenIndexCount = 0;

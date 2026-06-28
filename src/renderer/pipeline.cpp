@@ -335,7 +335,7 @@ namespace kera
         pipelineInfo.pViewportState = &viewportState;
         pipelineInfo.pRasterizationState = &rasterizer;
         pipelineInfo.pMultisampleState = &multisampling;
-        pipelineInfo.pDepthStencilState = (desc.depthTest || desc.depthWrite) ? &depthStencil : nullptr;
+        pipelineInfo.pDepthStencilState = depthFormat != VK_FORMAT_UNDEFINED ? &depthStencil : nullptr;
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.layout = pipeline_layout_;

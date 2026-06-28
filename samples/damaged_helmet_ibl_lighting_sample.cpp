@@ -21,6 +21,8 @@ namespace kera
             glm::mat4 model;
             glm::mat4 view;
             glm::mat4 projection;
+            glm::mat4 inverseView;
+            glm::mat4 inverseProjection;
             glm::vec4 cameraPosition;
             glm::vec4 lightDirectionAmbient;
             glm::vec4 baseColorFactor;
@@ -31,13 +33,15 @@ namespace kera
             glm::vec4 padding2;
         };
 
-        namespace DamagedHelmetShader
+        namespace DamagedHelmetIBLShader
         {
             constexpr const char* Path = "shaders/damaged_helmet_ibl.slang";
             constexpr const char* MeshVertexEntryPoint = "helmetVertexMain";
             constexpr const char* MeshFragmentEntryPoint = "helmetFragmentMain";
             constexpr const char* FullscreenVertexEntryPoint = "fullscreenVertexMain";
             constexpr const char* FullscreenFragmentEntryPoint = "fullscreenFragmentMain";
+            constexpr const char* SkyboxVertexEntryPoint = "skyboxVertexMain";
+            constexpr const char* SkyboxFragmentEntryPoint = "skyboxFragmentMain";
             constexpr const char* HelmetParams = "helmetParams";
             constexpr const char* BaseColorTexture = "baseColorTexture";
             constexpr const char* MetalRoughnessTexture = "metalRoughnessTexture";
@@ -46,6 +50,8 @@ namespace kera
             constexpr const char* NormalTexture = "normalTexture";
             constexpr const char* SceneTexture = "sceneTexture";
             constexpr const char* MaterialSampler = "materialSampler";
+            constexpr const char* SkyboxTexture = "skyboxTexture";
+            constexpr const char* SkyboxSampler = "skyboxSampler";
             constexpr const char* EnvironmentTexture = "environmentTexture";
             constexpr const char* EnvironmentSampler = "environmentSampler";
         }  // namespace DamagedHelmetShader
@@ -136,11 +142,11 @@ namespace kera
 
     bool DamagedHelmetIBLLightingSample::createShaderPrograms()
     {
-        const std::string shaderPath = resolveShaderPath(DamagedHelmetShader::Path);
+        const std::string shaderPath = resolveShaderPath(DamagedHelmetIBLShader::Path);
         m_meshShaderProgram = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shaderPath),
-            .vertexEntryPoint = stringView(DamagedHelmetShader::MeshVertexEntryPoint),
-            .fragmentEntryPoint = stringView(DamagedHelmetShader::MeshFragmentEntryPoint),
+            .vertexEntryPoint = stringView(DamagedHelmetIBLShader::MeshVertexEntryPoint),
+            .fragmentEntryPoint = stringView(DamagedHelmetIBLShader::MeshFragmentEntryPoint),
             .source = KERA_SHADER_SOURCE_SLANG_FILE,
             .debugName = {},
         });
@@ -152,13 +158,26 @@ namespace kera
 
         m_displayShaderProgram = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shaderPath),
-            .vertexEntryPoint = stringView(DamagedHelmetShader::FullscreenVertexEntryPoint),
-            .fragmentEntryPoint = stringView(DamagedHelmetShader::FullscreenFragmentEntryPoint),
+            .vertexEntryPoint = stringView(DamagedHelmetIBLShader::FullscreenVertexEntryPoint),
+            .fragmentEntryPoint = stringView(DamagedHelmetIBLShader::FullscreenFragmentEntryPoint),
             .source = KERA_SHADER_SOURCE_SLANG_FILE,
             .debugName = {},
         });
 
-        return m_displayShaderProgram.isValid();
+        if (!m_displayShaderProgram.isValid())
+        {
+            return false;
+        }
+
+        m_skyboxShaderProgram = m_renderer.createGraphicsShaderProgram({
+            .path = sampleStringView(shaderPath),
+            .vertexEntryPoint = stringView(DamagedHelmetIBLShader::SkyboxVertexEntryPoint),
+            .fragmentEntryPoint = stringView(DamagedHelmetIBLShader::SkyboxFragmentEntryPoint),
+            .source = KERA_SHADER_SOURCE_SLANG_FILE,
+            .debugName = {},
+        });
+
+        return m_skyboxShaderProgram.isValid();
     }
 
     bool DamagedHelmetIBLLightingSample::loadGltfModelResources()
@@ -317,15 +336,16 @@ namespace kera
 
             const std::size_t uniformOffset = sizeof(HelmetUniforms) * index;
             if (!m_renderer.updateDescriptors(descriptorSet)
-                     .uniform<HelmetUniforms>(DamagedHelmetShader::HelmetParams, m_uniformBuffer, uniformOffset)
-                     .sampledImage(DamagedHelmetShader::BaseColorTexture, m_model.materialTextures.baseColor)
-                     .sampledImage(DamagedHelmetShader::MetalRoughnessTexture, m_model.materialTextures.metalRoughness)
-                     .sampledImage(DamagedHelmetShader::EmissiveTexture, m_model.materialTextures.emissive)
-                     .sampledImage(DamagedHelmetShader::OcclusionTexture, m_model.materialTextures.occlusion)
-                     .sampledImage(DamagedHelmetShader::NormalTexture, m_model.materialTextures.normal)
-                     .sampledImage(DamagedHelmetShader::EnvironmentTexture, m_iblEnvironment.iblTexture)
-                     .sampler(DamagedHelmetShader::MaterialSampler, m_model.materialSampler)
-                     .sampler(DamagedHelmetShader::EnvironmentSampler, m_iblEnvironment.sampler)
+                     .uniform<HelmetUniforms>(DamagedHelmetIBLShader::HelmetParams, m_uniformBuffer, uniformOffset)
+                     .sampledImage(DamagedHelmetIBLShader::BaseColorTexture, m_model.materialTextures.baseColor)
+                     .sampledImage(DamagedHelmetIBLShader::MetalRoughnessTexture,
+                                   m_model.materialTextures.metalRoughness)
+                     .sampledImage(DamagedHelmetIBLShader::EmissiveTexture, m_model.materialTextures.emissive)
+                     .sampledImage(DamagedHelmetIBLShader::OcclusionTexture, m_model.materialTextures.occlusion)
+                     .sampledImage(DamagedHelmetIBLShader::NormalTexture, m_model.materialTextures.normal)
+                     .sampledImage(DamagedHelmetIBLShader::EnvironmentTexture, m_iblEnvironment.iblTexture)
+                     .sampler(DamagedHelmetIBLShader::MaterialSampler, m_model.materialSampler)
+                     .sampler(DamagedHelmetIBLShader::EnvironmentSampler, m_iblEnvironment.sampler)
                      .ok())
             {
                 return false;
@@ -353,11 +373,54 @@ namespace kera
         }
 
         m_displayDescriptorSet = m_renderer.createDescriptorSet(m_displayPipeline);
-        return m_displayDescriptorSet.isValid() &&
-               m_renderer.updateDescriptors(m_displayDescriptorSet)
-                   .sampledImage(DamagedHelmetShader::SceneTexture, m_sceneTexture)
-                   .sampler(DamagedHelmetShader::MaterialSampler, m_model.materialSampler)
-                   .ok();
+        m_displayDescriptorSet.isValid() &&
+            m_renderer.updateDescriptors(m_displayDescriptorSet)
+                .sampledImage(DamagedHelmetIBLShader::SceneTexture, m_sceneTexture)
+                .sampler(DamagedHelmetIBLShader::MaterialSampler, m_model.materialSampler)
+                .ok();
+
+        if (!m_displayDescriptorSet.isValid())
+        {
+            return false;
+        }
+
+        m_skyboxPipeline =
+            m_renderer.createGraphicsPipeline({.shaderProgram = m_skyboxShaderProgram,
+                                               .vertexInput = displayVertexInput,
+                                               .renderTarget = m_sceneRenderTarget,
+                                               .cullMode = CullModeKind::None,
+                                               .depthTest = false,
+                                               .depthWrite = false,
+                                               .debugName = stringView("DamagedHelmet Skybox Pipeline")});
+
+        if (!m_skyboxPipeline.isValid())
+        {
+            return false;
+        }
+
+        m_syboxDescriptorSets.clear();
+        m_syboxDescriptorSets.reserve(kUniformRingSlots);
+        for (uint32_t index = 0; index < kUniformRingSlots; ++index)
+        {
+            DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_skyboxPipeline);
+            if (!descriptorSet.isValid())
+            {
+                return false;
+            }
+
+            const std::size_t uniformOffset = sizeof(HelmetUniforms) * index;
+            if (!m_renderer.updateDescriptors(descriptorSet)
+                     .uniform<HelmetUniforms>(DamagedHelmetIBLShader::HelmetParams, m_uniformBuffer, uniformOffset)
+                     .sampledImage("skyboxTexture", m_iblEnvironment.skyboxTexture)
+                     .sampler("skyboxSampler", m_iblEnvironment.sampler)
+                     .ok())
+            {
+                return false;
+            }
+            m_syboxDescriptorSets.push_back(descriptorSet);
+        }
+
+        return true;
     }
 
     void DamagedHelmetIBLLightingSample::update(float deltaTime)
@@ -409,6 +472,8 @@ namespace kera
                 uniforms.model = glm::rotate(glm::mat4(1.0f), yawRadians, glm::vec3(0.0f, 1.0f, 0.0f)) *
                                  glm::make_mat4(m_model.transform);
                 uniforms.view = glm::lookAt(cameraPosition, glm::vec3(0.0f, -0.05f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                uniforms.inverseView = glm::inverse(uniforms.view);
+                uniforms.inverseProjection = glm::inverse(uniforms.projection);
                 uniforms.projection = glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
                 uniforms.cameraPosition = glm::vec4(cameraPosition, 1.0f);
                 uniforms.lightDirectionAmbient = glm::vec4(glm::normalize(glm::vec3(-0.42f, -0.72f, -0.48f)), 0.08f);
@@ -437,6 +502,12 @@ namespace kera
                 const std::size_t uniformOffset = m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
                 const std::size_t descriptorIndex =
                     (uniformOffset / sizeof(HelmetUniforms)) % m_meshDescriptorSets.size();
+
+                m_renderer.bindPipeline(frame, m_skyboxPipeline);
+                m_renderer.bindVertexBuffer(frame, 0, m_fullscreenVertexBuffer);
+                m_renderer.bindIndexBuffer(frame, m_fullscreenIndexBuffer, IndexFormat::UInt16);
+                m_renderer.bindDescriptorSet(frame, m_skyboxPipeline, m_syboxDescriptorSets[descriptorIndex]);
+                m_renderer.drawIndexed(frame, m_fullscreenIndexCount);
 
                 m_renderer.bindPipeline(frame, m_meshPipeline);
                 m_renderer.bindVertexBuffer(frame, 0, m_model.vertexBuffer);
@@ -468,6 +539,7 @@ namespace kera
             m_renderer.destroyDescriptorSet(m_displayDescriptorSet);
             m_displayDescriptorSet = {};
         }
+
         for (DescriptorSetHandle descriptorSet : m_meshDescriptorSets)
         {
             if (descriptorSet.isValid())
@@ -476,7 +548,16 @@ namespace kera
             }
         }
 
+        for (DescriptorSetHandle descriptorSet : m_syboxDescriptorSets)
+        {
+            if (descriptorSet.isValid())
+            {
+                m_renderer.destroyDescriptorSet(descriptorSet);
+            }
+        }
+
         m_meshDescriptorSets.clear();
+        m_syboxDescriptorSets.clear();
 
         if (m_displayPipeline.isValid())
         {
@@ -488,6 +569,12 @@ namespace kera
         {
             m_renderer.destroyGraphicsPipeline(m_meshPipeline);
             m_meshPipeline = {};
+        }
+
+        if (m_skyboxPipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_skyboxPipeline);
+            m_skyboxPipeline = {};
         }
 
         if (m_sceneRenderTarget.isValid())

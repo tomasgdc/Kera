@@ -12,6 +12,8 @@ struct HelmetUniforms {
     float4x4 model;
     float4x4 view;
     float4x4 projection;
+    float4x4 inverseView;
+    float4x4 inverseProjection;
     float4 cameraPosition;
     float4 lightDirectionAmbient;
     float4 baseColorFactor;
@@ -261,4 +263,37 @@ FullscreenVertexOutput fullscreenVertexMain(FullscreenVertexInput input) {
 [shader("fragment")]
 float4 fullscreenFragmentMain(float2 uv : TEXCOORD0) : SV_Target {
     return sceneTexture.Sample(materialSampler, uv);
+}
+
+TextureCube<float4> skyboxTexture;
+SamplerState skyboxSampler;
+
+struct SkyboxVertexOutput {
+    float4 sv_position : SV_Position;
+    float2 uv          : TEXCOORD0;
+};
+
+[shader("vertex")]
+SkyboxVertexOutput skyboxVertexMain(FullscreenVertexInput input) {
+    SkyboxVertexOutput output;
+    output.sv_position = float4(input.position, 0.0, 1.0);
+    output.uv = input.uv;
+    return output;
+}
+
+[shader("fragment")]
+float4 skyboxFragmentMain(float2 uv : TEXCOORD0) : SV_Target {
+    float2 ndc = uv * 2.0 - 1.0;
+    ndc.y = -ndc.y;
+
+    float4 clip = float4(ndc, 1.0, 1.0);
+    float4 view = mul(clip, helmetParams.inverseProjection);
+    view.xyz /= view.w;
+
+    float3 dirView = normalize(view.xyz);
+    float3 dirWorld = normalize(mul(float4(dirView, 0.0), helmetParams.inverseView).xyz);
+
+    float3 color = skyboxTexture.SampleLevel(skyboxSampler, dirWorld, 0.0).rgb;
+    color = toneMapKhronosPbrNeutral(color * helmetParams.alphaModeCutoffReflectionExposure.w);
+    return float4(color, 1.0);
 }
