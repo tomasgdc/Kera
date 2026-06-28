@@ -466,8 +466,11 @@ namespace kera
                         .searchPaths = desc.searchPaths,
                     };
 
-                    if (!SlangCompiler::compileToSpirvAndReflect(request, spirvCode, reflection))
+                    std::string diagnostics;
+                    if (!SlangCompiler::compileToSpirvAndReflect(request, spirvCode, reflection, &diagnostics))
                     {
+                        Logger::getInstance().error("Failed to compile Slang shader: " + desc.path +
+                                                    " entry=" + desc.entryPoint + "\n" + diagnostics);
                         return false;
                     }
 
