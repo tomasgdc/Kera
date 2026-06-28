@@ -1197,13 +1197,13 @@ namespace kera
         if (ringSlotStride < elementSize ||
             ringSlotStride > std::numeric_limits<std::size_t>::max() / resolvedSlotCount)
         {
-            Logger::getInstance().error("Uniform ring buffer size exceeds addresable memory");
+            Logger::getInstance().error("Uniform ring buffer size exceeds addresable memory.");
             return {};
         }
 
         VulkanBufferResource resource{};
         resource.m_ringSlotSize = elementSize;
-        resource.m_ringSlotSize = ringSlotStride;
+        resource.m_ringSlotStride = ringSlotStride;
         resource.m_ringSlotCount = resolvedSlotCount;
         if (!resource.m_buffer.initialize(*m_device, static_cast<VkDeviceSize>(ringSlotStride * resolvedSlotCount),
                                           BufferUsage::Uniform, toMemoryFlags(MemoryAccess::CpuWrite)))
