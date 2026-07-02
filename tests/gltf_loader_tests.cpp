@@ -143,6 +143,11 @@ namespace
         {
             return m_createResources && data && size > 0;
         }
+        bool uploadTextureSubresource(kera::TextureHandle texture, const kera::TexturePrepareUpload& upload)
+        {
+            return m_createResources && upload.data && upload.size > 0 && upload.subresources &&
+                   upload.subresourceCount > 0;
+        }
         bool destroyTexture(kera::TextureHandle) override
         {
             return m_createResources;

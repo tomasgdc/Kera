@@ -191,6 +191,10 @@ namespace
         {
             return false;
         }
+        bool uploadTextureSubresource(kera::TextureHandle texture, const kera::TexturePrepareUpload& upload)
+        {
+            return false;
+        }
         bool destroyTexture(kera::TextureHandle) override
         {
             return false;
