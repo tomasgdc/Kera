@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # Kera - Cross-Platform Rendering Library
 
-Kera is a Vulkan-first rendering library built with SDL3, Slang, and CMake for high-performance graphics applications.
+Kera is a rendering library built with runtime Slang reflection system for high-performance graphics applications.
 
 ## Features
 
@@ -13,8 +13,6 @@ Kera is a Vulkan-first rendering library built with SDL3, Slang, and CMake for h
 - **SDL3 integration**: Window management, input handling, and platform abstraction.
 - **Slang shaders**: Runtime Slang compilation and reflection for graphics shader programs.
 - **Reflection-driven pipelines**: C++ vertex/layout contracts are validated against Slang entry points and descriptor names.
-- **glTF texture loading sample**: DamagedHelmet demonstrates renderer-owned glTF asset loading, texture upload, mipmaps, and sampler fidelity.
-- **Sample application**: Basic Triangle, Instanced Triangle, Many Lights, and DamagedHelmet renderer demonstrations.
 - **No-exception build**: Kera targets no-exception C++ and routes diagnostics through the Kera logger facade.
 
 ## Documentation
@@ -22,7 +20,8 @@ Kera is a Vulkan-first rendering library built with SDL3, Slang, and CMake for h
 - [Renderer API](docs/RENDERER_API.md): STL-free public renderer API, Slang reflection, descriptors, and frame flow.
 - [Renderer ABI Policy](docs/RENDERER_ABI.md): installed public ABI headers and shared-build guardrails.
 - [Validation](docs/VALIDATION.md): CTest labels, Vulkan smoke tests, shader contract checks, and capture lanes.
-- [DamagedHelmet Attribution](samples/assets/gltf/DamagedHelmet/ATTRIBUTION.md): source and license note for the bundled glTF sample asset.
+- [Damaged Helmet Attribution](samples/assets/gltf/DamagedHelmet/ATTRIBUTION.md): source and license note for the bundled glTF sample asset.
+- [Autum Field Puresky Attribution](samples/assets/ibl/autum_field_puresky/ATTRIBUTION.md): source and license note for the bundled exr sample asset.
 
 ## Building
 
@@ -165,7 +164,4 @@ public API. See [Renderer API](docs/RENDERER_API.md) for the current flow.
 
 Kera-owned source code and documentation are licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for
 project attribution and distribution notes.
-
-Third-party dependencies and bundled sample assets retain their own licenses. The bundled DamagedHelmet sample asset
-remains Creative Commons Attribution-NonCommercial and is not relicensed by Kera; see
-[DamagedHelmet Attribution](samples/assets/gltf/DamagedHelmet/ATTRIBUTION.md).
+Third-party dependencies and bundled sample assets retain their own licenses.
