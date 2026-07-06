@@ -52,7 +52,7 @@ namespace kera
         GraphicsPipelineHandle m_displayPipeline;
         GraphicsPipelineHandle m_skyboxPipeline;
         std::vector<DescriptorSetHandle> m_meshDescriptorSets;
-        std::vector<DescriptorSetHandle> m_syboxDescriptorSets;
+        std::vector<DescriptorSetHandle> m_skyboxDescriptorSets;
         DescriptorSetHandle m_displayDescriptorSet;
         Extent2D m_renderExtent;
         uint32_t m_fullscreenIndexCount = 0;

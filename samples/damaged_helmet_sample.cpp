@@ -268,9 +268,12 @@ namespace kera
             return false;
         }
 
+        KeraUniformRingBufferInfo ringInfo = m_renderer.getUniformRingBufferInfo(m_uniformBuffer);
+
         m_meshDescriptorSets.clear();
-        m_meshDescriptorSets.reserve(kUniformRingSlots);
-        for (uint32_t index = 0; index < kUniformRingSlots; ++index)
+        m_meshDescriptorSets.reserve(ringInfo.slotCount);
+
+        for (uint32_t slot = 0; slot < ringInfo.slotCount; ++slot)
         {
             DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_meshPipeline);
             if (!descriptorSet.isValid())
@@ -278,7 +281,7 @@ namespace kera
                 return false;
             }
 
-            const std::size_t uniformOffset = sizeof(HelmetUniforms) * index;
+            const std::size_t uniformOffset = m_renderer.getUniformRingBufferSlotOffset(m_uniformBuffer, slot);
             if (!m_renderer.updateDescriptors(descriptorSet)
                      .uniform<HelmetUniforms>(DamagedHelmetShader::HelmetParams, m_uniformBuffer, uniformOffset)
                      .sampledImage(DamagedHelmetShader::BaseColorTexture, m_model.materialTextures.baseColor)
@@ -394,14 +397,12 @@ namespace kera
                     return;
                 }
 
-                const std::size_t uniformOffset = m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
-                const std::size_t descriptorIndex =
-                    (uniformOffset / sizeof(HelmetUniforms)) % m_meshDescriptorSets.size();
+                uint32_t uniformBufferSlot = m_renderer.getUniformRingBufferSlot(m_uniformBuffer, frame);
 
                 m_renderer.bindPipeline(frame, m_meshPipeline);
                 m_renderer.bindVertexBuffer(frame, 0, m_model.vertexBuffer);
                 m_renderer.bindIndexBuffer(frame, m_model.indexBuffer, m_model.indexFormat);
-                m_renderer.bindDescriptorSet(frame, m_meshPipeline, m_meshDescriptorSets[descriptorIndex]);
+                m_renderer.bindDescriptorSet(frame, m_meshPipeline, m_meshDescriptorSets[uniformBufferSlot]);
                 m_renderer.drawIndexed(frame, m_model.indexCount);
             });
 

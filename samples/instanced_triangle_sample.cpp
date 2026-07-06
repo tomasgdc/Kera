@@ -172,9 +172,12 @@ namespace kera
             return false;
         }
 
+        KeraUniformRingBufferInfo ringInfo = m_renderer.getUniformRingBufferInfo(m_uniformBuffer);
+
         m_uniformDescriptorSets.clear();
-        m_uniformDescriptorSets.reserve(kUniformRingSlots);
-        for (uint32_t index = 0; index < kUniformRingSlots; ++index)
+        m_uniformDescriptorSets.reserve(ringInfo.slotCount);
+
+        for (uint32_t slot = 0; slot < ringInfo.slotCount; ++slot)
         {
             DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_pipeline);
             if (!descriptorSet.isValid())
@@ -182,7 +185,7 @@ namespace kera
                 return false;
             }
 
-            const std::size_t uniformOffset = sizeof(Uniforms) * index;
+            const std::size_t uniformOffset = m_renderer.getUniformRingBufferSlotOffset(m_uniformBuffer, slot);
             if (!m_renderer.updateDescriptors(descriptorSet)
                      .uniform<Uniforms>(InstancedTriangleShader::GlobalParams, m_uniformBuffer, uniformOffset)
                      .ok())
@@ -259,9 +262,11 @@ namespace kera
                     return;
                 }
 
-                const std::size_t uniformOffset = m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
-                const std::size_t descriptorIndex = (uniformOffset / sizeof(Uniforms)) % m_uniformDescriptorSets.size();
-                DescriptorSetHandle uniformDescriptorSet = m_uniformDescriptorSets[descriptorIndex];
+                uint32_t uniformBufferSlot = m_renderer.getUniformRingBufferSlot(m_uniformBuffer, frame);
+                const std::size_t uniformOffset =
+                    m_renderer.getUniformRingBufferSlotOffset(m_uniformBuffer, uniformBufferSlot);
+
+                DescriptorSetHandle uniformDescriptorSet = m_uniformDescriptorSets[uniformBufferSlot];
                 if (!m_renderer.updateDescriptors(uniformDescriptorSet)
                          .uniform<Uniforms>(InstancedTriangleShader::GlobalParams, m_uniformBuffer, uniformOffset)
                          .ok())

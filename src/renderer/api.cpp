@@ -388,6 +388,24 @@ namespace
         };
     }
 
+    KeraUniformRingBufferInfo toKera(const kera::UniformRingBufferInfo& value)
+    {
+        return {
+            .elementSize = value.elementSize,
+            .slotStride = value.slotStride,
+            .slotCount = value.slotCount,
+        };
+    }
+
+    kera::UniformRingBufferInfo fromKera(const KeraUniformRingBufferInfo& value)
+    {
+        return {
+            .elementSize = value.elementSize,
+            .slotStride = value.slotStride,
+            .slotCount = value.slotCount,
+        };
+    }
+
     KeraRenderer* createRenderer(const KeraRendererCreateDesc* desc)
     {
         if (!desc || !desc->sdlWindow || desc->backend != KERA_GRAPHICS_BACKEND_VULKAN)
@@ -554,11 +572,25 @@ namespace
                    : 0;
     }
 
-    size_t getUniformRingBufferOffset(const KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame)
+    KeraUniformRingBufferInfo getUniformRingBufferInfo(KeraRenderer* renderer, KeraBufferHandle buffer)
     {
         return renderer && renderer->renderer
-                   ? renderer->renderer->getUniformRingBufferOffset(fromKera<kera::BufferHandle>(buffer),
-                                                                    fromKera<kera::FrameHandle>(frame))
+                   ? toKera(renderer->renderer->getUniformRingBufferInfo(fromKera<kera::BufferHandle>(buffer)))
+                   : KeraUniformRingBufferInfo{};
+    }
+
+    uint32_t getUniformRingBufferSlot(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame)
+    {
+        return renderer && renderer->renderer
+                   ? renderer->renderer->getUniformRingBufferSlot(fromKera<kera::BufferHandle>(buffer),
+                                                                  fromKera<kera::FrameHandle>(frame))
+                   : 0;
+    }
+
+    size_t getUniformRingBufferSlotOffset(KeraRenderer* renderer, KeraBufferHandle buffer, uint32_t slot)
+    {
+        return renderer && renderer->renderer
+                   ? renderer->renderer->getUniformRingBufferSlotOffset(fromKera<kera::BufferHandle>(buffer), slot)
                    : 0;
     }
 
@@ -909,7 +941,9 @@ namespace
         .unmapBuffer = unmapBuffer,
         .uploadBuffer = uploadBuffer,
         .uploadUniformRingBuffer = uploadUniformRingBuffer,
-        .getUniformRingBufferOffset = getUniformRingBufferOffset,
+        .getUniformRingBufferInfo = getUniformRingBufferInfo,
+        .getUniformRingBufferSlot = getUniformRingBufferSlot,
+        .getUniformRingBufferSlotOffset = getUniformRingBufferSlotOffset,
         .createTexture = createTexture,
         .uploadTexture = uploadTexture,
         .destroyTexture = destroyTexture,

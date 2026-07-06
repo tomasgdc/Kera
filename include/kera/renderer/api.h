@@ -414,9 +414,19 @@ namespace kera
             return isValid() && m_api->uploadUniformRingBuffer(m_renderer, buffer, frame, data, size) != 0;
         }
 
-        size_t getUniformRingBufferOffset(KeraBufferHandle buffer, KeraFrameHandle frame) const noexcept
+        KeraUniformRingBufferInfo getUniformRingBufferInfo(KeraBufferHandle buffer) const noexcept
         {
-            return isValid() ? m_api->getUniformRingBufferOffset(m_renderer, buffer, frame) : 0;
+            return isValid() ? m_api->getUniformRingBufferInfo(m_renderer, buffer) : KeraUniformRingBufferInfo{};
+        }
+
+        uint32_t getUniformRingBufferSlot(KeraBufferHandle buffer, KeraFrameHandle frame) const noexcept
+        {
+            return isValid() ? m_api->getUniformRingBufferSlot(m_renderer, buffer, frame) : 0;
+        }
+
+        size_t getUniformRingBufferSlotOffset(KeraBufferHandle buffer, uint32_t slot) const noexcept
+        {
+            return isValid() ? m_api->getUniformRingBufferSlotOffset(m_renderer, buffer, slot) : 0;
         }
 
         KeraTextureHandle createTexture(const KeraTextureDesc& desc) noexcept

@@ -342,7 +342,9 @@ namespace kera
         BufferHandle createUniformRingBuffer(std::size_t elementSize, uint32_t slotCount = 0) override;
         bool uploadUniformRingBuffer(BufferHandle buffer, FrameHandle frame, const void* data,
                                      std::size_t size) override;
-        std::size_t getUniformRingBufferOffset(BufferHandle buffer, FrameHandle frame) const override;
+        virtual UniformRingBufferInfo getUniformRingBufferInfo(BufferHandle buffer) const override;
+        virtual uint32_t getUniformRingBufferSlot(BufferHandle buffer, FrameHandle frame) const override;
+        std::size_t getUniformRingBufferSlotOffset(BufferHandle buffer, uint32_t slot) const override;
 
         TextureHandle createTexture(const TextureDesc& desc) override;
         bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) override;

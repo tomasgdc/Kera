@@ -125,11 +125,18 @@ namespace
         {
             return false;
         }
-        std::size_t getUniformRingBufferOffset(kera::BufferHandle, kera::FrameHandle) const override
+        kera::UniformRingBufferInfo getUniformRingBufferInfo(kera::BufferHandle buffer) const
+        {
+            return kera::UniformRingBufferInfo{};
+        }
+        uint32_t getUniformRingBufferSlot(kera::BufferHandle buffer, kera::FrameHandle frame) const
         {
             return 0;
         }
-
+        std::size_t getUniformRingBufferSlotOffset(kera::BufferHandle buffer, uint32_t slot) const
+        {
+            return 0;
+        }
         kera::TextureHandle createTexture(const kera::TextureDesc& desc) override
         {
             if (!m_createResources)

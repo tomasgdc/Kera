@@ -65,6 +65,13 @@ namespace kera
         std::size_t subresourceCount = 0;
     };
 
+    struct UniformRingBufferInfo
+    {
+        std::size_t elementSize = 0;
+        std::size_t slotStride = 0;
+        uint32_t slotCount = 0;
+    };
+
     class IRenderer
     {
     public:
@@ -106,7 +113,9 @@ namespace kera
         virtual BufferHandle createUniformRingBuffer(std::size_t elementSize, uint32_t slotCount = 0) = 0;
         virtual bool uploadUniformRingBuffer(BufferHandle buffer, FrameHandle frame, const void* data,
                                              std::size_t size) = 0;
-        virtual std::size_t getUniformRingBufferOffset(BufferHandle buffer, FrameHandle frame) const = 0;
+        virtual UniformRingBufferInfo getUniformRingBufferInfo(BufferHandle buffer) const = 0;
+        virtual uint32_t getUniformRingBufferSlot(BufferHandle buffer, FrameHandle frame) const = 0;
+        virtual std::size_t getUniformRingBufferSlotOffset(BufferHandle buffer, uint32_t slot) const = 0;
 
         virtual TextureHandle createTexture(const TextureDesc& desc) = 0;
         virtual bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) = 0;

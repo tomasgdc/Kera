@@ -76,12 +76,12 @@ namespace kera
     }  // namespace
 
     DamagedHelmetIBLLightingSample::DamagedHelmetIBLLightingSample(Renderer& renderer)
-        : Sample("Damaged Helmet IBL Lighint"), m_renderer(renderer)
+        : Sample("Damaged Helmet IBL Lighting"), m_renderer(renderer)
     {
     }
 
     DamagedHelmetIBLLightingSample::DamagedHelmetIBLLightingSample(Renderer& renderer, uint32_t debugView)
-        : Sample("Damaged Helmet IBL Lighint")
+        : Sample("Damaged Helmet IBL Lighting")
         , m_renderer(renderer)
         , m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
     {
@@ -89,7 +89,7 @@ namespace kera
 
     DamagedHelmetIBLLightingSample::DamagedHelmetIBLLightingSample(Renderer& renderer, uint32_t debugView,
                                                                    bool fixedYaw, float yawRadians)
-        : Sample("Damaged Helmet IBL Lighint")
+        : Sample("Damaged Helmet IBL Lighting")
         , m_renderer(renderer)
         , m_initialYawRadians(fixedYaw ? yawRadians : 2.2f)
         , m_debugView(debugView <= kMaxDamagedHelmetDebugView ? debugView : 0)
@@ -325,9 +325,12 @@ namespace kera
             return false;
         }
 
+        KeraUniformRingBufferInfo ringInfo = m_renderer.getUniformRingBufferInfo(m_uniformBuffer);
+
         m_meshDescriptorSets.clear();
-        m_meshDescriptorSets.reserve(kUniformRingSlots);
-        for (uint32_t index = 0; index < kUniformRingSlots; ++index)
+        m_meshDescriptorSets.reserve(ringInfo.slotCount);
+
+        for (uint32_t slot = 0; slot < ringInfo.slotCount; ++slot)
         {
             DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_meshPipeline);
             if (!descriptorSet.isValid())
@@ -335,7 +338,7 @@ namespace kera
                 return false;
             }
 
-            const std::size_t uniformOffset = sizeof(HelmetUniforms) * index;
+            const std::size_t uniformOffset = m_renderer.getUniformRingBufferSlotOffset(m_uniformBuffer, slot);
             if (!m_renderer.updateDescriptors(descriptorSet)
                      .uniform<HelmetUniforms>(DamagedHelmetIBLShader::HelmetParams, m_uniformBuffer, uniformOffset)
                      .sampledImage(DamagedHelmetIBLShader::BaseColorTexture, m_model.materialTextures.baseColor)
@@ -399,9 +402,10 @@ namespace kera
             return false;
         }
 
-        m_syboxDescriptorSets.clear();
-        m_syboxDescriptorSets.reserve(kUniformRingSlots);
-        for (uint32_t index = 0; index < kUniformRingSlots; ++index)
+        m_skyboxDescriptorSets.clear();
+        m_skyboxDescriptorSets.reserve(ringInfo.slotCount);
+
+        for (uint32_t slot = 0; slot < ringInfo.slotCount; ++slot)
         {
             DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_skyboxPipeline);
             if (!descriptorSet.isValid())
@@ -409,7 +413,7 @@ namespace kera
                 return false;
             }
 
-            const std::size_t uniformOffset = sizeof(HelmetUniforms) * index;
+            const std::size_t uniformOffset = m_renderer.getUniformRingBufferSlotOffset(m_uniformBuffer, slot);
             if (!m_renderer.updateDescriptors(descriptorSet)
                      .uniform<HelmetUniforms>(DamagedHelmetIBLShader::HelmetParams, m_uniformBuffer, uniformOffset)
                      .sampledImage("skyboxTexture", m_iblEnvironment.skyboxTexture)
@@ -418,7 +422,7 @@ namespace kera
             {
                 return false;
             }
-            m_syboxDescriptorSets.push_back(descriptorSet);
+            m_skyboxDescriptorSets.push_back(descriptorSet);
         }
 
         return true;
@@ -508,20 +512,18 @@ namespace kera
                     return;
                 }
 
-                const std::size_t uniformOffset = m_renderer.getUniformRingBufferOffset(m_uniformBuffer, frame);
-                const std::size_t descriptorIndex =
-                    (uniformOffset / sizeof(HelmetUniforms)) % m_meshDescriptorSets.size();
+                uint32_t uniformBufferSlot = m_renderer.getUniformRingBufferSlot(m_uniformBuffer, frame);
 
                 m_renderer.bindPipeline(frame, m_skyboxPipeline);
                 m_renderer.bindVertexBuffer(frame, 0, m_fullscreenVertexBuffer);
                 m_renderer.bindIndexBuffer(frame, m_fullscreenIndexBuffer, IndexFormat::UInt16);
-                m_renderer.bindDescriptorSet(frame, m_skyboxPipeline, m_syboxDescriptorSets[descriptorIndex]);
+                m_renderer.bindDescriptorSet(frame, m_skyboxPipeline, m_skyboxDescriptorSets[uniformBufferSlot]);
                 m_renderer.drawIndexed(frame, m_fullscreenIndexCount);
 
                 m_renderer.bindPipeline(frame, m_meshPipeline);
                 m_renderer.bindVertexBuffer(frame, 0, m_model.vertexBuffer);
                 m_renderer.bindIndexBuffer(frame, m_model.indexBuffer, m_model.indexFormat);
-                m_renderer.bindDescriptorSet(frame, m_meshPipeline, m_meshDescriptorSets[descriptorIndex]);
+                m_renderer.bindDescriptorSet(frame, m_meshPipeline, m_meshDescriptorSets[uniformBufferSlot]);
                 m_renderer.drawIndexed(frame, m_model.indexCount);
             });
 
@@ -557,7 +559,7 @@ namespace kera
             }
         }
 
-        for (DescriptorSetHandle descriptorSet : m_syboxDescriptorSets)
+        for (DescriptorSetHandle descriptorSet : m_skyboxDescriptorSets)
         {
             if (descriptorSet.isValid())
             {
@@ -566,7 +568,7 @@ namespace kera
         }
 
         m_meshDescriptorSets.clear();
-        m_syboxDescriptorSets.clear();
+        m_skyboxDescriptorSets.clear();
 
         if (m_displayPipeline.isValid())
         {

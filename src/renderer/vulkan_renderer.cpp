@@ -1239,17 +1239,53 @@ namespace kera
             return false;
         }
 
+        if (!data || size == 0)
+        {
+            Logger::getInstance().error("Invalid data pointer or size passed to uploadUniformRingBuffer.");
+            return false;
+        }
+
         if (size > buffer->m_ringSlotSize)
         {
             Logger::getInstance().error("Uniform ring buffer upload exceeds slot size.");
             return false;
         }
 
-        const std::size_t offset = getUniformRingBufferOffset(bufferHandle, frameHandle);
+        const uint32_t slot = getUniformRingBufferSlot(bufferHandle, frameHandle);
+        if (slot == -1)
+        {
+            Logger::getInstance().error("Failed to resolve uniform ring buffer slot for the given frame.");
+            return false;
+        }
+
+        const std::size_t offset = getUniformRingBufferSlotOffset(bufferHandle, slot);
+        if (offset == -1)
+        {
+            Logger::getInstance().error("Failed to resolve uniform ring buffer slot offset.");
+            return false;
+        }
+
         return uploadBuffer(bufferHandle, data, size, offset);
     }
 
-    std::size_t VulkanRenderer::getUniformRingBufferOffset(BufferHandle bufferHandle, FrameHandle frameHandle) const
+    UniformRingBufferInfo VulkanRenderer::getUniformRingBufferInfo(BufferHandle bufferHandle) const
+    {
+        const VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
+        if (!buffer || buffer->m_ringSlotStride == 0 || buffer->m_ringSlotCount == 0)
+        {
+            return {};
+        }
+
+        UniformRingBufferInfo bufferInfo = {
+            .elementSize = buffer->m_ringSlotSize,
+            .slotStride = buffer->m_ringSlotStride,
+            .slotCount = buffer->m_ringSlotCount,
+        };
+
+        return bufferInfo;
+    }
+
+    uint32_t VulkanRenderer::getUniformRingBufferSlot(BufferHandle bufferHandle, FrameHandle frameHandle) const
     {
         const VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
         const VulkanFrameResource* frame = m_frames.get(frameHandle);
@@ -1257,8 +1293,24 @@ namespace kera
         {
             return 0;
         }
+        return frame->m_syncIndex % buffer->m_ringSlotCount;
+    }
 
-        return buffer->m_ringSlotStride * (frame->m_syncIndex % buffer->m_ringSlotCount);
+    std::size_t VulkanRenderer::getUniformRingBufferSlotOffset(BufferHandle bufferHandle, uint32_t slot) const
+    {
+        const VulkanBufferResource* buffer = m_buffers.get(bufferHandle);
+        if (!buffer || buffer->m_ringSlotStride == 0 || buffer->m_ringSlotCount == 0)
+        {
+            return 0;
+        }
+
+        if (slot >= buffer->m_ringSlotCount)
+        {
+            Logger::getInstance().error("Uniform ring buffer slot index exceeds the slot count.");
+            return 0;
+        }
+
+        return buffer->m_ringSlotStride * slot;
     }
 
     TextureHandle VulkanRenderer::createTexture(const TextureDesc& desc)

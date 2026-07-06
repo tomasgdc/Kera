@@ -438,6 +438,13 @@ extern "C"
         uint32_t skyboxMipLevels;
     } KeraIblEnvironment;
 
+    typedef struct KeraUniformRingBufferInfo
+    {
+        size_t elementSize;
+        size_t slotStride;
+        uint32_t slotCount;
+    } KeraUniformRingBufferInfo;
+
     typedef struct KeraRenderer KeraRenderer;
 
     typedef struct KeraRendererApiV1
@@ -469,8 +476,9 @@ extern "C"
                             size_t offset);
         int (*uploadUniformRingBuffer)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame,
                                        const void* data, size_t size);
-        size_t (*getUniformRingBufferOffset)(const KeraRenderer* renderer, KeraBufferHandle buffer,
-                                             KeraFrameHandle frame);
+        KeraUniformRingBufferInfo (*getUniformRingBufferInfo)(KeraRenderer* renderer, KeraBufferHandle buffer);
+        uint32_t (*getUniformRingBufferSlot)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame);
+        size_t (*getUniformRingBufferSlotOffset)(KeraRenderer* renderer, KeraBufferHandle buffer, uint32_t slot);
         KeraTextureHandle (*createTexture)(KeraRenderer* renderer, const KeraTextureDesc* desc);
         int (*uploadTexture)(KeraRenderer* renderer, KeraTextureHandle texture, const void* data, size_t size);
         int (*destroyTexture)(KeraRenderer* renderer, KeraTextureHandle texture);
