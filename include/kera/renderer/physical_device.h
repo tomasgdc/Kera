@@ -64,6 +64,8 @@ namespace kera
         bool isSuitable() const;
         std::string getDeviceName() const;
 
+        bool refreshSwapchainSupport(VkSurfaceKHR surface);
+
     private:
         void pickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface);
         bool checkDeviceExtensionSupport(VkPhysicalDevice device) const;

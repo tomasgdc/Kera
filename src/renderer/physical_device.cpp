@@ -206,4 +206,15 @@ namespace kera
         return "No device selected";
     }
 
+    bool PhysicalDevice::refreshSwapchainSupport(VkSurfaceKHR surface)
+    {
+        if (physical_device_ == VK_NULL_HANDLE || surface == VK_NULL_HANDLE)
+        {
+            return false;
+        }
+
+        swap_chain_support_ = querySwapChainSupport(physical_device_, surface);
+        return !swap_chain_support_.formats.empty() && !swap_chain_support_.presentModes.empty();
+    }
+
 }  // namespace kera

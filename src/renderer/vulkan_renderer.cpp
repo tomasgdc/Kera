@@ -2443,10 +2443,12 @@ namespace kera
             Logger::getInstance().error("Renderer frame resources are not initialized.");
             return {};
         }
-        if (m_swapchainRecreateRequested && m_windowExtent.width == 0 && m_windowExtent.height == 0)
+
+        if (m_swapchainRecreateRequested && m_windowExtent.width == 0 || m_windowExtent.height == 0)
         {
             return {};
         }
+
         const VkExtent2D currentSwapchainExtent = m_swapchain->getExtent();
         if (currentSwapchainExtent.width == 0 || currentSwapchainExtent.height == 0)
         {
@@ -3205,11 +3207,11 @@ namespace kera
 
     bool VulkanRenderer::refreshSwapchainSupport()
     {
-        if (!m_instance || !m_surface || !m_physicalDevice)
+        if (!m_surface || !m_physicalDevice)
         {
             return false;
         }
-        return m_physicalDevice->initialize(m_instance->getVulkanInstance(), m_surface->getVulkanSurface());
+        return m_physicalDevice->refreshSwapchainSupport(m_surface->getVulkanSurface());
     }
 
     bool VulkanRenderer::hasActiveFrames() const

@@ -230,7 +230,6 @@ set(KERA_RENDERER_SOURCES
     src/renderer/gltf_loader.cpp
     src/renderer/ktx_loader.cpp
     src/renderer/buffer.cpp
-    src/renderer/image.cpp
 )
 
 set(KERA_RENDERER_PUBLIC_HEADERS
@@ -264,7 +263,6 @@ set(KERA_RENDERER_INTERNAL_HEADERS
     include/kera/renderer/ktx_loader.h
     include/kera/renderer/result.h
     include/kera/renderer/buffer.h
-    include/kera/renderer/image.h
 )
 
 set(KERA_PUBLIC_API_HEADERS
