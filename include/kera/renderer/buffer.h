@@ -10,7 +10,6 @@
 
 namespace kera
 {
-
     enum class BufferUsage
     {
         Vertex,

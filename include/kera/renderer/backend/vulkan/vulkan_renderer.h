@@ -279,9 +279,19 @@ namespace kera
         std::vector<VkCommandBuffer> m_commandBuffers;
     };
 
+    struct PendingTextureUpload
+    {
+        TextureHandle texture;
+        Buffer stagingBuffer;
+        std::vector<VkBufferImageCopy> regions;
+        bool generateMipmaps = false;
+    };
+
     struct VulkanUploadContext
     {
-        std::vector<Buffer> m_availableStagingBuffers;
+        std::vector<Buffer> availableStagingBuffers;
+        std::vector<PendingTextureUpload> pendingTextureUploads;
+        bool batchActive = false;
     };
 
     struct VulkanDescriptorPoolResource
@@ -423,9 +433,8 @@ namespace kera
         bool createDescriptorPoolBlock();
         void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
                                      VkImageLayout newLayout);
-        bool copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture);
-        bool copyBufferToTextureSubresources(Buffer& stagingBuffer, VulkanTextureResource& texture,
-                                             const std::vector<VkBufferImageCopy>& regions);
+        bool recordTextureUpload(VkCommandBuffer commandBuffer, PendingTextureUpload& pendingUpload,
+                                 VulkanTextureResource& texture);
         bool generateTextureMipmaps(VkCommandBuffer commandBuffer, VulkanTextureResource& texture);
         void clearCompletedFrameResourceUse(uint32_t syncIndex);
         void recordDescriptorSetUse(uint32_t syncIndex, DescriptorSetHandle descriptorSetHandle,
@@ -452,6 +461,7 @@ namespace kera
         bool createSyncObjects();
         bool createDescriptorPool();
         void destroyDescriptorPool();
+        bool flushUploads();
 
         Window* m_window;
         SDL_Window* m_sdlWindow = nullptr;
