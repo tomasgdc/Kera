@@ -194,6 +194,22 @@ namespace
         {
             return {};
         }
+        int32_t uploadBatchBeginCount = 0;
+        int32_t uploadBatchEndCount = 0;
+        int32_t uploadBatchCancelCount = 0;
+        bool uploadBatchBeginSucceeds = true;
+        bool uploadBatchEndSucceeds = true;
+        bool textureUploadsSuceed = true;
+
+        bool beginUploadBatch() override
+        {
+            return false;
+        }
+        bool endUploadBatch() override
+        {
+            return false;
+        }
+        void cancelUploadBatch() override {}
         bool uploadTexture(kera::TextureHandle, const void*, std::size_t) override
         {
             return false;

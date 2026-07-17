@@ -357,6 +357,9 @@ namespace kera
         std::size_t getUniformRingBufferSlotOffset(BufferHandle buffer, uint32_t slot) const override;
 
         TextureHandle createTexture(const TextureDesc& desc) override;
+        bool beginUploadBatch() override;
+        bool endUploadBatch() override;
+        void cancelUploadBatch() override;
         bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) override;
         bool uploadTextureSubresource(TextureHandle texture, const TexturePrepareUpload& upload) override;
         bool destroyTexture(TextureHandle texture) override;
@@ -462,6 +465,7 @@ namespace kera
         bool createDescriptorPool();
         void destroyDescriptorPool();
         bool flushUploads();
+        void discardPendingUploads();
 
         Window* m_window;
         SDL_Window* m_sdlWindow = nullptr;

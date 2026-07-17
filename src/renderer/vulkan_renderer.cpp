@@ -611,6 +611,8 @@ namespace kera
 
     void VulkanRenderer::shutdown()
     {
+        m_uploadContext.batchActive = false;
+        discardPendingUploads();
         waitForDeviceIdle();
         flushDeferredDeletions();
         shutdownUi();
@@ -1488,6 +1490,58 @@ namespace kera
         return handle;
     }
 
+    bool VulkanRenderer::beginUploadBatch()
+    {
+        if (!m_device)
+        {
+            Logger::getInstance().error("Renderer is not initialized.");
+            return false;
+        }
+
+        if (m_uploadContext.batchActive)
+        {
+            Logger::getInstance().error("Cannot begin a new upload batch while another batch is active.");
+            return false;
+        }
+
+        if (!m_uploadContext.pendingTextureUploads.empty())
+        {
+            Logger::getInstance().warning("Can not begin Vulkan Texture upload batch with pending uploads.");
+            discardPendingUploads();
+            return false;
+        }
+
+        m_uploadContext.batchActive = true;
+        return true;
+    }
+
+    bool VulkanRenderer::endUploadBatch()
+    {
+        if (!m_uploadContext.batchActive)
+        {
+            Logger::getInstance().error("Cannot end an upload batch when no batch is active.");
+            return false;
+        }
+
+        m_uploadContext.batchActive = false;
+        if (flushUploads())
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    void VulkanRenderer::cancelUploadBatch()
+    {
+        if (m_uploadContext.batchActive)
+        {
+            m_uploadContext.batchActive = false;
+        }
+
+        m_uploadContext.batchActive = false;
+    }
+
     bool VulkanRenderer::uploadTexture(TextureHandle textureHandle, const void* data, std::size_t size)
     {
         if (!m_device)
@@ -1574,7 +1628,13 @@ namespace kera
         pendingUpload.generateMipmaps = texture->m_generateMipmaps;
 
         m_uploadContext.pendingTextureUploads.push_back(std::move(pendingUpload));
-        return m_uploadContext.batchActive || flushUploads();
+        if (m_uploadContext.batchActive || flushUploads())
+        {
+            return true;
+        }
+
+        discardPendingUploads();
+        return false;
     }
 
     bool VulkanRenderer::uploadTextureSubresource(TextureHandle textureHandle, const TexturePrepareUpload& upload)
@@ -1668,11 +1728,27 @@ namespace kera
         pendingUpload.generateMipmaps = false;
 
         m_uploadContext.pendingTextureUploads.push_back(std::move(pendingUpload));
-        return m_uploadContext.batchActive || flushUploads();
+        if (m_uploadContext.batchActive || flushUploads())
+        {
+            return true;
+        }
+
+        discardPendingUploads();
+        return false;
     }
 
     bool VulkanRenderer::destroyTexture(TextureHandle texture)
     {
+        const auto pendingUpload =
+            std::find_if(m_uploadContext.pendingTextureUploads.begin(), m_uploadContext.pendingTextureUploads.end(),
+                         [texture](const PendingTextureUpload& upload) { return upload.texture == texture; });
+
+        if (pendingUpload != m_uploadContext.pendingTextureUploads.end())
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan texture that has pending uploads.");
+            return false;
+        }
+
         if (descriptorSetsReference(texture))
         {
             Logger::getInstance().error(
@@ -3742,7 +3818,7 @@ namespace kera
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                static_cast<uint32_t>(pendingUpload.regions.size()), pendingUpload.regions.data());
 
-        if (texture.m_generateMipmaps)
+        if (pendingUpload.generateMipmaps)
         {
             if (!generateTextureMipmaps(commandBuffer, texture))
             {
@@ -4235,6 +4311,7 @@ namespace kera
         VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
         if (vkAllocateCommandBuffers(m_device->getVulkanDevice(), &allocateInfo, &commandBuffer) != VK_SUCCESS)
         {
+            Logger::getInstance().error("Failed to allocate Vulkan flush upload command buffer.");
             return false;
         }
 
@@ -4247,6 +4324,22 @@ namespace kera
             Logger::getInstance().error("Failed to begin Vulkan flush upload command buffer.");
             return false;
         }
+
+        struct RecordTextureLayout
+        {
+            VulkanTextureResource* texture = nullptr;
+            VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        };
+
+        std::vector<RecordTextureLayout> recordLayouts;
+        recordLayouts.reserve(pendingUpload.size());
+        const auto restoreRecordedLayouts = [&recordLayouts, this]
+        {
+            for (const RecordTextureLayout& record : recordLayouts)
+            {
+                record.texture->m_currentLayout = record.layout;
+            }
+        };
 
         for (PendingTextureUpload& upload : pendingUpload)
         {
@@ -4270,6 +4363,7 @@ namespace kera
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
         {
             vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            restoreRecordedLayouts();
             Logger::getInstance().error("Failed to end Vulkan flush upload command buffer.");
             return false;
         }
@@ -4278,6 +4372,7 @@ namespace kera
         if (!submitImmediateCommandBuffer(commandBuffer, uploadTimelineValue))
         {
             vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+            restoreRecordedLayouts();
             Logger::getInstance().error("Failed to submit Vulkan flush upload command buffer.");
             return false;
         }
@@ -4294,6 +4389,15 @@ namespace kera
         queueDeferredDeletion(std::move(deletion));
         pendingUpload.clear();
         return true;
+    }
+
+    void VulkanRenderer::discardPendingUploads()
+    {
+        for (PendingTextureUpload& upload : m_uploadContext.pendingTextureUploads)
+        {
+            releaseStagingBuffer(std::move(upload.stagingBuffer));
+        }
+        m_uploadContext.pendingTextureUploads.clear();
     }
 
     bool VulkanRenderer::createDescriptorPoolBlock()

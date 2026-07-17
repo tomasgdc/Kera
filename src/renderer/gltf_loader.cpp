@@ -43,6 +43,59 @@ namespace kera
             return RendererResult<GltfLoadedModel>::failure(code, std::move(message));
         }
 
+        class UploadBatchGuard
+        {
+        public:
+            explicit UploadBatchGuard(IRenderer& renderer) : m_renderer(renderer), m_active(renderer.beginUploadBatch())
+            {
+            }
+
+            ~UploadBatchGuard()
+            {
+                if (m_active)
+                {
+                    if (!m_renderer.endUploadBatch())
+                    {
+                        m_renderer.cancelUploadBatch();
+                    }
+                }
+            }
+
+            bool started() const
+            {
+                return m_active;
+            }
+
+            bool finish()
+            {
+                if (!m_active)
+                {
+                    return false;
+                }
+
+                const bool finished = m_renderer.endUploadBatch();
+                if (!finished)
+                {
+                    m_renderer.cancelUploadBatch();
+                }
+                m_active = false;
+                return finished;
+            }
+
+            void cancel()
+            {
+                if (m_active)
+                {
+                    m_renderer.cancelUploadBatch();
+                    m_active = false;
+                }
+            }
+
+        private:
+            IRenderer& m_renderer;
+            bool m_active = false;
+        };
+
         std::string makeDebugName(const GltfLoadDesc& desc, const char* suffix)
         {
             const std::string prefix = desc.debugName.empty() ? "glTF" : desc.debugName;
@@ -705,6 +758,13 @@ namespace kera
         uint32_t emissiveMipLevels = 1;
         uint32_t occlusionMipLevels = 1;
         uint32_t normalMipLevels = 1;
+        UploadBatchGuard uploadBatch(renderer);
+        if (!uploadBatch.started())
+        {
+            return failLoad(renderer, loadedModel, RendererErrorCode::BackendFailure,
+                            "Failed to upload glTF material textures upload batch");
+        }
+
         const bool loadedAllTextures =
             createMaterialTexture(renderer, tinyModel, material.pbrMetallicRoughness.baseColorTexture.index,
                                   TextureFormat::RGBA8Srgb, makeDebugName(desc, "Base Color"),
@@ -725,9 +785,17 @@ namespace kera
                                   loadedModel.textureNames.normal, normalMipLevels);
         if (!loadedAllTextures && desc.requireMaterialTextures)
         {
+            uploadBatch.cancel();
             return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
                             "glTF material is missing a required PBR texture or uses an unsupported image format.");
         }
+
+        if (!uploadBatch.finish())
+        {
+            return failLoad(renderer, loadedModel, RendererErrorCode::BackendFailure,
+                            "Failed to submit glTF material textures upload batch.");
+        }
+
         maxMaterialMipLevels = std::max(
             {baseColorMipLevels, metalRoughnessMipLevels, emissiveMipLevels, occlusionMipLevels, normalMipLevels});
 

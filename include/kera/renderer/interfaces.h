@@ -118,6 +118,9 @@ namespace kera
         virtual std::size_t getUniformRingBufferSlotOffset(BufferHandle buffer, uint32_t slot) const = 0;
 
         virtual TextureHandle createTexture(const TextureDesc& desc) = 0;
+        virtual bool beginUploadBatch() = 0;
+        virtual bool endUploadBatch() = 0;
+        virtual void cancelUploadBatch() = 0;
         virtual bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) = 0;
         virtual bool uploadTextureSubresource(TextureHandle texture, const TexturePrepareUpload& upload) = 0;
         virtual bool destroyTexture(TextureHandle texture) = 0;

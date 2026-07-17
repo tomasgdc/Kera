@@ -29,6 +29,12 @@ namespace
         std::vector<kera::TextureDesc> textureDescs;
         std::vector<kera::SamplerDesc> samplerDescs;
         std::vector<kera::GltfVertex> uploadedVertices;
+        int32_t uploadBatchBeginCount = 0;
+        int32_t uploadBatchEndCount = 0;
+        int32_t uploadBatchCancelCount = 0;
+        bool uploadBatchBeginSucceeds = true;
+        bool uploadBatchEndSucceeds = true;
+        bool textureUploadsSuceed = true;
 
         kera::GraphicsBackend getBackend() const override
         {
@@ -146,9 +152,23 @@ namespace
             textureDescs.push_back(desc);
             return {m_nextTexture++, 1};
         }
+        bool beginUploadBatch() override
+        {
+            ++uploadBatchBeginCount;
+            return uploadBatchBeginSucceeds;
+        }
+        bool endUploadBatch() override
+        {
+            ++uploadBatchEndCount;
+            return uploadBatchEndSucceeds;
+        }
+        void cancelUploadBatch() override
+        {
+            ++uploadBatchCancelCount;
+        }
         bool uploadTexture(kera::TextureHandle, const void* data, std::size_t size) override
         {
-            return m_createResources && data && size > 0;
+            return m_createResources && textureUploadsSuceed && data && size > 0;
         }
         bool uploadTextureSubresource(kera::TextureHandle texture, const kera::TexturePrepareUpload& upload)
         {
@@ -424,9 +444,14 @@ TEST(KeraGltfLoader, LoadsDamagedHelmetResourcesAndGeneratedTangents)
     NullRenderer resourceRenderer(true);
     const std::string damagedHelmetPath =
         std::string(KERA_SOURCE_DIR) + "/samples/assets/gltf/DamagedHelmet/DamagedHelmet.gltf";
+
     kera::RendererResult<kera::GltfLoadedModel> damagedHelmet =
         kera::loadGltfModel(resourceRenderer, {.path = damagedHelmetPath, .debugName = "DamagedHelmet"});
+
     ASSERT_TRUE(damagedHelmet.ok());
+    EXPECT_EQ(resourceRenderer.uploadBatchBeginCount, 1);
+    EXPECT_EQ(resourceRenderer.uploadBatchEndCount, 1);
+    EXPECT_EQ(resourceRenderer.uploadBatchCancelCount, 0);
     EXPECT_EQ(damagedHelmet.value().indexCount, 46356u);
     EXPECT_EQ(damagedHelmet.value().materialFactors.baseColor, glm::vec4(1.0f));
     EXPECT_EQ(damagedHelmet.value().materialFactors.emissive, glm::vec3(1.0f));
@@ -472,6 +497,33 @@ TEST(KeraGltfLoader, LoadsDamagedHelmetResourcesAndGeneratedTangents)
     }
     EXPECT_TRUE(foundGeneratedTangent);
     kera::destroyGltfModel(resourceRenderer, damagedHelmet.value());
+}
+
+TEST(KeraGltfLoader, CancelsFailedMaterialTextureUploadBatches)
+{
+    const std::string damagedHelmetPath =
+        std::string(KERA_SOURCE_DIR) + "/samples/assets/gltf/DamagedHelmet/DamagedHelmet.gltf";
+
+    NullRenderer uploadFailureRenderer(true);
+    uploadFailureRenderer.textureUploadsSuceed = false;
+    const kera::RendererResult<kera::GltfLoadedModel> uploadFailure =
+        kera::loadGltfModel(uploadFailureRenderer, {.path = damagedHelmetPath, .debugName = "UploadFailure"});
+
+    EXPECT_FALSE(uploadFailure.ok());
+    EXPECT_EQ(uploadFailureRenderer.uploadBatchBeginCount, 1);
+    EXPECT_EQ(uploadFailureRenderer.uploadBatchEndCount, 0);
+    EXPECT_EQ(uploadFailureRenderer.uploadBatchCancelCount, 1);
+
+    NullRenderer submitFailureRenderer(true);
+    submitFailureRenderer.uploadBatchEndSucceeds = false;
+    const kera::RendererResult<kera::GltfLoadedModel> submitFailure =
+        kera::loadGltfModel(submitFailureRenderer, {.path = damagedHelmetPath, .debugName = "SubmitFailure"});
+
+    EXPECT_FALSE(submitFailure.ok());
+    EXPECT_EQ(submitFailure.errorCode(), kera::RendererErrorCode::BackendFailure);
+    EXPECT_EQ(submitFailureRenderer.uploadBatchBeginCount, 1);
+    EXPECT_EQ(submitFailureRenderer.uploadBatchEndCount, 1);
+    EXPECT_EQ(submitFailureRenderer.uploadBatchCancelCount, 1);
 }
 
 TEST(KeraGltfLoader, PreservesAuthoredTangentsAndGeneratesFallbackTangents)
