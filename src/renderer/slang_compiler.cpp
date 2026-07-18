@@ -26,181 +26,181 @@ namespace kera
 
         struct SlangLinkedProgramContext
         {
-            Slang::ComPtr<slang::IGlobalSession> globalSession;
+            Slang::ComPtr<slang::IGlobalSession> global_session;
             Slang::ComPtr<slang::ISession> session;
             Slang::ComPtr<slang::IModule> module;
-            Slang::ComPtr<slang::IEntryPoint> entryPoint;
-            Slang::ComPtr<slang::IComponentType> compositeProgram;
-            Slang::ComPtr<slang::IComponentType> linkedProgram;
+            Slang::ComPtr<slang::IEntryPoint> entry_point;
+            Slang::ComPtr<slang::IComponentType> composite_program;
+            Slang::ComPtr<slang::IComponentType> linked_program;
         };
 
-        SlangStage shaderTypeToSlangStage(ShaderType type)
+        SlangStage shaderTypeToSlangStage(EShaderType type)
         {
             switch (type)
             {
-                case ShaderType::Vertex:
+                case EShaderType::VERTEX:
                     return SLANG_STAGE_VERTEX;
-                case ShaderType::Fragment:
+                case EShaderType::FRAGMENT:
                     return SLANG_STAGE_FRAGMENT;
-                case ShaderType::Compute:
+                case EShaderType::COMPUTE:
                     return SLANG_STAGE_COMPUTE;
-                case ShaderType::Geometry:
+                case EShaderType::GEOMETRY:
                     return SLANG_STAGE_GEOMETRY;
-                case ShaderType::TessellationControl:
+                case EShaderType::TESSELLATION_CONTROL:
                     return SLANG_STAGE_HULL;
-                case ShaderType::TessellationEvaluation:
+                case EShaderType::TESSELLATION_EVALUATION:
                     return SLANG_STAGE_DOMAIN;
                 default:
                     return SLANG_STAGE_NONE;
             }
         }
 
-        void appendDiagnostics(std::string* outDiagnostics, slang::IBlob* diagnosticsBlob)
+        void appendDiagnostics(std::string* out_diagnostics, slang::IBlob* diagnostics_blob)
         {
-            if (!outDiagnostics || !diagnosticsBlob || diagnosticsBlob->getBufferSize() == 0)
+            if (!out_diagnostics || !diagnostics_blob || diagnostics_blob->getBufferSize() == 0)
             {
                 return;
             }
 
-            const auto* text = static_cast<const char*>(diagnosticsBlob->getBufferPointer());
-            outDiagnostics->append(text, diagnosticsBlob->getBufferSize());
+            const auto* text = static_cast<const char*>(diagnostics_blob->getBufferPointer());
+            out_diagnostics->append(text, diagnostics_blob->getBufferSize());
         }
 
         std::vector<const char*> buildSearchPathPointers(const SlangCompileRequest& request,
-                                                         std::vector<std::string>& ownedSearchPaths)
+                                                         std::vector<std::string>& owned_search_paths)
         {
-            ownedSearchPaths = request.searchPaths;
+            owned_search_paths = request.search_paths;
 
-            const std::filesystem::path shaderPath(request.shaderPath);
-            const std::string shaderDirectory = shaderPath.has_parent_path() ? shaderPath.parent_path().string()
+            const std::filesystem::path shader_path(request.shader_path);
+            const std::string shader_directory = shader_path.has_parent_path() ? shader_path.parent_path().string()
                                                                              : std::filesystem::current_path().string();
 
-            const bool hasShaderDirectory =
-                std::find(ownedSearchPaths.begin(), ownedSearchPaths.end(), shaderDirectory) != ownedSearchPaths.end();
+            const bool has_shader_directory =
+                std::find(owned_search_paths.begin(), owned_search_paths.end(), shader_directory) != owned_search_paths.end();
 
-            if (!hasShaderDirectory)
+            if (!has_shader_directory)
             {
-                ownedSearchPaths.push_back(shaderDirectory);
+                owned_search_paths.push_back(shader_directory);
             }
 
-            std::vector<const char*> searchPathPointers;
-            searchPathPointers.reserve(ownedSearchPaths.size());
-            for (const std::string& path : ownedSearchPaths)
+            std::vector<const char*> search_path_pointers;
+            search_path_pointers.reserve(owned_search_paths.size());
+            for (const std::string& path : owned_search_paths)
             {
-                searchPathPointers.push_back(path.c_str());
+                search_path_pointers.push_back(path.c_str());
             }
 
-            return searchPathPointers;
+            return search_path_pointers;
         }
 
-        bool validateRequest(const SlangCompileRequest& request, const char* operation, std::string* outDiagnostics)
+        bool validateRequest(const SlangCompileRequest& request, const char* operation, std::string* out_diagnostics)
         {
-            if (request.shaderPath.empty())
+            if (request.shader_path.empty())
             {
-                if (outDiagnostics)
+                if (out_diagnostics)
                 {
-                    *outDiagnostics = "Slang shader path is empty.";
+                    *out_diagnostics = "Slang shader path is empty.";
                 }
                 Logger::getInstance().error(std::string("Slang ") + operation + " failed: shader path is empty.");
                 return false;
             }
 
-            if (request.entryPoint.empty())
+            if (request.entry_point.empty())
             {
-                if (outDiagnostics)
+                if (out_diagnostics)
                 {
-                    *outDiagnostics = "Slang entry point is empty.";
+                    *out_diagnostics = "Slang entry point is empty.";
                 }
                 Logger::getInstance().error(std::string("Slang ") + operation + " failed: entry point is empty.");
                 return false;
             }
 
-            if (!FileUtils::fileExists(request.shaderPath))
+            if (!FileUtils::fileExists(request.shader_path))
             {
-                if (outDiagnostics)
+                if (out_diagnostics)
                 {
-                    *outDiagnostics = "Slang shader file not found: " + request.shaderPath;
+                    *out_diagnostics = "Slang shader file not found: " + request.shader_path;
                 }
-                Logger::getInstance().error("Slang shader file not found: " + request.shaderPath);
+                Logger::getInstance().error("Slang shader file not found: " + request.shader_path);
                 return false;
             }
 
             return true;
         }
 
-        bool createLinkedProgram(const SlangCompileRequest& request, SlangLinkedProgramContext& outContext,
-                                 std::string* outDiagnostics)
+        bool createLinkedProgram(const SlangCompileRequest& request, SlangLinkedProgramContext& out_context,
+                                 std::string* out_diagnostics)
         {
-            outContext = {};
+            out_context = {};
 
-            SlangResult result = slang::createGlobalSession(outContext.globalSession.writeRef());
+            SlangResult result = slang::createGlobalSession(out_context.global_session.writeRef());
             if (SLANG_FAILED(result))
             {
-                if (outDiagnostics)
+                if (out_diagnostics)
                 {
-                    *outDiagnostics = "Failed to create Slang global session.";
+                    *out_diagnostics = "Failed to create Slang global session.";
                 }
                 Logger::getInstance().error("Failed to create Slang global session.");
                 return false;
             }
 
-            std::vector<std::string> ownedSearchPaths;
-            const std::vector<const char*> searchPathPointers = buildSearchPathPointers(request, ownedSearchPaths);
+            std::vector<std::string> owned_search_paths;
+            const std::vector<const char*> search_path_pointers = buildSearchPathPointers(request, owned_search_paths);
 
-            slang::TargetDesc targetDesc = {};
-            targetDesc.structureSize = sizeof(targetDesc);
-            targetDesc.format = SLANG_SPIRV;
-            targetDesc.profile = outContext.globalSession->findProfile("spirv_1_5");
+            slang::TargetDesc target_desc = {};
+            target_desc.structureSize = sizeof(target_desc);
+            target_desc.format = SLANG_SPIRV;
+            target_desc.profile = out_context.global_session->findProfile("spirv_1_5");
 
-            slang::SessionDesc sessionDesc = {};
-            sessionDesc.structureSize = sizeof(sessionDesc);
-            sessionDesc.targets = &targetDesc;
-            sessionDesc.targetCount = 1;
-            sessionDesc.searchPaths = searchPathPointers.empty() ? nullptr : searchPathPointers.data();
-            sessionDesc.searchPathCount = static_cast<SlangInt>(searchPathPointers.size());
+            slang::SessionDesc session_desc = {};
+            session_desc.structureSize = sizeof(session_desc);
+            session_desc.targets = &target_desc;
+            session_desc.targetCount = 1;
+            session_desc.searchPaths = search_path_pointers.empty() ? nullptr : search_path_pointers.data();
+            session_desc.searchPathCount = static_cast<SlangInt>(search_path_pointers.size());
 
-            result = outContext.globalSession->createSession(sessionDesc, outContext.session.writeRef());
+            result = out_context.global_session->createSession(session_desc, out_context.session.writeRef());
             if (SLANG_FAILED(result))
             {
-                if (outDiagnostics)
+                if (out_diagnostics)
                 {
-                    *outDiagnostics = "Failed to create Slang session.";
+                    *out_diagnostics = "Failed to create Slang session.";
                 }
                 Logger::getInstance().error("Failed to create Slang session.");
                 return false;
             }
 
-            const std::filesystem::path shaderPath(request.shaderPath);
-            const std::string moduleName = shaderPath.stem().string();
-            Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-            slang::IModule* rawModule = outContext.session->loadModule(moduleName.c_str(), diagnosticsBlob.writeRef());
-            appendDiagnostics(outDiagnostics, diagnosticsBlob);
+            const std::filesystem::path shader_path(request.shader_path);
+            const std::string module_name = shader_path.stem().string();
+            Slang::ComPtr<slang::IBlob> diagnostics_blob;
+            slang::IModule* raw_module = out_context.session->loadModule(module_name.c_str(), diagnostics_blob.writeRef());
+            appendDiagnostics(out_diagnostics, diagnostics_blob);
 
-            if (!rawModule)
+            if (!raw_module)
             {
-                Logger::getInstance().error("Failed to load Slang module: " + request.shaderPath);
+                Logger::getInstance().error("Failed to load Slang module: " + request.shader_path);
                 return false;
             }
 
-            outContext.module = rawModule;
-            diagnosticsBlob = nullptr;
-            result = outContext.module->findAndCheckEntryPoint(
-                request.entryPoint.c_str(), shaderTypeToSlangStage(request.shaderType),
-                outContext.entryPoint.writeRef(), diagnosticsBlob.writeRef());
-            appendDiagnostics(outDiagnostics, diagnosticsBlob);
+            out_context.module = raw_module;
+            diagnostics_blob = nullptr;
+            result = out_context.module->findAndCheckEntryPoint(
+                request.entry_point.c_str(), shaderTypeToSlangStage(request.shader_type),
+                out_context.entry_point.writeRef(), diagnostics_blob.writeRef());
+            appendDiagnostics(out_diagnostics, diagnostics_blob);
 
             if (SLANG_FAILED(result))
             {
-                Logger::getInstance().error("Failed to find Slang entry point '" + request.entryPoint + "' in " +
-                                            request.shaderPath);
+                Logger::getInstance().error("Failed to find Slang entry point '" + request.entry_point + "' in " +
+                                            request.shader_path);
                 return false;
             }
 
-            slang::IComponentType* components[] = {outContext.module.get(), outContext.entryPoint.get()};
-            diagnosticsBlob = nullptr;
-            result = outContext.session->createCompositeComponentType(
-                components, 2, outContext.compositeProgram.writeRef(), diagnosticsBlob.writeRef());
-            appendDiagnostics(outDiagnostics, diagnosticsBlob);
+            slang::IComponentType* components[] = {out_context.module.get(), out_context.entry_point.get()};
+            diagnostics_blob = nullptr;
+            result = out_context.session->createCompositeComponentType(
+                components, 2, out_context.composite_program.writeRef(), diagnostics_blob.writeRef());
+            appendDiagnostics(out_diagnostics, diagnostics_blob);
 
             if (SLANG_FAILED(result))
             {
@@ -208,9 +208,9 @@ namespace kera
                 return false;
             }
 
-            diagnosticsBlob = nullptr;
-            result = outContext.compositeProgram->link(outContext.linkedProgram.writeRef(), diagnosticsBlob.writeRef());
-            appendDiagnostics(outDiagnostics, diagnosticsBlob);
+            diagnostics_blob = nullptr;
+            result = out_context.composite_program->link(out_context.linked_program.writeRef(), diagnostics_blob.writeRef());
+            appendDiagnostics(out_diagnostics, diagnostics_blob);
 
             if (SLANG_FAILED(result))
             {
@@ -221,166 +221,166 @@ namespace kera
             return true;
         }
 
-        bool reflectLinkedProgramToJson(slang::IComponentType& linkedProgram, SlangReflectionMetadata& outReflection,
-                                        std::string* outDiagnostics)
+        bool reflectLinkedProgramToJson(slang::IComponentType& linked_program, SlangReflectionMetadata& out_reflection,
+                                        std::string* out_diagnostics)
         {
-            outReflection = {};
+            out_reflection = {};
 
-            Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-            slang::ProgramLayout* layout = linkedProgram.getLayout(0, diagnosticsBlob.writeRef());
-            appendDiagnostics(outDiagnostics, diagnosticsBlob);
+            Slang::ComPtr<slang::IBlob> diagnostics_blob;
+            slang::ProgramLayout* layout = linked_program.getLayout(0, diagnostics_blob.writeRef());
+            appendDiagnostics(out_diagnostics, diagnostics_blob);
             if (!layout)
             {
-                if (outDiagnostics)
+                if (out_diagnostics)
                 {
-                    outDiagnostics->append("Failed to get Slang program layout.");
+                    out_diagnostics->append("Failed to get Slang program layout.");
                 }
                 Logger::getInstance().error("Failed to get Slang program layout.");
                 return false;
             }
 
-            Slang::ComPtr<slang::IBlob> jsonBlob;
-            const SlangResult result = layout->toJson(jsonBlob.writeRef());
-            if (SLANG_FAILED(result) || !jsonBlob)
+            Slang::ComPtr<slang::IBlob> json_blob;
+            const SlangResult result = layout->toJson(json_blob.writeRef());
+            if (SLANG_FAILED(result) || !json_blob)
             {
-                if (outDiagnostics)
+                if (out_diagnostics)
                 {
-                    outDiagnostics->append("Failed to serialize Slang reflection JSON.");
+                    out_diagnostics->append("Failed to serialize Slang reflection JSON.");
                 }
                 Logger::getInstance().error("Failed to serialize Slang reflection JSON.");
                 return false;
             }
 
-            const std::string reflectionJson(static_cast<const char*>(jsonBlob->getBufferPointer()),
-                                             jsonBlob->getBufferSize());
-            return parseSlangReflectionMetadata(reflectionJson, outReflection, outDiagnostics);
+            const std::string reflection_json(static_cast<const char*>(json_blob->getBufferPointer()),
+                                             json_blob->getBufferSize());
+            return parseSlangReflectionMetadata(reflection_json, out_reflection, out_diagnostics);
         }
 
 #endif
 
     }  // namespace
 
-    bool SlangCompiler::compileToSpirv(const SlangCompileRequest& request, std::vector<uint32_t>& outSpirv,
-                                       std::string* outDiagnostics)
+    bool SlangCompiler::compileToSpirv(const SlangCompileRequest& request, std::vector<uint32_t>& out_spirv,
+                                       std::string* out_diagnostics)
     {
-        outSpirv.clear();
+        out_spirv.clear();
 
-        if (outDiagnostics)
+        if (out_diagnostics)
         {
-            outDiagnostics->clear();
+            out_diagnostics->clear();
         }
 
 #if !defined(KERA_HAS_SLANG)
-        if (outDiagnostics)
+        if (out_diagnostics)
         {
-            *outDiagnostics = "Kera was built without Slang support.";
+            *out_diagnostics = "Kera was built without Slang support.";
         }
         Logger::getInstance().error("Slang compile requested but KERA_HAS_SLANG is not enabled.");
         return false;
 #else
         SlangLinkedProgramContext context;
-        if (!validateRequest(request, "compile", outDiagnostics) ||
-            !createLinkedProgram(request, context, outDiagnostics))
+        if (!validateRequest(request, "compile", out_diagnostics) ||
+            !createLinkedProgram(request, context, out_diagnostics))
         {
             return false;
         }
 
-        Slang::ComPtr<slang::IBlob> spirvBlob;
-        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        Slang::ComPtr<slang::IBlob> spirv_blob;
+        Slang::ComPtr<slang::IBlob> diagnostics_blob;
         SlangResult result =
-            context.linkedProgram->getEntryPointCode(0, 0, spirvBlob.writeRef(), diagnosticsBlob.writeRef());
-        appendDiagnostics(outDiagnostics, diagnosticsBlob);
+            context.linked_program->getEntryPointCode(0, 0, spirv_blob.writeRef(), diagnostics_blob.writeRef());
+        appendDiagnostics(out_diagnostics, diagnostics_blob);
 
-        if (SLANG_FAILED(result) || !spirvBlob)
+        if (SLANG_FAILED(result) || !spirv_blob)
         {
             Logger::getInstance().error("Failed to generate SPIR-V from Slang.");
             return false;
         }
 
-        const size_t byteCount = spirvBlob->getBufferSize();
-        if (byteCount % sizeof(uint32_t) != 0)
+        const size_t byte_count = spirv_blob->getBufferSize();
+        if (byte_count % sizeof(uint32_t) != 0)
         {
-            if (outDiagnostics)
+            if (out_diagnostics)
             {
-                outDiagnostics->append("Generated SPIR-V size is not aligned to 32-bit words.");
+                out_diagnostics->append("Generated SPIR-V size is not aligned to 32-bit words.");
             }
             Logger::getInstance().error("Generated Slang SPIR-V blob has invalid size.");
             return false;
         }
 
-        outSpirv.resize(byteCount / sizeof(uint32_t));
-        std::memcpy(outSpirv.data(), spirvBlob->getBufferPointer(), byteCount);
+        out_spirv.resize(byte_count / sizeof(uint32_t));
+        std::memcpy(out_spirv.data(), spirv_blob->getBufferPointer(), byte_count);
 
-        Logger::getInstance().debug("Compiled Slang shader at startup: " + request.shaderPath + " [" +
-                                    request.entryPoint + "]");
+        Logger::getInstance().debug("Compiled Slang shader at startup: " + request.shader_path + " [" +
+                                    request.entry_point + "]");
         return true;
 #endif
     }
 
-    bool SlangCompiler::compileToSpirvAndReflect(const SlangCompileRequest& request, std::vector<uint32_t>& outSpirv,
-                                                 SlangReflectionMetadata& outReflection, std::string* outDiagnostics)
+    bool SlangCompiler::compileToSpirvAndReflect(const SlangCompileRequest& request, std::vector<uint32_t>& out_spirv,
+                                                 SlangReflectionMetadata& out_reflection, std::string* out_diagnostics)
     {
-        outSpirv.clear();
-        outReflection = {};
+        out_spirv.clear();
+        out_reflection = {};
 
-        if (outDiagnostics)
+        if (out_diagnostics)
         {
-            outDiagnostics->clear();
+            out_diagnostics->clear();
         }
 
 #if !defined(KERA_HAS_SLANG)
-        if (outDiagnostics)
+        if (out_diagnostics)
         {
-            *outDiagnostics = "Kera was built without Slang support.";
+            *out_diagnostics = "Kera was built without Slang support.";
         }
         Logger::getInstance().error("Slang compile requested but KERA_HAS_SLANG is not enabled.");
         return false;
 #else
         SlangLinkedProgramContext context;
-        if (!validateRequest(request, "compile", outDiagnostics) ||
-            !createLinkedProgram(request, context, outDiagnostics))
+        if (!validateRequest(request, "compile", out_diagnostics) ||
+            !createLinkedProgram(request, context, out_diagnostics))
         {
             return false;
         }
 
-        Slang::ComPtr<slang::IBlob> spirvBlob;
-        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        Slang::ComPtr<slang::IBlob> spirv_blob;
+        Slang::ComPtr<slang::IBlob> diagnostics_blob;
         SlangResult result =
-            context.linkedProgram->getEntryPointCode(0, 0, spirvBlob.writeRef(), diagnosticsBlob.writeRef());
-        appendDiagnostics(outDiagnostics, diagnosticsBlob);
+            context.linked_program->getEntryPointCode(0, 0, spirv_blob.writeRef(), diagnostics_blob.writeRef());
+        appendDiagnostics(out_diagnostics, diagnostics_blob);
 
-        if (SLANG_FAILED(result) || !spirvBlob)
+        if (SLANG_FAILED(result) || !spirv_blob)
         {
             Logger::getInstance().error("Failed to generate SPIR-V from Slang.");
             return false;
         }
 
-        const size_t byteCount = spirvBlob->getBufferSize();
-        if (byteCount % sizeof(uint32_t) != 0)
+        const size_t byte_count = spirv_blob->getBufferSize();
+        if (byte_count % sizeof(uint32_t) != 0)
         {
-            if (outDiagnostics)
+            if (out_diagnostics)
             {
-                outDiagnostics->append("Generated SPIR-V size is not aligned to 32-bit words.");
+                out_diagnostics->append("Generated SPIR-V size is not aligned to 32-bit words.");
             }
             Logger::getInstance().error("Generated Slang SPIR-V blob has invalid size.");
             return false;
         }
 
-        if (!reflectLinkedProgramToJson(*context.linkedProgram, outReflection, outDiagnostics))
+        if (!reflectLinkedProgramToJson(*context.linked_program, out_reflection, out_diagnostics))
         {
             return false;
         }
 
-        for (SlangReflectionBinding& binding : outReflection.bindings)
+        for (SlangReflectionBinding& binding : out_reflection.bindings)
         {
-            binding.stage = request.shaderType;
+            binding.stage = request.shader_type;
         }
 
-        outSpirv.resize(byteCount / sizeof(uint32_t));
-        std::memcpy(outSpirv.data(), spirvBlob->getBufferPointer(), byteCount);
+        out_spirv.resize(byte_count / sizeof(uint32_t));
+        std::memcpy(out_spirv.data(), spirv_blob->getBufferPointer(), byte_count);
 
-        Logger::getInstance().debug("Compiled and reflected Slang shader at startup: " + request.shaderPath + " [" +
-                                    request.entryPoint + "]");
+        Logger::getInstance().debug("Compiled and reflected Slang shader at startup: " + request.shader_path + " [" +
+                                    request.entry_point + "]");
         return true;
 #endif
     }

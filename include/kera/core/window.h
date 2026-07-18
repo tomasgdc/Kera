@@ -38,46 +38,46 @@ namespace kera
         void processEvents();
         bool wasResized() const
         {
-            return was_resized_;
+            return m_was_resized;
         }
         void clearResizeFlag()
         {
-            was_resized_ = false;
+            m_was_resized = false;
         }
 
         ::SDL_Window* getSDLWindow() const
         {
-            return window_;
+            return m_window;
         }
         int getWidth() const
         {
-            return width_;
+            return m_width;
         }
         int getHeight() const
         {
-            return height_;
+            return m_height;
         }
 
-        using KeyCallback = std::function<void(Key key, bool pressed)>;
+        using KeyCallback = std::function<void(EKey key, bool pressed)>;
         void setKeyCallback(KeyCallback callback)
         {
-            key_callback_ = std::move(callback);
+            m_key_callback = std::move(callback);
         }
 
         using EventCallback = std::function<void(const SDL_Event& event)>;
         void setEventCallback(EventCallback callback)
         {
-            event_callback_ = std::move(callback);
+            m_event_callback = std::move(callback);
         }
 
     private:
-        ::SDL_Window* window_;
-        int width_;
-        int height_;
-        bool should_close_;
-        bool was_resized_;
-        KeyCallback key_callback_;
-        EventCallback event_callback_;
+        ::SDL_Window* m_window;
+        int m_width;
+        int m_height;
+        bool m_should_close;
+        bool m_was_resized;
+        KeyCallback m_key_callback;
+        EventCallback m_event_callback;
     };
 
 }  // namespace kera

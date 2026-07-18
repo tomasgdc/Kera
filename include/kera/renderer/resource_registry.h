@@ -18,22 +18,22 @@ namespace kera
         template <typename... Args>
         HandleT emplace(Args&&... args)
         {
-            uint32_t slotIndex = 0;
-            if (!m_freeList.empty())
+            uint32_t slot_index = 0;
+            if (!m_free_list.empty())
             {
-                slotIndex = m_freeList.back();
-                m_freeList.pop_back();
+                slot_index = m_free_list.back();
+                m_free_list.pop_back();
             }
             else
             {
                 m_slots.push_back({});
-                slotIndex = static_cast<uint32_t>(m_slots.size() - 1);
-                m_slots[slotIndex].m_generation = 1;
+                slot_index = static_cast<uint32_t>(m_slots.size() - 1);
+                m_slots[slot_index].m_generation = 1;
             }
 
-            Slot& slot = m_slots[slotIndex];
+            Slot& slot = m_slots[slot_index];
             slot.m_value.emplace(std::forward<Args>(args)...);
-            return HandleT{static_cast<int32_t>(slotIndex), slot.m_generation};
+            return HandleT{static_cast<int32_t>(slot_index), slot.m_generation};
         }
 
         T* get(HandleT handle)
@@ -62,7 +62,7 @@ namespace kera
             {
                 slot->m_generation = 1;
             }
-            m_freeList.push_back(static_cast<uint32_t>(handle.m_index));
+            m_free_list.push_back(static_cast<uint32_t>(handle.m_index));
             return true;
         }
 
@@ -81,7 +81,7 @@ namespace kera
             {
                 slot->m_generation = 1;
             }
-            m_freeList.push_back(static_cast<uint32_t>(handle.m_index));
+            m_free_list.push_back(static_cast<uint32_t>(handle.m_index));
             return value;
         }
 
@@ -112,10 +112,10 @@ namespace kera
                     }
                 }
             }
-            m_freeList.clear();
+            m_free_list.clear();
             for (uint32_t i = 0; i < m_slots.size(); ++i)
             {
-                m_freeList.push_back(i);
+                m_free_list.push_back(i);
             }
         }
 
@@ -183,7 +183,7 @@ namespace kera
         }
 
         std::vector<Slot> m_slots;
-        std::vector<uint32_t> m_freeList;
+        std::vector<uint32_t> m_free_list;
     };
 
 }  // namespace kera

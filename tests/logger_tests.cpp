@@ -19,7 +19,7 @@ namespace
 #error "Kera tests must compile with C++ exceptions disabled."
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && defined(_HAS_EXCEPTIONS) && (_HAS_EXCEPTIONS == 0)
     static_assert(_HAS_EXCEPTIONS == 0, "Kera MSVC builds must compile the STL with exceptions disabled.");
 #endif
 
@@ -86,11 +86,11 @@ TEST(KeraLogger, WritesLevelsFiltersEnvironmentFatalAndValidationMessages)
     kera::Logger& logger = kera::Logger::getInstance();
     logger.clearLogFile();
     logger.setAbortOnFatal(false);
-    logger.setLogLevel(kera::LogLevel::Debug);
+    logger.setLogLevel(kera::ELogLevel::DEBUG);
 
-    const std::filesystem::path levelLog = makeLogPath("kera_logger_level_tests.log");
-    removeFile(levelLog);
-    ASSERT_TRUE(logger.setLogFilePath(levelLog.string()));
+    const std::filesystem::path level_log = makeLogPath("kera_logger_level_tests.log");
+    removeFile(level_log);
+    ASSERT_TRUE(logger.setLogFilePath(level_log.string()));
 
     logger.debug("debug-visible");
     logger.info("info-visible");
@@ -99,58 +99,58 @@ TEST(KeraLogger, WritesLevelsFiltersEnvironmentFatalAndValidationMessages)
     logger.flush();
     logger.clearLogFile();
 
-    std::string content = readTextFile(levelLog);
+    std::string content = readTextFile(level_log);
     EXPECT_TRUE(contains(content, "[DEBUG] debug-visible"));
     EXPECT_TRUE(contains(content, "[INFO] info-visible"));
     EXPECT_TRUE(contains(content, "[WARN] warning-visible"));
     EXPECT_TRUE(contains(content, "[ERROR] error-visible"));
 
-    const std::filesystem::path filterLog = makeLogPath("kera_logger_filter_tests.log");
-    removeFile(filterLog);
-    ASSERT_TRUE(logger.setLogFilePath(filterLog.string()));
-    logger.setLogLevel(kera::LogLevel::Warning);
+    const std::filesystem::path filter_log = makeLogPath("kera_logger_filter_tests.log");
+    removeFile(filter_log);
+    ASSERT_TRUE(logger.setLogFilePath(filter_log.string()));
+    logger.setLogLevel(kera::ELogLevel::WARNING);
     logger.info("filtered-info");
     logger.warning("kept-warning");
     logger.flush();
     logger.clearLogFile();
 
-    content = readTextFile(filterLog);
+    content = readTextFile(filter_log);
     EXPECT_FALSE(contains(content, "filtered-info"));
     EXPECT_TRUE(contains(content, "[WARN] kept-warning"));
 
     setEnv("KERA_LOG_LEVEL", "error");
-    logger.setLogLevel(kera::LogLevel::Debug);
+    logger.setLogLevel(kera::ELogLevel::DEBUG);
     logger.configureFromEnvironment();
-    EXPECT_EQ(logger.getLogLevel(), kera::LogLevel::Error);
+    EXPECT_EQ(logger.getLogLevel(), kera::ELogLevel::ERROR);
     clearEnv("KERA_LOG_LEVEL");
 
-    const std::filesystem::path fatalLog = makeLogPath("kera_logger_fatal_tests.log");
-    removeFile(fatalLog);
-    ASSERT_TRUE(logger.setLogFilePath(fatalLog.string()));
-    logger.setLogLevel(kera::LogLevel::Debug);
+    const std::filesystem::path fatal_log = makeLogPath("kera_logger_fatal_tests.log");
+    removeFile(fatal_log);
+    ASSERT_TRUE(logger.setLogFilePath(fatal_log.string()));
+    logger.setLogLevel(kera::ELogLevel::DEBUG);
     logger.fatal("fatal-without-abort");
     logger.flush();
     logger.clearLogFile();
 
-    content = readTextFile(fatalLog);
+    content = readTextFile(fatal_log);
     EXPECT_TRUE(contains(content, "[FATAL] fatal-without-abort"));
 
-    bool assertHandlerCalled = false;
+    bool assert_handler_called = false;
     kera::Validation::setAssertHandler(
-        [&assertHandlerCalled](const std::string& condition, const std::string& message, const char*, int)
+        [&assert_handler_called](const std::string& condition, const std::string& message, const char*, int)
         {
-            assertHandlerCalled = true;
+            assert_handler_called = true;
             EXPECT_EQ(condition, "false");
             EXPECT_EQ(message, "handler-before-fatal");
         });
     kera::Validation::assertCondition(false, "false", "handler-before-fatal", "logger_tests.cpp", 123);
-    EXPECT_TRUE(assertHandlerCalled);
+    EXPECT_TRUE(assert_handler_called);
     kera::Validation::setAssertHandler(nullptr);
 
     logger.clearLogFile();
-    logger.setLogLevel(kera::LogLevel::Info);
+    logger.setLogLevel(kera::ELogLevel::INFO);
     logger.setAbortOnFatal(true);
-    removeFile(levelLog);
-    removeFile(filterLog);
-    removeFile(fatalLog);
+    removeFile(level_log);
+    removeFile(filter_log);
+    removeFile(fatal_log);
 }

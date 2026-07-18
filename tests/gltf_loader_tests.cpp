@@ -23,22 +23,22 @@ namespace
     class NullRenderer final : public kera::IRenderer
     {
     public:
-        explicit NullRenderer(bool createResources = false) : m_createResources(createResources) {}
+        explicit NullRenderer(bool create_resources = false) : m_create_resources(create_resources) {}
 
-        std::vector<kera::BufferDesc> bufferDescs;
-        std::vector<kera::TextureDesc> textureDescs;
-        std::vector<kera::SamplerDesc> samplerDescs;
-        std::vector<kera::GltfVertex> uploadedVertices;
-        int32_t uploadBatchBeginCount = 0;
-        int32_t uploadBatchEndCount = 0;
-        int32_t uploadBatchCancelCount = 0;
-        bool uploadBatchBeginSucceeds = true;
-        bool uploadBatchEndSucceeds = true;
-        bool textureUploadsSuceed = true;
+        std::vector<kera::BufferDesc> buffer_descs;
+        std::vector<kera::TextureDesc> texture_descs;
+        std::vector<kera::SamplerDesc> sampler_descs;
+        std::vector<kera::GltfVertex> uploaded_vertices;
+        int32_t upload_batch_begin_count = 0;
+        int32_t upload_batch_end_count = 0;
+        int32_t upload_batch_cancel_count = 0;
+        bool upload_batch_begin_succeeds = true;
+        bool upload_batch_end_succeeds = true;
+        bool texture_uploads_suceed = true;
 
-        kera::GraphicsBackend getBackend() const override
+        kera::EGraphicsBackend getBackend() const override
         {
-            return kera::GraphicsBackend::Vulkan;
+            return kera::EGraphicsBackend::VULKAN;
         }
         kera::Extent2D getDrawableExtent() const override
         {
@@ -94,16 +94,16 @@ namespace
 
         kera::BufferHandle createBuffer(const kera::BufferDesc& desc) override
         {
-            if (!m_createResources)
+            if (!m_create_resources)
             {
                 return {};
             }
-            bufferDescs.push_back(desc);
-            return {m_nextBuffer++, 1};
+            buffer_descs.push_back(desc);
+            return {m_next_buffer++, 1};
         }
         bool destroyBuffer(kera::BufferHandle) override
         {
-            return m_createResources;
+            return m_create_resources;
         }
         bool mapBuffer(kera::BufferHandle, void**) override
         {
@@ -112,14 +112,14 @@ namespace
         void unmapBuffer(kera::BufferHandle) override {}
         bool uploadBuffer(kera::BufferHandle, const void* data, std::size_t size, std::size_t) override
         {
-            if (!m_createResources || !data)
+            if (!m_create_resources || !data)
             {
                 return false;
             }
-            if (size >= sizeof(kera::GltfVertex) && size % sizeof(kera::GltfVertex) == 0 && uploadedVertices.empty())
+            if (size >= sizeof(kera::GltfVertex) && size % sizeof(kera::GltfVertex) == 0 && uploaded_vertices.empty())
             {
-                uploadedVertices.resize(size / sizeof(kera::GltfVertex));
-                std::memcpy(uploadedVertices.data(), data, size);
+                uploaded_vertices.resize(size / sizeof(kera::GltfVertex));
+                std::memcpy(uploaded_vertices.data(), data, size);
             }
             return true;
         }
@@ -145,52 +145,52 @@ namespace
         }
         kera::TextureHandle createTexture(const kera::TextureDesc& desc) override
         {
-            if (!m_createResources)
+            if (!m_create_resources)
             {
                 return {};
             }
-            textureDescs.push_back(desc);
-            return {m_nextTexture++, 1};
+            texture_descs.push_back(desc);
+            return {m_next_texture++, 1};
         }
         bool beginUploadBatch() override
         {
-            ++uploadBatchBeginCount;
-            return uploadBatchBeginSucceeds;
+            ++upload_batch_begin_count;
+            return upload_batch_begin_succeeds;
         }
         bool endUploadBatch() override
         {
-            ++uploadBatchEndCount;
-            return uploadBatchEndSucceeds;
+            ++upload_batch_end_count;
+            return upload_batch_end_succeeds;
         }
         void cancelUploadBatch() override
         {
-            ++uploadBatchCancelCount;
+            ++upload_batch_cancel_count;
         }
         bool uploadTexture(kera::TextureHandle, const void* data, std::size_t size) override
         {
-            return m_createResources && textureUploadsSuceed && data && size > 0;
+            return m_create_resources && texture_uploads_suceed && data && size > 0;
         }
         bool uploadTextureSubresource(kera::TextureHandle texture, const kera::TexturePrepareUpload& upload)
         {
-            return m_createResources && upload.data && upload.size > 0 && upload.subresources &&
-                   upload.subresourceCount > 0;
+            return m_create_resources && upload.data && upload.size > 0 && upload.subresources &&
+                   upload.subresource_count > 0;
         }
         bool destroyTexture(kera::TextureHandle) override
         {
-            return m_createResources;
+            return m_create_resources;
         }
         kera::SamplerHandle createSampler(const kera::SamplerDesc& desc) override
         {
-            if (!m_createResources)
+            if (!m_create_resources)
             {
                 return {};
             }
-            samplerDescs.push_back(desc);
-            return {m_nextSampler++, 1};
+            sampler_descs.push_back(desc);
+            return {m_next_sampler++, 1};
         }
         bool destroySampler(kera::SamplerHandle) override
         {
-            return m_createResources;
+            return m_create_resources;
         }
         kera::RenderTargetHandle createRenderTarget(const kera::RenderTargetDesc&) override
         {
@@ -267,7 +267,7 @@ namespace
         void endRenderPass(kera::FrameHandle) override {}
         void bindPipeline(kera::FrameHandle, kera::GraphicsPipelineHandle) override {}
         void bindVertexBuffer(kera::FrameHandle, uint32_t, kera::BufferHandle, std::size_t) override {}
-        void bindIndexBuffer(kera::FrameHandle, kera::BufferHandle, kera::IndexFormat, std::size_t) override {}
+        void bindIndexBuffer(kera::FrameHandle, kera::BufferHandle, kera::EIndexFormat, std::size_t) override {}
         void bindDescriptorSet(kera::FrameHandle, kera::GraphicsPipelineHandle, kera::DescriptorSetHandle) override {}
         void bindDescriptorSet(kera::FrameHandle, kera::GraphicsPipelineHandle, uint32_t,
                                kera::DescriptorSetHandle) override
@@ -280,10 +280,10 @@ namespace
         }
 
     private:
-        bool m_createResources = false;
-        int32_t m_nextBuffer = 0;
-        int32_t m_nextTexture = 0;
-        int32_t m_nextSampler = 0;
+        bool m_create_resources = false;
+        int32_t m_next_buffer = 0;
+        int32_t m_next_texture = 0;
+        int32_t m_next_sampler = 0;
     };
 
     template <typename T>
@@ -303,7 +303,7 @@ namespace
         appendValue(bytes, value);
     }
 
-    bool writeTangentGltfFixture(const std::string& basePath, bool authoredTangents)
+    bool writeTangentGltfFixture(const std::string& base_path, bool authored_tangents)
     {
         std::vector<uint8_t> bytes;
 
@@ -333,22 +333,22 @@ namespace
         {
             appendFloat(bytes, value);
         }
-        if (authoredTangents)
+        if (authored_tangents)
         {
             for (float value : tangents)
             {
                 appendFloat(bytes, value);
             }
         }
-        const size_t indexByteOffset = bytes.size();
+        const size_t index_byte_offset = bytes.size();
         for (uint16_t value : indices)
         {
             appendUInt16(bytes, value);
         }
 
-        const std::string binPath = basePath + ".bin";
+        const std::string bin_path = base_path + ".bin";
         {
-            std::ofstream bin(binPath, std::ios::binary);
+            std::ofstream bin(bin_path, std::ios::binary);
             if (!bin)
             {
                 return false;
@@ -360,8 +360,8 @@ namespace
             }
         }
 
-        const std::string gltfPath = basePath + ".gltf";
-        std::ofstream gltf(gltfPath);
+        const std::string gltf_path = base_path + ".gltf";
+        std::ofstream gltf(gltf_path);
         if (!gltf)
         {
             return false;
@@ -369,32 +369,32 @@ namespace
 
         gltf << "{\n"
              << "  \"asset\": {\"version\": \"2.0\"},\n"
-             << "  \"buffers\": [{\"uri\": \"" << basePath << ".bin\", \"byteLength\": " << bytes.size() << "}],\n"
+             << "  \"buffers\": [{\"uri\": \"" << base_path << ".bin\", \"byteLength\": " << bytes.size() << "}],\n"
              << "  \"bufferViews\": [\n"
              << "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36, \"target\": 34962},\n"
              << "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36, \"target\": 34962},\n"
              << "    {\"buffer\": 0, \"byteOffset\": 72, \"byteLength\": 24, \"target\": 34962}";
-        if (authoredTangents)
+        if (authored_tangents)
         {
             gltf << ",\n"
                  << "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 48, \"target\": 34962}";
         }
         gltf << ",\n"
-             << "    {\"buffer\": 0, \"byteOffset\": " << indexByteOffset << ", \"byteLength\": 6, \"target\": 34963}\n"
+             << "    {\"buffer\": 0, \"byteOffset\": " << index_byte_offset << ", \"byteLength\": 6, \"target\": 34963}\n"
              << "  ],\n"
              << "  \"accessors\": [\n"
              << "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
              << "    {\"bufferView\": 1, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
              << "    {\"bufferView\": 2, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC2\"}";
-        if (authoredTangents)
+        if (authored_tangents)
         {
             gltf << ",\n"
                  << "    {\"bufferView\": 3, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC4\"}";
         }
-        const int indexAccessor = authoredTangents ? 4 : 3;
-        const int indexBufferView = authoredTangents ? 4 : 3;
+        const int index_accessor = authored_tangents ? 4 : 3;
+        const int index_buffer_view = authored_tangents ? 4 : 3;
         gltf << ",\n"
-             << "    {\"bufferView\": " << indexBufferView
+             << "    {\"bufferView\": " << index_buffer_view
              << ", \"componentType\": 5123, \"count\": 3, \"type\": \"SCALAR\"}\n"
              << "  ],\n"
              << "  \"materials\": [{\n"
@@ -408,11 +408,11 @@ namespace
              << "    }\n"
              << "  }],\n"
              << "  \"meshes\": [{\"primitives\": [{\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": 2";
-        if (authoredTangents)
+        if (authored_tangents)
         {
             gltf << ", \"TANGENT\": 3";
         }
-        gltf << "}, \"indices\": " << indexAccessor << ", \"material\": 0}]}],\n"
+        gltf << "}, \"indices\": " << index_accessor << ", \"material\": 0}]}],\n"
              << "  \"nodes\": [{\"mesh\": 0}],\n"
              << "  \"scenes\": [{\"nodes\": [0]}],\n"
              << "  \"scene\": 0\n"
@@ -426,157 +426,157 @@ TEST(KeraGltfLoader, ReportsValidationFailuresForMissingPaths)
 {
     NullRenderer renderer;
 
-    const kera::RendererResult<kera::GltfLoadedModel> emptyPath =
-        kera::loadGltfModel(renderer, {.path = "", .debugName = "Empty"});
-    EXPECT_FALSE(emptyPath.ok());
-    EXPECT_EQ(emptyPath.errorCode(), kera::RendererErrorCode::ValidationFailed);
-    EXPECT_FALSE(emptyPath.errorMessage().empty());
+    const kera::RendererResult<kera::GltfLoadedModel> empty_path =
+        kera::loadGltfModel(renderer, {.path = "", .debug_name = "Empty"});
+    EXPECT_FALSE(empty_path.ok());
+    EXPECT_EQ(empty_path.errorCode(), kera::ERendererErrorCode::VALIDATION_FAILED);
+    EXPECT_FALSE(empty_path.errorMessage().empty());
 
-    const kera::RendererResult<kera::GltfLoadedModel> missingFile =
-        kera::loadGltfModel(renderer, {.path = "missing_file_that_should_not_exist.gltf", .debugName = "Missing"});
-    EXPECT_FALSE(missingFile.ok());
-    EXPECT_EQ(missingFile.errorCode(), kera::RendererErrorCode::ValidationFailed);
-    EXPECT_FALSE(missingFile.errorMessage().empty());
+    const kera::RendererResult<kera::GltfLoadedModel> missing_file =
+        kera::loadGltfModel(renderer, {.path = "missing_file_that_should_not_exist.gltf", .debug_name = "Missing"});
+    EXPECT_FALSE(missing_file.ok());
+    EXPECT_EQ(missing_file.errorCode(), kera::ERendererErrorCode::VALIDATION_FAILED);
+    EXPECT_FALSE(missing_file.errorMessage().empty());
 }
 
 TEST(KeraGltfLoader, LoadsDamagedHelmetResourcesAndGeneratedTangents)
 {
-    NullRenderer resourceRenderer(true);
-    const std::string damagedHelmetPath =
+    NullRenderer resource_renderer(true);
+    const std::string damaged_helmet_path =
         std::string(KERA_SOURCE_DIR) + "/samples/assets/gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    kera::RendererResult<kera::GltfLoadedModel> damagedHelmet =
-        kera::loadGltfModel(resourceRenderer, {.path = damagedHelmetPath, .debugName = "DamagedHelmet"});
+    kera::RendererResult<kera::GltfLoadedModel> damaged_helmet =
+        kera::loadGltfModel(resource_renderer, {.path = damaged_helmet_path, .debug_name = "DamagedHelmet"});
 
-    ASSERT_TRUE(damagedHelmet.ok());
-    EXPECT_EQ(resourceRenderer.uploadBatchBeginCount, 1);
-    EXPECT_EQ(resourceRenderer.uploadBatchEndCount, 1);
-    EXPECT_EQ(resourceRenderer.uploadBatchCancelCount, 0);
-    EXPECT_EQ(damagedHelmet.value().indexCount, 46356u);
-    EXPECT_EQ(damagedHelmet.value().materialFactors.baseColor, glm::vec4(1.0f));
-    EXPECT_EQ(damagedHelmet.value().materialFactors.emissive, glm::vec3(1.0f));
-    EXPECT_EQ(damagedHelmet.value().materialFactors.metallic, 1.0f);
-    EXPECT_EQ(damagedHelmet.value().materialFactors.roughness, 1.0f);
-    EXPECT_EQ(damagedHelmet.value().materialFactors.normalScale, 1.0f);
-    EXPECT_EQ(damagedHelmet.value().materialFactors.occlusionStrength, 1.0f);
-    EXPECT_EQ(damagedHelmet.value().materialFactors.alphaCutoff, 0.5f);
-    EXPECT_EQ(damagedHelmet.value().materialFactors.alphaMode, kera::GltfAlphaMode::Opaque);
-    EXPECT_FALSE(damagedHelmet.value().materialFactors.doubleSided);
+    ASSERT_TRUE(damaged_helmet.ok());
+    EXPECT_EQ(resource_renderer.upload_batch_begin_count, 1);
+    EXPECT_EQ(resource_renderer.upload_batch_end_count, 1);
+    EXPECT_EQ(resource_renderer.upload_batch_cancel_count, 0);
+    EXPECT_EQ(damaged_helmet.value().index_count, 46356u);
+    EXPECT_EQ(damaged_helmet.value().material_factors.base_color, glm::vec4(1.0f));
+    EXPECT_EQ(damaged_helmet.value().material_factors.emissive, glm::vec3(1.0f));
+    EXPECT_EQ(damaged_helmet.value().material_factors.metallic, 1.0f);
+    EXPECT_EQ(damaged_helmet.value().material_factors.roughness, 1.0f);
+    EXPECT_EQ(damaged_helmet.value().material_factors.normal_scale, 1.0f);
+    EXPECT_EQ(damaged_helmet.value().material_factors.occlusion_strength, 1.0f);
+    EXPECT_EQ(damaged_helmet.value().material_factors.alpha_cutoff, 0.5f);
+    EXPECT_EQ(damaged_helmet.value().material_factors.alpha_mode, kera::EGltfAlphaMode::ALPHA_OPAQUE);
+    EXPECT_FALSE(damaged_helmet.value().material_factors.double_sided);
 
-    ASSERT_EQ(resourceRenderer.textureDescs.size(), 5u);
-    EXPECT_EQ(resourceRenderer.textureDescs[0].format, kera::TextureFormat::RGBA8Srgb);
-    EXPECT_EQ(resourceRenderer.textureDescs[1].format, kera::TextureFormat::RGBA8);
-    EXPECT_EQ(resourceRenderer.textureDescs[2].format, kera::TextureFormat::RGBA8Srgb);
-    EXPECT_EQ(resourceRenderer.textureDescs[3].format, kera::TextureFormat::RGBA8);
-    EXPECT_EQ(resourceRenderer.textureDescs[4].format, kera::TextureFormat::RGBA8);
-    for (const kera::TextureDesc& textureDesc : resourceRenderer.textureDescs)
+    ASSERT_EQ(resource_renderer.texture_descs.size(), 5u);
+    EXPECT_EQ(resource_renderer.texture_descs[0].format, kera::ETextureFormat::RGB_A8_SRGB);
+    EXPECT_EQ(resource_renderer.texture_descs[1].format, kera::ETextureFormat::RGBA8);
+    EXPECT_EQ(resource_renderer.texture_descs[2].format, kera::ETextureFormat::RGB_A8_SRGB);
+    EXPECT_EQ(resource_renderer.texture_descs[3].format, kera::ETextureFormat::RGBA8);
+    EXPECT_EQ(resource_renderer.texture_descs[4].format, kera::ETextureFormat::RGBA8);
+    for (const kera::TextureDesc& texture_desc : resource_renderer.texture_descs)
     {
-        EXPECT_TRUE(textureDesc.generateMipmaps);
-        EXPECT_EQ(textureDesc.mipLevels, kera::textureFullMipLevelCount(textureDesc.width, textureDesc.height));
-        EXPECT_GT(textureDesc.mipLevels, 1u);
+        EXPECT_TRUE(texture_desc.generate_mipmaps);
+        EXPECT_EQ(texture_desc.mip_levels, kera::textureFullMipLevelCount(texture_desc.width, texture_desc.height));
+        EXPECT_GT(texture_desc.mip_levels, 1u);
     }
-    ASSERT_EQ(resourceRenderer.samplerDescs.size(), 1u);
-    EXPECT_EQ(resourceRenderer.samplerDescs[0].minFilter, kera::SamplerFilter::Linear);
-    EXPECT_EQ(resourceRenderer.samplerDescs[0].magFilter, kera::SamplerFilter::Linear);
-    EXPECT_EQ(resourceRenderer.samplerDescs[0].mipFilter, kera::SamplerMipFilter::Linear);
-    EXPECT_EQ(resourceRenderer.samplerDescs[0].addressModeU, kera::SamplerAddressMode::Repeat);
-    EXPECT_EQ(resourceRenderer.samplerDescs[0].addressModeV, kera::SamplerAddressMode::Repeat);
-    EXPECT_GT(resourceRenderer.samplerDescs[0].maxLod, 1.0f);
-    EXPECT_EQ(resourceRenderer.samplerDescs[0].maxAnisotropy, 1.0f);
-    ASSERT_FALSE(resourceRenderer.uploadedVertices.empty());
+    ASSERT_EQ(resource_renderer.sampler_descs.size(), 1u);
+    EXPECT_EQ(resource_renderer.sampler_descs[0].min_filter, kera::ESamplerFilter::LINEAR);
+    EXPECT_EQ(resource_renderer.sampler_descs[0].mag_filter, kera::ESamplerFilter::LINEAR);
+    EXPECT_EQ(resource_renderer.sampler_descs[0].mip_filter, kera::ESamplerMipFilter::LINEAR);
+    EXPECT_EQ(resource_renderer.sampler_descs[0].address_mode_u, kera::ESamplerAddressMode::REPEAT);
+    EXPECT_EQ(resource_renderer.sampler_descs[0].address_mode_v, kera::ESamplerAddressMode::REPEAT);
+    EXPECT_GT(resource_renderer.sampler_descs[0].max_lod, 1.0f);
+    EXPECT_EQ(resource_renderer.sampler_descs[0].max_anisotropy, 1.0f);
+    ASSERT_FALSE(resource_renderer.uploaded_vertices.empty());
 
-    bool foundGeneratedTangent = false;
-    for (const kera::GltfVertex& vertex : resourceRenderer.uploadedVertices)
+    bool found_generated_tangent = false;
+    for (const kera::GltfVertex& vertex : resource_renderer.uploaded_vertices)
     {
-        const float tangentLengthSquared = glm::dot(glm::vec3(vertex.tangent), glm::vec3(vertex.tangent));
-        if (tangentLengthSquared > 0.5f && std::abs(std::abs(vertex.tangent.w) - 1.0f) < 0.001f)
+        const float tangent_length_squared = glm::dot(glm::vec3(vertex.tangent), glm::vec3(vertex.tangent));
+        if (tangent_length_squared > 0.5f && std::abs(std::abs(vertex.tangent.w) - 1.0f) < 0.001f)
         {
-            foundGeneratedTangent = true;
+            found_generated_tangent = true;
             break;
         }
     }
-    EXPECT_TRUE(foundGeneratedTangent);
-    kera::destroyGltfModel(resourceRenderer, damagedHelmet.value());
+    EXPECT_TRUE(found_generated_tangent);
+    kera::destroyGltfModel(resource_renderer, damaged_helmet.value());
 }
 
 TEST(KeraGltfLoader, CancelsFailedMaterialTextureUploadBatches)
 {
-    const std::string damagedHelmetPath =
+    const std::string damaged_helmet_path =
         std::string(KERA_SOURCE_DIR) + "/samples/assets/gltf/DamagedHelmet/DamagedHelmet.gltf";
 
-    NullRenderer uploadFailureRenderer(true);
-    uploadFailureRenderer.textureUploadsSuceed = false;
-    const kera::RendererResult<kera::GltfLoadedModel> uploadFailure =
-        kera::loadGltfModel(uploadFailureRenderer, {.path = damagedHelmetPath, .debugName = "UploadFailure"});
+    NullRenderer upload_failure_renderer(true);
+    upload_failure_renderer.texture_uploads_suceed = false;
+    const kera::RendererResult<kera::GltfLoadedModel> upload_failure =
+        kera::loadGltfModel(upload_failure_renderer, {.path = damaged_helmet_path, .debug_name = "UploadFailure"});
 
-    EXPECT_FALSE(uploadFailure.ok());
-    EXPECT_EQ(uploadFailureRenderer.uploadBatchBeginCount, 1);
-    EXPECT_EQ(uploadFailureRenderer.uploadBatchEndCount, 0);
-    EXPECT_EQ(uploadFailureRenderer.uploadBatchCancelCount, 1);
+    EXPECT_FALSE(upload_failure.ok());
+    EXPECT_EQ(upload_failure_renderer.upload_batch_begin_count, 1);
+    EXPECT_EQ(upload_failure_renderer.upload_batch_end_count, 0);
+    EXPECT_EQ(upload_failure_renderer.upload_batch_cancel_count, 1);
 
-    NullRenderer submitFailureRenderer(true);
-    submitFailureRenderer.uploadBatchEndSucceeds = false;
-    const kera::RendererResult<kera::GltfLoadedModel> submitFailure =
-        kera::loadGltfModel(submitFailureRenderer, {.path = damagedHelmetPath, .debugName = "SubmitFailure"});
+    NullRenderer submit_failure_renderer(true);
+    submit_failure_renderer.upload_batch_end_succeeds = false;
+    const kera::RendererResult<kera::GltfLoadedModel> submit_failure =
+        kera::loadGltfModel(submit_failure_renderer, {.path = damaged_helmet_path, .debug_name = "SubmitFailure"});
 
-    EXPECT_FALSE(submitFailure.ok());
-    EXPECT_EQ(submitFailure.errorCode(), kera::RendererErrorCode::BackendFailure);
-    EXPECT_EQ(submitFailureRenderer.uploadBatchBeginCount, 1);
-    EXPECT_EQ(submitFailureRenderer.uploadBatchEndCount, 1);
-    EXPECT_EQ(submitFailureRenderer.uploadBatchCancelCount, 1);
+    EXPECT_FALSE(submit_failure.ok());
+    EXPECT_EQ(submit_failure.errorCode(), kera::ERendererErrorCode::BACKEND_FAILURE);
+    EXPECT_EQ(submit_failure_renderer.upload_batch_begin_count, 1);
+    EXPECT_EQ(submit_failure_renderer.upload_batch_end_count, 1);
+    EXPECT_EQ(submit_failure_renderer.upload_batch_cancel_count, 1);
 }
 
 TEST(KeraGltfLoader, PreservesAuthoredTangentsAndGeneratesFallbackTangents)
 {
-    const std::string authoredBasePath = "authored_tangent_material";
-    ASSERT_TRUE(writeTangentGltfFixture(authoredBasePath, true));
+    const std::string authored_base_path = "authored_tangent_material";
+    ASSERT_TRUE(writeTangentGltfFixture(authored_base_path, true));
 
-    NullRenderer authoredRenderer(true);
-    kera::RendererResult<kera::GltfLoadedModel> authoredModel =
-        kera::loadGltfModel(authoredRenderer, {
-                                                  .path = authoredBasePath + ".gltf",
-                                                  .debugName = "Authored Tangent Material",
-                                                  .requireMaterialTextures = false,
-                                              });
-    ASSERT_TRUE(authoredModel.ok());
-    EXPECT_EQ(authoredModel.value().indexCount, 3u);
-    EXPECT_EQ(authoredModel.value().materialFactors.baseColor, glm::vec4(0.2f, 0.3f, 0.4f, 0.6f));
-    EXPECT_EQ(authoredModel.value().materialFactors.emissive, glm::vec3(0.0f));
-    EXPECT_EQ(authoredModel.value().materialFactors.metallic, 0.25f);
-    EXPECT_EQ(authoredModel.value().materialFactors.roughness, 0.75f);
-    EXPECT_EQ(authoredModel.value().materialFactors.alphaCutoff, 0.42f);
-    EXPECT_EQ(authoredModel.value().materialFactors.alphaMode, kera::GltfAlphaMode::Mask);
-    EXPECT_TRUE(authoredModel.value().materialFactors.doubleSided);
-    EXPECT_TRUE(authoredRenderer.textureDescs.empty());
-    ASSERT_EQ(authoredRenderer.samplerDescs.size(), 1u);
-    ASSERT_FALSE(authoredRenderer.uploadedVertices.empty());
-    for (const kera::GltfVertex& vertex : authoredRenderer.uploadedVertices)
+    NullRenderer authored_renderer(true);
+    kera::RendererResult<kera::GltfLoadedModel> authored_model =
+        kera::loadGltfModel(authored_renderer, {
+                                                   .path = authored_base_path + ".gltf",
+                                                   .debug_name = "Authored Tangent Material",
+                                                   .require_material_textures = false,
+                                               });
+    ASSERT_TRUE(authored_model.ok());
+    EXPECT_EQ(authored_model.value().index_count, 3u);
+    EXPECT_EQ(authored_model.value().material_factors.base_color, glm::vec4(0.2f, 0.3f, 0.4f, 0.6f));
+    EXPECT_EQ(authored_model.value().material_factors.emissive, glm::vec3(0.0f));
+    EXPECT_EQ(authored_model.value().material_factors.metallic, 0.25f);
+    EXPECT_EQ(authored_model.value().material_factors.roughness, 0.75f);
+    EXPECT_EQ(authored_model.value().material_factors.alpha_cutoff, 0.42f);
+    EXPECT_EQ(authored_model.value().material_factors.alpha_mode, kera::EGltfAlphaMode::ALPHA_MASK);
+    EXPECT_TRUE(authored_model.value().material_factors.double_sided);
+    EXPECT_TRUE(authored_renderer.texture_descs.empty());
+    ASSERT_EQ(authored_renderer.sampler_descs.size(), 1u);
+    ASSERT_FALSE(authored_renderer.uploaded_vertices.empty());
+    for (const kera::GltfVertex& vertex : authored_renderer.uploaded_vertices)
     {
         EXPECT_NEAR(vertex.tangent.x, 0.0f, 0.001f);
         EXPECT_NEAR(vertex.tangent.y, 1.0f, 0.001f);
         EXPECT_NEAR(vertex.tangent.z, 0.0f, 0.001f);
         EXPECT_NEAR(vertex.tangent.w, -1.0f, 0.001f);
     }
-    kera::destroyGltfModel(authoredRenderer, authoredModel.value());
+    kera::destroyGltfModel(authored_renderer, authored_model.value());
 
-    const std::string generatedBasePath = "generated_tangent_material";
-    ASSERT_TRUE(writeTangentGltfFixture(generatedBasePath, false));
+    const std::string generated_base_path = "generated_tangent_material";
+    ASSERT_TRUE(writeTangentGltfFixture(generated_base_path, false));
 
-    NullRenderer generatedRenderer(true);
-    kera::RendererResult<kera::GltfLoadedModel> generatedModel =
-        kera::loadGltfModel(generatedRenderer, {
-                                                   .path = generatedBasePath + ".gltf",
-                                                   .debugName = "Generated Tangent Material",
-                                                   .requireMaterialTextures = false,
-                                               });
-    ASSERT_TRUE(generatedModel.ok());
-    ASSERT_FALSE(generatedRenderer.uploadedVertices.empty());
-    for (const kera::GltfVertex& vertex : generatedRenderer.uploadedVertices)
+    NullRenderer generated_renderer(true);
+    kera::RendererResult<kera::GltfLoadedModel> generated_model =
+        kera::loadGltfModel(generated_renderer, {
+                                                    .path = generated_base_path + ".gltf",
+                                                    .debug_name = "Generated Tangent Material",
+                                                    .require_material_textures = false,
+                                                });
+    ASSERT_TRUE(generated_model.ok());
+    ASSERT_FALSE(generated_renderer.uploaded_vertices.empty());
+    for (const kera::GltfVertex& vertex : generated_renderer.uploaded_vertices)
     {
         EXPECT_NEAR(vertex.tangent.x, 1.0f, 0.001f);
         EXPECT_NEAR(vertex.tangent.y, 0.0f, 0.001f);
         EXPECT_NEAR(vertex.tangent.z, 0.0f, 0.001f);
         EXPECT_NEAR(vertex.tangent.w, 1.0f, 0.001f);
     }
-    kera::destroyGltfModel(generatedRenderer, generatedModel.value());
+    kera::destroyGltfModel(generated_renderer, generated_model.value());
 }

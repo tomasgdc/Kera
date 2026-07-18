@@ -83,12 +83,12 @@ extern "C"
 #endif
     } KeraExtent2D;
 
-    typedef enum KeraGraphicsBackend
+    typedef enum EKeraGraphicsBackend
     {
         KERA_GRAPHICS_BACKEND_VULKAN = 0
     } KeraGraphicsBackend;
 
-    typedef enum KeraShaderStage
+    typedef enum EKeraShaderStage
     {
         KERA_SHADER_STAGE_VERTEX = 0,
         KERA_SHADER_STAGE_FRAGMENT = 1,
@@ -96,14 +96,14 @@ extern "C"
         KERA_SHADER_STAGE_ALL_GRAPHICS = 3
     } KeraShaderStage;
 
-    typedef enum KeraShaderSourceKind
+    typedef enum EKeraShaderSourceKind
     {
         KERA_SHADER_SOURCE_SLANG_FILE = 0,
         KERA_SHADER_SOURCE_SPIRV_FILE = 1,
         KERA_SHADER_SOURCE_SPIRV_BINARY = 2
     } KeraShaderSourceKind;
 
-    typedef enum KeraBufferUsageKind
+    typedef enum EKeraBufferUsageKind
     {
         KERA_BUFFER_USAGE_VERTEX = 0,
         KERA_BUFFER_USAGE_INDEX = 1,
@@ -111,63 +111,63 @@ extern "C"
         KERA_BUFFER_USAGE_STORAGE = 3
     } KeraBufferUsageKind;
 
-    typedef enum KeraMemoryAccess
+    typedef enum EKeraMemoryAccess
     {
         KERA_MEMORY_ACCESS_GPU_ONLY = 0,
         KERA_MEMORY_ACCESS_CPU_WRITE = 1
     } KeraMemoryAccess;
 
-    typedef enum KeraIndexFormat
+    typedef enum EKeraIndexFormat
     {
         KERA_INDEX_FORMAT_UINT16 = 0,
         KERA_INDEX_FORMAT_UINT32 = 1
     } KeraIndexFormat;
 
-    typedef enum KeraVertexFormat
+    typedef enum EKeraVertexFormat
     {
         KERA_VERTEX_FORMAT_FLOAT2 = 0,
         KERA_VERTEX_FORMAT_FLOAT3 = 1,
         KERA_VERTEX_FORMAT_FLOAT4 = 2
     } KeraVertexFormat;
 
-    typedef enum KeraVertexInputRate
+    typedef enum EKeraVertexInputRate
     {
         KERA_VERTEX_INPUT_RATE_VERTEX = 0,
         KERA_VERTEX_INPUT_RATE_INSTANCE = 1
     } KeraVertexInputRate;
 
-    typedef enum KeraPrimitiveTopologyKind
+    typedef enum EKeraPrimitiveTopologyKind
     {
         KERA_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST = 0
     } KeraPrimitiveTopologyKind;
 
-    typedef enum KeraCullModeKind
+    typedef enum EKeraCullModeKind
     {
         KERA_CULL_MODE_NONE = 0,
         KERA_CULL_MODE_FRONT = 1,
         KERA_CULL_MODE_BACK = 2
     } KeraCullModeKind;
 
-    typedef enum KeraFrontFaceKind
+    typedef enum EKeraFrontFaceKind
     {
         KERA_FRONT_FACE_CLOCKWISE = 0,
         KERA_FRONT_FACE_COUNTER_CLOCKWISE = 1
     } KeraFrontFaceKind;
 
-    typedef enum KeraBlendModeKind
+    typedef enum EKeraBlendModeKind
     {
         KERA_BLEND_MODE_OPAQUE = 0,
         KERA_BLEND_MODE_ALPHA = 1
     } KeraBlendModeKind;
 
-    typedef enum KeraDescriptorType
+    typedef enum EKeraDescriptorType
     {
         KERA_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 0,
         KERA_DESCRIPTOR_TYPE_SAMPLED_IMAGE = 1,
         KERA_DESCRIPTOR_TYPE_SAMPLER = 2
     } KeraDescriptorType;
 
-    typedef enum KeraTextureFormat
+    typedef enum EKeraTextureFormat
     {
         KERA_TEXTURE_FORMAT_RGBA8 = 0,
         KERA_TEXTURE_FORMAT_RGBA8_SRGB = 1,
@@ -175,33 +175,33 @@ extern "C"
         KERA_TEXTURE_FORMAT_DEPTH32 = 3
     } KeraTextureFormat;
 
-    typedef enum KeraSamplerFilter
+    typedef enum EKeraSamplerFilter
     {
         KERA_SAMPLER_FILTER_NEAREST = 0,
         KERA_SAMPLER_FILTER_LINEAR = 1
     } KeraSamplerFilter;
 
-    typedef enum KeraSamplerMipFilter
+    typedef enum EKeraSamplerMipFilter
     {
         KERA_SAMPLER_MIP_FILTER_NEAREST = 0,
         KERA_SAMPLER_MIP_FILTER_LINEAR = 1
     } KeraSamplerMipFilter;
 
-    typedef enum KeraSamplerAddressMode
+    typedef enum EKeraSamplerAddressMode
     {
         KERA_SAMPLER_ADDRESS_CLAMP_TO_EDGE = 0,
         KERA_SAMPLER_ADDRESS_REPEAT = 1,
         KERA_SAMPLER_ADDRESS_MIRRORED_REPEAT = 2
     } KeraSamplerAddressMode;
 
-    typedef enum KeraGltfAlphaMode
+    typedef enum EKeraGltfAlphaMode
     {
         KERA_GLTF_ALPHA_OPAQUE = 0,
         KERA_GLTF_ALPHA_MASK = 1,
         KERA_GLTF_ALPHA_BLEND = 2
     } KeraGltfAlphaMode;
 
-    typedef enum KeraLogLevel
+    typedef enum EKeraLogLevel
     {
         KERA_LOG_LEVEL_DEBUG = 0,
         KERA_LOG_LEVEL_INFO = 1,
@@ -213,7 +213,7 @@ extern "C"
     typedef struct KeraRendererCreateDesc
     {
         KeraGraphicsBackend backend;
-        void* sdlWindow;
+        void* sdl_window;
         uint32_t width;
         uint32_t height;
     } KeraRendererCreateDesc;
@@ -222,8 +222,8 @@ extern "C"
     {
         size_t size;
         KeraBufferUsageKind usage;
-        KeraMemoryAccess memoryAccess;
-        KeraStringView debugName;
+        KeraMemoryAccess memory_access;
+        KeraStringView debug_name;
     } KeraBufferDesc;
 
     typedef struct KeraTextureDesc
@@ -231,54 +231,54 @@ extern "C"
         uint32_t width;
         uint32_t height;
         KeraTextureFormat format;
-        uint32_t mipLevels;
-        uint8_t generateMipmaps;
-        uint8_t renderTarget;
+        uint32_t mip_levels;
+        uint8_t generate_mipmaps;
+        uint8_t render_target;
         uint8_t sampled;
-        uint8_t depthStencil;
-        KeraStringView debugName;
+        uint8_t depth_stencil;
+        KeraStringView debug_name;
     } KeraTextureDesc;
 
     typedef struct KeraSamplerDesc
     {
-        KeraSamplerFilter minFilter;
-        KeraSamplerFilter magFilter;
-        KeraSamplerMipFilter mipFilter;
-        KeraSamplerAddressMode addressModeU;
-        KeraSamplerAddressMode addressModeV;
-        float minLod;
-        float maxLod;
-        float maxAnisotropy;
-        KeraStringView debugName;
+        KeraSamplerFilter min_filter;
+        KeraSamplerFilter mag_filter;
+        KeraSamplerMipFilter mip_filter;
+        KeraSamplerAddressMode address_mode_u;
+        KeraSamplerAddressMode address_mode_v;
+        float min_lod;
+        float max_lod;
+        float max_anisotropy;
+        KeraStringView debug_name;
     } KeraSamplerDesc;
 
     typedef struct KeraRenderTargetDesc
     {
-        KeraTextureHandle colorTexture;
-        KeraTextureHandle depthTexture;
-        KeraStringView debugName;
+        KeraTextureHandle color_texture;
+        KeraTextureHandle depth_texture;
+        KeraStringView debug_name;
     } KeraRenderTargetDesc;
 
     typedef struct KeraGraphicsShaderProgramDesc
     {
         KeraStringView path;
-        KeraStringView vertexEntryPoint;
-        KeraStringView fragmentEntryPoint;
+        KeraStringView vertex_entry_point;
+        KeraStringView fragment_entry_point;
         KeraShaderSourceKind source;
-        KeraStringView debugName;
+        KeraStringView debug_name;
     } KeraGraphicsShaderProgramDesc;
 
     typedef struct KeraVertexInputBindingDesc
     {
         uint32_t binding;
         uint32_t stride;
-        KeraVertexInputRate inputRate;
+        KeraVertexInputRate input_rate;
     } KeraVertexInputBindingDesc;
 
     typedef struct KeraVertexInputFieldDesc
     {
-        KeraStringView parameterName;
-        KeraStringView fieldName;
+        KeraStringView parameter_name;
+        KeraStringView field_name;
         uint32_t binding;
         uint32_t offset;
         KeraVertexFormat format;
@@ -287,23 +287,23 @@ extern "C"
     typedef struct KeraVertexInputLayout
     {
         const KeraVertexInputBindingDesc* bindings;
-        size_t bindingCount;
+        size_t binding_count;
         const KeraVertexInputFieldDesc* fields;
-        size_t fieldCount;
+        size_t field_count;
     } KeraVertexInputLayout;
 
     typedef struct KeraGraphicsPipelineCreateDesc
     {
-        KeraShaderProgramHandle shaderProgram;
-        KeraVertexInputLayout vertexInput;
-        KeraRenderTargetHandle renderTarget;
+        KeraShaderProgramHandle shader_program;
+        KeraVertexInputLayout vertex_input;
+        KeraRenderTargetHandle render_target;
         KeraPrimitiveTopologyKind topology;
-        KeraCullModeKind cullMode;
-        KeraFrontFaceKind frontFace;
-        KeraBlendModeKind blendMode;
-        uint8_t depthTest;
-        uint8_t depthWrite;
-        KeraStringView debugName;
+        KeraCullModeKind cull_mode;
+        KeraFrontFaceKind front_face;
+        KeraBlendModeKind blend_mode;
+        uint8_t depth_test;
+        uint8_t depth_write;
+        KeraStringView debug_name;
     } KeraGraphicsPipelineCreateDesc;
 
     typedef struct KeraClearColorValue
@@ -316,35 +316,35 @@ extern "C"
 
     typedef struct KeraRenderPassDesc
     {
-        KeraClearColorValue clearColor;
-        float clearDepth;
+        KeraClearColorValue clear_color;
+        float clear_depth;
     } KeraRenderPassDesc;
 
     typedef struct KeraRendererResourceStats
     {
-        uint32_t shaderModules;
-        uint32_t shaderPrograms;
+        uint32_t shader_modules;
+        uint32_t shader_programs;
         uint32_t buffers;
         uint32_t textures;
         uint32_t samplers;
-        uint32_t renderTargets;
-        uint32_t graphicsPipelines;
-        uint32_t descriptorSets;
+        uint32_t render_targets;
+        uint32_t graphics_pipelines;
+        uint32_t descriptor_sets;
         uint32_t frames;
     } KeraRendererResourceStats;
 
     typedef struct KeraRendererStats
     {
         KeraRendererResourceStats resources;
-        uint32_t drawCallsThisFrame;
-        uint32_t pipelinesBoundThisFrame;
-        uint32_t descriptorSetsBoundThisFrame;
-        uint32_t vertexBuffersBoundThisFrame;
-        uint32_t indexBuffersBoundThisFrame;
-        uint32_t bufferUploadsThisFrame;
-        uint32_t textureUploadsThisFrame;
-        uint32_t validationIssuesThisFrame;
-        uint64_t frameIndex;
+        uint32_t draw_calls_this_frame;
+        uint32_t pipelines_bound_this_frame;
+        uint32_t descriptor_sets_bound_this_frame;
+        uint32_t vertex_buffers_bound_this_frame;
+        uint32_t index_buffers_bound_this_frame;
+        uint32_t buffer_uploads_this_frame;
+        uint32_t texture_uploads_this_frame;
+        uint32_t validation_issues_this_frame;
+        uint64_t frame_index;
     } KeraRendererStats;
 
     typedef struct KeraRendererError
@@ -363,13 +363,13 @@ extern "C"
     typedef struct KeraRendererValidationReport
     {
         const KeraRendererValidationIssue* issues;
-        size_t issueCount;
+        size_t issue_count;
     } KeraRendererValidationReport;
 
     typedef struct KeraGltfMaterialTextures
     {
-        KeraTextureHandle baseColor;
-        KeraTextureHandle metalRoughness;
+        KeraTextureHandle base_color;
+        KeraTextureHandle metal_roughness;
         KeraTextureHandle emissive;
         KeraTextureHandle occlusion;
         KeraTextureHandle normal;
@@ -377,34 +377,34 @@ extern "C"
 
     typedef struct KeraGltfMaterialFactors
     {
-        float baseColor[4];
+        float base_color[4];
         float emissive[3];
         float metallic;
         float roughness;
-        float normalScale;
-        float occlusionStrength;
-        float alphaCutoff;
-        KeraGltfAlphaMode alphaMode;
-        uint8_t doubleSided;
+        float normal_scale;
+        float occlusion_strength;
+        float alpha_cutoff;
+        KeraGltfAlphaMode alpha_mode;
+        uint8_t double_sided;
     } KeraGltfMaterialFactors;
 
     typedef struct KeraGltfLoadedModel
     {
-        KeraBufferHandle vertexBuffer;
-        KeraBufferHandle indexBuffer;
-        KeraGltfMaterialTextures materialTextures;
-        KeraSamplerHandle materialSampler;
-        KeraIndexFormat indexFormat;
-        uint32_t indexCount;
+        KeraBufferHandle vertex_buffer;
+        KeraBufferHandle index_buffer;
+        KeraGltfMaterialTextures material_textures;
+        KeraSamplerHandle material_sampler;
+        KeraIndexFormat index_format;
+        uint32_t index_count;
         float transform[16];
-        KeraGltfMaterialFactors materialFactors;
+        KeraGltfMaterialFactors material_factors;
     } KeraGltfLoadedModel;
 
     typedef struct KeraGltfLoadDesc
     {
         KeraStringView path;
-        KeraStringView debugName;
-        uint8_t requireMaterialTextures;
+        KeraStringView debug_name;
+        uint8_t require_material_textures;
     } KeraGltfLoadDesc;
 
     typedef struct KeraGltfVertex
@@ -422,107 +422,107 @@ extern "C"
 
     typedef struct KeraIblEnvironmentLoadDesc
     {
-        KeraStringView iblKtxPath;
-        KeraStringView skyboxKtxPath;
-        KeraStringView sphericalHarmonicsPath;
-        KeraStringView debugName;
+        KeraStringView ibl_ktx_path;
+        KeraStringView skybox_ktx_path;
+        KeraStringView spherical_harmonics_path;
+        KeraStringView debug_name;
     } KeraIblEnvironmentLoadDesc;
 
     typedef struct KeraIblEnvironment
     {
-        KeraTextureHandle iblTexture;
-        KeraTextureHandle skyboxTexture;
+        KeraTextureHandle ibl_texture;
+        KeraTextureHandle skybox_texture;
         KeraSamplerHandle sampler;
-        KeraIblSphericalHarmonics sphericalHarmonics;
-        uint32_t iblMipLevels;
-        uint32_t skyboxMipLevels;
+        KeraIblSphericalHarmonics spherical_harmonics;
+        uint32_t ibl_mip_levels;
+        uint32_t skybox_mip_levels;
     } KeraIblEnvironment;
 
     typedef struct KeraUniformRingBufferInfo
     {
-        size_t elementSize;
-        size_t slotStride;
-        uint32_t slotCount;
+        size_t element_size;
+        size_t slot_stride;
+        uint32_t slot_count;
     } KeraUniformRingBufferInfo;
 
     typedef struct KeraRenderer KeraRenderer;
 
     typedef struct KeraRendererApiV1
     {
-        uint32_t abiVersion;
-        KeraRenderer* (*createRenderer)(const KeraRendererCreateDesc* desc);
+        uint32_t abi_version;
+        KeraRenderer* (*create_renderer)(const KeraRendererCreateDesc* desc);
         void (*destroy)(KeraRenderer* renderer);
         void (*shutdown)(KeraRenderer* renderer);
-        KeraGraphicsBackend (*getBackend)(const KeraRenderer* renderer);
-        KeraExtent2D (*getDrawableExtent)(const KeraRenderer* renderer);
-        KeraRendererStats (*getStats)(const KeraRenderer* renderer);
+        KeraGraphicsBackend (*get_backend)(const KeraRenderer* renderer);
+        KeraExtent2D (*get_drawable_extent)(const KeraRenderer* renderer);
+        KeraRendererStats (*get_stats)(const KeraRenderer* renderer);
         int (*resize)(KeraRenderer* renderer, KeraExtent2D extent);
-        int (*initializeUi)(KeraRenderer* renderer);
-        void (*shutdownUi)(KeraRenderer* renderer);
-        void (*handleUiEvent)(KeraRenderer* renderer, const void* sdlEvent);
-        void (*beginUi)(KeraRenderer* renderer);
-        void (*endUi)(KeraRenderer* renderer);
-        void (*renderUi)(KeraRenderer* renderer, KeraFrameHandle frame);
-        int (*isUiAvailable)(const KeraRenderer* renderer);
-        KeraShaderProgramHandle (*createGraphicsShaderProgram)(KeraRenderer* renderer,
+        int (*initialize_ui)(KeraRenderer* renderer);
+        void (*shutdown_ui)(KeraRenderer* renderer);
+        void (*handle_ui_event)(KeraRenderer* renderer, const void* sdl_event);
+        void (*begin_ui)(KeraRenderer* renderer);
+        void (*end_ui)(KeraRenderer* renderer);
+        void (*render_ui)(KeraRenderer* renderer, KeraFrameHandle frame);
+        int (*is_ui_available)(const KeraRenderer* renderer);
+        KeraShaderProgramHandle (*create_graphics_shader_program)(KeraRenderer* renderer,
                                                                const KeraGraphicsShaderProgramDesc* desc);
-        int (*destroyShaderProgram)(KeraRenderer* renderer, KeraShaderProgramHandle program);
-        KeraBufferHandle (*createBuffer)(KeraRenderer* renderer, const KeraBufferDesc* desc);
-        KeraBufferHandle (*createUniformRingBuffer)(KeraRenderer* renderer, size_t elementSize, uint32_t slotCount);
-        int (*destroyBuffer)(KeraRenderer* renderer, KeraBufferHandle buffer);
-        int (*mapBuffer)(KeraRenderer* renderer, KeraBufferHandle buffer, void** data);
-        void (*unmapBuffer)(KeraRenderer* renderer, KeraBufferHandle buffer);
-        int (*uploadBuffer)(KeraRenderer* renderer, KeraBufferHandle buffer, const void* data, size_t size,
+        int (*destroy_shader_program)(KeraRenderer* renderer, KeraShaderProgramHandle program);
+        KeraBufferHandle (*create_buffer)(KeraRenderer* renderer, const KeraBufferDesc* desc);
+        KeraBufferHandle (*create_uniform_ring_buffer)(KeraRenderer* renderer, size_t element_size, uint32_t slot_count);
+        int (*destroy_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer);
+        int (*map_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer, void** data);
+        void (*unmap_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer);
+        int (*upload_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer, const void* data, size_t size,
                             size_t offset);
-        int (*uploadUniformRingBuffer)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame,
+        int (*upload_uniform_ring_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame,
                                        const void* data, size_t size);
-        KeraUniformRingBufferInfo (*getUniformRingBufferInfo)(KeraRenderer* renderer, KeraBufferHandle buffer);
-        uint32_t (*getUniformRingBufferSlot)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame);
-        size_t (*getUniformRingBufferSlotOffset)(KeraRenderer* renderer, KeraBufferHandle buffer, uint32_t slot);
-        KeraTextureHandle (*createTexture)(KeraRenderer* renderer, const KeraTextureDesc* desc);
-        int (*uploadTexture)(KeraRenderer* renderer, KeraTextureHandle texture, const void* data, size_t size);
-        int (*destroyTexture)(KeraRenderer* renderer, KeraTextureHandle texture);
-        KeraSamplerHandle (*createSampler)(KeraRenderer* renderer, const KeraSamplerDesc* desc);
-        int (*destroySampler)(KeraRenderer* renderer, KeraSamplerHandle sampler);
-        KeraRenderTargetHandle (*createRenderTarget)(KeraRenderer* renderer, const KeraRenderTargetDesc* desc);
-        int (*destroyRenderTarget)(KeraRenderer* renderer, KeraRenderTargetHandle target);
-        KeraRendererValidationReport (*validateVertexInputLayout)(const KeraRenderer* renderer,
-                                                                  KeraShaderProgramHandle shaderProgram,
-                                                                  KeraVertexInputLayout vertexInput);
-        KeraGraphicsPipelineHandle (*createGraphicsPipeline)(KeraRenderer* renderer,
+        KeraUniformRingBufferInfo (*get_uniform_ring_buffer_info)(KeraRenderer* renderer, KeraBufferHandle buffer);
+        uint32_t (*get_uniform_ring_buffer_slot)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame);
+        size_t (*get_uniform_ring_buffer_slot_offset)(KeraRenderer* renderer, KeraBufferHandle buffer, uint32_t slot);
+        KeraTextureHandle (*create_texture)(KeraRenderer* renderer, const KeraTextureDesc* desc);
+        int (*upload_texture)(KeraRenderer* renderer, KeraTextureHandle texture, const void* data, size_t size);
+        int (*destroy_texture)(KeraRenderer* renderer, KeraTextureHandle texture);
+        KeraSamplerHandle (*create_sampler)(KeraRenderer* renderer, const KeraSamplerDesc* desc);
+        int (*destroy_sampler)(KeraRenderer* renderer, KeraSamplerHandle sampler);
+        KeraRenderTargetHandle (*create_render_target)(KeraRenderer* renderer, const KeraRenderTargetDesc* desc);
+        int (*destroy_render_target)(KeraRenderer* renderer, KeraRenderTargetHandle target);
+        KeraRendererValidationReport (*validate_vertex_input_layout)(const KeraRenderer* renderer,
+                                                                  KeraShaderProgramHandle shader_program,
+                                                                  KeraVertexInputLayout vertex_input);
+        KeraGraphicsPipelineHandle (*create_graphics_pipeline)(KeraRenderer* renderer,
                                                              const KeraGraphicsPipelineCreateDesc* desc);
-        int (*destroyGraphicsPipeline)(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline);
-        KeraDescriptorSetHandle (*createDescriptorSet)(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline,
+        int (*destroy_graphics_pipeline)(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline);
+        KeraDescriptorSetHandle (*create_descriptor_set)(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline,
                                                        uint32_t set);
-        int (*destroyDescriptorSet)(KeraRenderer* renderer, KeraDescriptorSetHandle set);
-        int (*updateDescriptorBuffer)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
+        int (*destroy_descriptor_set)(KeraRenderer* renderer, KeraDescriptorSetHandle set);
+        int (*update_descriptor_buffer)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
                                       KeraBufferHandle buffer, size_t offset, size_t range);
-        int (*updateDescriptorTexture)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
+        int (*update_descriptor_texture)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
                                        KeraTextureHandle texture);
-        int (*updateDescriptorSampler)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
+        int (*update_descriptor_sampler)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
                                        KeraSamplerHandle sampler);
-        KeraRendererValidationReport (*validateDescriptorSet)(const KeraRenderer* renderer,
-                                                              KeraDescriptorSetHandle descriptorSet);
-        int (*setDebugName)(KeraRenderer* renderer, KeraHandle handle, KeraStringView name);
-        KeraFrameHandle (*beginFrame)(KeraRenderer* renderer);
-        void (*beginRenderPass)(KeraRenderer* renderer, KeraFrameHandle frame, const KeraRenderPassDesc* desc);
-        void (*beginRenderPassTarget)(KeraRenderer* renderer, KeraFrameHandle frame, KeraRenderTargetHandle target,
+        KeraRendererValidationReport (*validate_descriptor_set)(const KeraRenderer* renderer,
+                                                              KeraDescriptorSetHandle descriptor_set);
+        int (*set_debug_name)(KeraRenderer* renderer, KeraHandle handle, KeraStringView name);
+        KeraFrameHandle (*begin_frame)(KeraRenderer* renderer);
+        void (*begin_render_pass)(KeraRenderer* renderer, KeraFrameHandle frame, const KeraRenderPassDesc* desc);
+        void (*begin_render_pass_target)(KeraRenderer* renderer, KeraFrameHandle frame, KeraRenderTargetHandle target,
                                       const KeraRenderPassDesc* desc);
-        void (*endRenderPass)(KeraRenderer* renderer, KeraFrameHandle frame);
-        void (*bindPipeline)(KeraRenderer* renderer, KeraFrameHandle frame, KeraGraphicsPipelineHandle pipeline);
-        void (*bindVertexBuffer)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t slot, KeraBufferHandle buffer,
+        void (*end_render_pass)(KeraRenderer* renderer, KeraFrameHandle frame);
+        void (*bind_pipeline)(KeraRenderer* renderer, KeraFrameHandle frame, KeraGraphicsPipelineHandle pipeline);
+        void (*bind_vertex_buffer)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t slot, KeraBufferHandle buffer,
                                  size_t offset);
-        void (*bindIndexBuffer)(KeraRenderer* renderer, KeraFrameHandle frame, KeraBufferHandle buffer,
+        void (*bind_index_buffer)(KeraRenderer* renderer, KeraFrameHandle frame, KeraBufferHandle buffer,
                                 KeraIndexFormat format, size_t offset);
-        void (*bindDescriptorSet)(KeraRenderer* renderer, KeraFrameHandle frame, KeraGraphicsPipelineHandle pipeline,
-                                  uint32_t setIndex, KeraDescriptorSetHandle descriptorSet);
-        void (*drawIndexed)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t indexCount, uint32_t instanceCount);
-        int (*endFrame)(KeraRenderer* renderer, KeraFrameHandle frame);
-        int (*loadGltfModel)(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedModel* outModel);
-        void (*destroyGltfModel)(KeraRenderer* renderer, KeraGltfLoadedModel* model);
-        int (*loadIblEnvironment)(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
-                                  KeraIblEnvironment* outEnvironment);
-        void (*destroyIblEnvironment)(KeraRenderer* renderer, KeraIblEnvironment* env);
+        void (*bind_descriptor_set)(KeraRenderer* renderer, KeraFrameHandle frame, KeraGraphicsPipelineHandle pipeline,
+                                  uint32_t set_index, KeraDescriptorSetHandle descriptor_set);
+        void (*draw_indexed)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t index_count, uint32_t instance_count);
+        int (*end_frame)(KeraRenderer* renderer, KeraFrameHandle frame);
+        int (*load_gltf_model)(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedModel* out_model);
+        void (*destroy_gltf_model)(KeraRenderer* renderer, KeraGltfLoadedModel* model);
+        int (*load_ibl_environment)(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
+                                  KeraIblEnvironment* out_environment);
+        void (*destroy_ibl_environment)(KeraRenderer* renderer, KeraIblEnvironment* env);
     } KeraRendererApiV1;
 
     KERA_API const KeraRendererApiV1* keraGetRendererApiV1(void);

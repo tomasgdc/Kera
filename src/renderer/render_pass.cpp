@@ -1,4 +1,4 @@
-// Copyright 2026 Tomas Mikalauskas
+﻿// Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/render_pass.h"
@@ -14,17 +14,17 @@
 namespace kera
 {
 
-    RenderPass::RenderPass() : device_(VK_NULL_HANDLE), render_pass_(VK_NULL_HANDLE) {}
+    RenderPass::RenderPass() : m_device(VK_NULL_HANDLE), m_render_pass(VK_NULL_HANDLE) {}
 
     RenderPass::~RenderPass()
     {
         shutdown();
     }
 
-    RenderPass::RenderPass(RenderPass&& other) noexcept : device_(other.device_), render_pass_(other.render_pass_)
+    RenderPass::RenderPass(RenderPass&& other) noexcept : m_device(other.m_device), m_render_pass(other.m_render_pass)
     {
-        other.device_ = VK_NULL_HANDLE;
-        other.render_pass_ = VK_NULL_HANDLE;
+        other.m_device = VK_NULL_HANDLE;
+        other.m_render_pass = VK_NULL_HANDLE;
     }
 
     RenderPass& RenderPass::operator=(RenderPass&& other) noexcept
@@ -32,42 +32,42 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            device_ = other.device_;
-            render_pass_ = other.render_pass_;
-            other.device_ = VK_NULL_HANDLE;
-            other.render_pass_ = VK_NULL_HANDLE;
+            m_device = other.m_device;
+            m_render_pass = other.m_render_pass;
+            other.m_device = VK_NULL_HANDLE;
+            other.m_render_pass = VK_NULL_HANDLE;
         }
         return *this;
     }
 
-    bool RenderPass::initialize(const Device& device, const SwapChain& swapChain)
+    bool RenderPass::initialize(const Device& device, const SwapChain& swap_chain)
     {
-        if (render_pass_)
+        if (m_render_pass)
         {
             shutdown();
         }
 
-        VkDevice vkDevice = device.getVulkanDevice();
-        device_ = vkDevice;
+        VkDevice vk_device = device.getVulkanDevice();
+        m_device = vk_device;
 
-        VkAttachmentDescription colorAttachment{};
-        colorAttachment.format = swapChain.getImageFormat();
-        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        VkAttachmentDescription color_attachment{};
+        color_attachment.format = swap_chain.getImageFormat();
+        color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-        VkAttachmentReference colorAttachmentRef{};
-        colorAttachmentRef.attachment = 0;
-        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        VkAttachmentReference color_attachment_ref{};
+        color_attachment_ref.attachment = 0;
+        color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.pColorAttachments = &color_attachment_ref;
 
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -77,16 +77,16 @@ namespace kera
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-        VkRenderPassCreateInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = 1;
-        renderPassInfo.pAttachments = &colorAttachment;
-        renderPassInfo.subpassCount = 1;
-        renderPassInfo.pSubpasses = &subpass;
-        renderPassInfo.dependencyCount = 1;
-        renderPassInfo.pDependencies = &dependency;
+        VkRenderPassCreateInfo render_pass_info{};
+        render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        render_pass_info.attachmentCount = 1;
+        render_pass_info.pAttachments = &color_attachment;
+        render_pass_info.subpassCount = 1;
+        render_pass_info.pSubpasses = &subpass;
+        render_pass_info.dependencyCount = 1;
+        render_pass_info.pDependencies = &dependency;
 
-        VkResult result = vkCreateRenderPass(vkDevice, &renderPassInfo, nullptr, &render_pass_);
+        VkResult result = vkCreateRenderPass(vk_device, &render_pass_info, nullptr, &m_render_pass);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create render pass: " + std::to_string(result));
@@ -97,57 +97,57 @@ namespace kera
         return true;
     }
 
-    bool RenderPass::initializeColorTarget(const Device& device, VkFormat colorFormat, VkFormat depthFormat)
+    bool RenderPass::initializeColorTarget(const Device& device, VkFormat color_format, VkFormat depth_format)
     {
-        if (render_pass_)
+        if (m_render_pass)
         {
             shutdown();
         }
 
-        VkDevice vkDevice = device.getVulkanDevice();
-        device_ = vkDevice;
+        VkDevice vk_device = device.getVulkanDevice();
+        m_device = vk_device;
 
         std::vector<VkAttachmentDescription> attachments;
-        attachments.reserve(depthFormat == VK_FORMAT_UNDEFINED ? 1 : 2);
+        attachments.reserve(depth_format == VK_FORMAT_UNDEFINED ? 1 : 2);
 
-        VkAttachmentDescription colorAttachment{};
-        colorAttachment.format = colorFormat;
-        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        attachments.push_back(colorAttachment);
+        VkAttachmentDescription color_attachment{};
+        color_attachment.format = color_format;
+        color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        color_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        color_attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        attachments.push_back(color_attachment);
 
-        VkAttachmentReference colorAttachmentRef{};
-        colorAttachmentRef.attachment = 0;
-        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        VkAttachmentReference color_attachment_ref{};
+        color_attachment_ref.attachment = 0;
+        color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        VkAttachmentReference depthAttachmentRef{};
-        if (depthFormat != VK_FORMAT_UNDEFINED)
+        VkAttachmentReference depth_attachment_ref{};
+        if (depth_format != VK_FORMAT_UNDEFINED)
         {
-            VkAttachmentDescription depthAttachment{};
-            depthAttachment.format = depthFormat;
-            depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-            depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            attachments.push_back(depthAttachment);
+            VkAttachmentDescription depth_attachment{};
+            depth_attachment.format = depth_format;
+            depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depth_attachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            attachments.push_back(depth_attachment);
 
-            depthAttachmentRef.attachment = 1;
-            depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depth_attachment_ref.attachment = 1;
+            depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         }
 
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &colorAttachmentRef;
-        subpass.pDepthStencilAttachment = depthFormat == VK_FORMAT_UNDEFINED ? nullptr : &depthAttachmentRef;
+        subpass.pColorAttachments = &color_attachment_ref;
+        subpass.pDepthStencilAttachment = depth_format == VK_FORMAT_UNDEFINED ? nullptr : &depth_attachment_ref;
 
         VkSubpassDependency dependencies[2]{};
         dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -168,16 +168,16 @@ namespace kera
         dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-        VkRenderPassCreateInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        renderPassInfo.pAttachments = attachments.data();
-        renderPassInfo.subpassCount = 1;
-        renderPassInfo.pSubpasses = &subpass;
-        renderPassInfo.dependencyCount = 2;
-        renderPassInfo.pDependencies = dependencies;
+        VkRenderPassCreateInfo render_pass_info{};
+        render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        render_pass_info.attachmentCount = static_cast<uint32_t>(attachments.size());
+        render_pass_info.pAttachments = attachments.data();
+        render_pass_info.subpassCount = 1;
+        render_pass_info.pSubpasses = &subpass;
+        render_pass_info.dependencyCount = 2;
+        render_pass_info.pDependencies = dependencies;
 
-        VkResult result = vkCreateRenderPass(vkDevice, &renderPassInfo, nullptr, &render_pass_);
+        VkResult result = vkCreateRenderPass(vk_device, &render_pass_info, nullptr, &m_render_pass);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create color target render pass: " + std::to_string(result));
@@ -190,12 +190,12 @@ namespace kera
 
     void RenderPass::shutdown()
     {
-        if (render_pass_)
+        if (m_render_pass)
         {
-            vkDestroyRenderPass(device_, render_pass_, nullptr);
-            render_pass_ = VK_NULL_HANDLE;
+            vkDestroyRenderPass(m_device, m_render_pass, nullptr);
+            m_render_pass = VK_NULL_HANDLE;
         }
-        device_ = VK_NULL_HANDLE;
+        m_device = VK_NULL_HANDLE;
     }
 
 }  // namespace kera

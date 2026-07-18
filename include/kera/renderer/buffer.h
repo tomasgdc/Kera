@@ -10,14 +10,14 @@
 
 namespace kera
 {
-    enum class BufferUsage
+    enum class EBufferUsage
     {
-        Vertex,
-        Index,
-        Uniform,
-        Storage,
-        TransferSrc,
-        TransferDst
+        VERTEX,
+        INDEX,
+        UNIFORM,
+        STORAGE,
+        TRANSFER_SRC,
+        TRANSFER_DST
     };
 
     class Device;
@@ -36,25 +36,25 @@ namespace kera
         Buffer(Buffer&& other) noexcept;
         Buffer& operator=(Buffer&& other) noexcept;
 
-        bool initialize(const Device& device, VkDeviceSize size, BufferUsage usage, VkMemoryPropertyFlags properties);
+        bool initialize(const Device& device, VkDeviceSize size, EBufferUsage usage, VkMemoryPropertyFlags properties);
         void shutdown();
 
         VkBuffer getVulkanBuffer() const
         {
-            return buffer_;
+            return m_buffer;
         }
         VkDeviceMemory getDeviceMemory() const
         {
-            return memory_;
+            return m_memory;
         }
         VkDeviceSize getSize() const
         {
-            return size_;
+            return m_size;
         }
 
         bool isValid() const
         {
-            return buffer_ != VK_NULL_HANDLE;
+            return m_buffer != VK_NULL_HANDLE;
         }
 
         // Data operations
@@ -63,13 +63,13 @@ namespace kera
         bool copyFrom(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
 
     private:
-        VkDevice device_;
-        VkBuffer buffer_;
-        VkDeviceMemory memory_;
-        VkDeviceSize size_;
-        VkDeviceSize non_coherent_atom_size_;
-        VkMemoryPropertyFlags memory_properties_;
-        void* mapped_data_;
+        VkDevice m_device;
+        VkBuffer m_buffer;
+        VkDeviceMemory m_memory;
+        VkDeviceSize m_size;
+        VkDeviceSize m_non_coherent_atom_size;
+        VkMemoryPropertyFlags m_memory_properties;
+        void* m_mapped_data;
     };
 
 }  // namespace kera

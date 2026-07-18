@@ -29,29 +29,29 @@ namespace kera
         Framebuffer(Framebuffer&& other) noexcept;
         Framebuffer& operator=(Framebuffer&& other) noexcept;
 
-        bool initialize(const Device& device, const RenderPass& renderPass, const SwapChain& swapChain);
-        bool initializeSingleColorTarget(const Device& device, const RenderPass& renderPass, VkImageView colorImageView,
-                                         VkExtent2D extent, VkImageView depthImageView = VK_NULL_HANDLE);
+        bool initialize(const Device& device, const RenderPass& render_pass, const SwapChain& swap_chain);
+        bool initializeSingleColorTarget(const Device& device, const RenderPass& render_pass, VkImageView color_image_view,
+                                         VkExtent2D extent, VkImageView depth_image_view = VK_NULL_HANDLE);
         void shutdown();
 
         const std::vector<VkFramebuffer>& getVulkanFramebuffers() const
         {
-            return framebuffers_;
+            return m_framebuffers;
         }
         VkFramebuffer getFramebuffer(uint32_t index) const;
         uint32_t getFramebufferCount() const
         {
-            return static_cast<uint32_t>(framebuffers_.size());
+            return static_cast<uint32_t>(m_framebuffers.size());
         }
 
         bool isValid() const
         {
-            return !framebuffers_.empty();
+            return !m_framebuffers.empty();
         }
 
     private:
-        VkDevice device_;
-        std::vector<VkFramebuffer> framebuffers_;
+        VkDevice m_device;
+        std::vector<VkFramebuffer> m_framebuffers;
     };
 
 }  // namespace kera

@@ -23,31 +23,31 @@ namespace kera
     {
 
         // Validation layer
-        const std::vector<const char*> validationLayers = {"VK_LAYER_KHRONOS_validation"};
+        const std::vector<const char*> kValidationLayers = {"VK_LAYER_KHRONOS_validation"};
 
         // Required device extensions
-        const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        const std::vector<const char*> kDeviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-        VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                     VkDebugUtilsMessageTypeFlagsEXT messageType,
-                                                     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                                                     void* pUserData)
+        VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                                     VkDebugUtilsMessageTypeFlagsEXT message_type,
+                                                     const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
+                                                     void* p_user_data)
         {
-            (void)messageType;
-            (void)pUserData;
+            (void)message_type;
+            (void)p_user_data;
 
             const std::string message = std::string("Vulkan validation: ") +
-                                        (pCallbackData && pCallbackData->pMessage ? pCallbackData->pMessage : "");
+                                        (p_callback_data && p_callback_data->pMessage ? p_callback_data->pMessage : "");
 
-            if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0)
+            if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0)
             {
                 Logger::getInstance().error(message);
             }
-            else if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0)
+            else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0)
             {
                 Logger::getInstance().warning(message);
             }
-            else if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0)
+            else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0)
             {
                 Logger::getInstance().info(message);
             }
@@ -58,30 +58,30 @@ namespace kera
             return VK_FALSE;
         }
 
-        void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+        void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& create_info)
         {
-            createInfo = {};
-            createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            createInfo.messageSeverity =
+            create_info = {};
+            create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+            create_info.messageSeverity =
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+            create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                                      VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                      VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-            createInfo.pfnUserCallback = debugCallback;
+            create_info.pfnUserCallback = debugCallback;
         }
 
         VkResult createDebugUtilsMessengerEXT(VkInstance instance,
-                                              const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-                                              const VkAllocationCallbacks* pAllocator,
-                                              VkDebugUtilsMessengerEXT* pDebugMessenger)
+                                              const VkDebugUtilsMessengerCreateInfoEXT* p_create_info,
+                                              const VkAllocationCallbacks* p_allocator,
+                                              VkDebugUtilsMessengerEXT* p_debug_messenger)
         {
             auto func =
                 (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 
             if (func != nullptr)
             {
-                return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+                return func(instance, p_create_info, p_allocator, p_debug_messenger);
             }
             else
             {
@@ -89,40 +89,40 @@ namespace kera
             }
         }
 
-        void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
-                                           const VkAllocationCallbacks* pAllocator)
+        void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger,
+                                           const VkAllocationCallbacks* p_allocator)
         {
             auto func =
                 (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 
             if (func != nullptr)
             {
-                func(instance, debugMessenger, pAllocator);
+                func(instance, debug_messenger, p_allocator);
             }
         }
 
         bool checkValidationLayerSupport()
         {
-            uint32_t layerCount;
-            vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+            uint32_t layer_count;
+            vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-            std::vector<VkLayerProperties> availableLayers(layerCount);
-            vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+            std::vector<VkLayerProperties> available_layers(layer_count);
+            vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
 
-            for (const char* layerName : validationLayers)
+            for (const char* layer_name : kValidationLayers)
             {
-                bool layerFound = false;
+                bool layer_found = false;
 
-                for (const auto& layerProperties : availableLayers)
+                for (const auto& layer_properties : available_layers)
                 {
-                    if (strcmp(layerName, layerProperties.layerName) == 0)
+                    if (strcmp(layer_name, layer_properties.layerName) == 0)
                     {
-                        layerFound = true;
+                        layer_found = true;
                         break;
                     }
                 }
 
-                if (!layerFound)
+                if (!layer_found)
                 {
                     return false;
                 }
@@ -133,7 +133,7 @@ namespace kera
 
     }  // anonymous namespace
 
-    Instance::Instance() : instance_(VK_NULL_HANDLE), debug_messenger_(VK_NULL_HANDLE), validation_enabled_(false) {}
+    Instance::Instance() : m_instance(VK_NULL_HANDLE), m_debug_messenger(VK_NULL_HANDLE), m_validation_enabled(false) {}
 
     Instance::~Instance()
     {
@@ -141,13 +141,13 @@ namespace kera
     }
 
     Instance::Instance(Instance&& other) noexcept
-        : instance_(other.instance_)
-        , debug_messenger_(other.debug_messenger_)
-        , validation_enabled_(other.validation_enabled_)
+        : m_instance(other.m_instance)
+        , m_debug_messenger(other.m_debug_messenger)
+        , m_validation_enabled(other.m_validation_enabled)
     {
-        other.instance_ = VK_NULL_HANDLE;
-        other.debug_messenger_ = VK_NULL_HANDLE;
-        other.validation_enabled_ = false;
+        other.m_instance = VK_NULL_HANDLE;
+        other.m_debug_messenger = VK_NULL_HANDLE;
+        other.m_validation_enabled = false;
     }
 
     Instance& Instance::operator=(Instance&& other) noexcept
@@ -155,37 +155,37 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            instance_ = other.instance_;
-            debug_messenger_ = other.debug_messenger_;
-            validation_enabled_ = other.validation_enabled_;
+            m_instance = other.m_instance;
+            m_debug_messenger = other.m_debug_messenger;
+            m_validation_enabled = other.m_validation_enabled;
 
-            other.instance_ = VK_NULL_HANDLE;
-            other.debug_messenger_ = VK_NULL_HANDLE;
-            other.validation_enabled_ = false;
+            other.m_instance = VK_NULL_HANDLE;
+            other.m_debug_messenger = VK_NULL_HANDLE;
+            other.m_validation_enabled = false;
         }
         return *this;
     }
 
-    bool Instance::initialize(const std::string& appName, uint32_t appVersion, bool enableValidation)
+    bool Instance::initialize(const std::string& app_name, uint32_t app_version, bool enable_validation)
     {
-        if (instance_)
+        if (m_instance)
         {
             shutdown();
         }
 
-        validation_enabled_ = enableValidation && checkValidationLayerSupport();
+        m_validation_enabled = enable_validation && checkValidationLayerSupport();
 
-        if (enableValidation && !validation_enabled_)
+        if (enable_validation && !m_validation_enabled)
         {
             Logger::getInstance().warning("Vulkan validation layers requested but not available.");
         }
 
-        if (!createInstance(appName, appVersion))
+        if (!createInstance(app_name, app_version))
         {
             return false;
         }
 
-        if (validation_enabled_ && !setupDebugMessenger())
+        if (m_validation_enabled && !setupDebugMessenger())
         {
             Logger::getInstance().error("Failed to set up Vulkan debug messenger.");
             shutdown();
@@ -193,7 +193,7 @@ namespace kera
         }
 
         Logger::getInstance().debug("Vulkan instance created successfully.");
-        if (validation_enabled_)
+        if (m_validation_enabled)
         {
             Logger::getInstance().info("Vulkan validation layers enabled.");
         }
@@ -203,18 +203,18 @@ namespace kera
 
     void Instance::shutdown()
     {
-        if (validation_enabled_)
+        if (m_validation_enabled)
         {
             destroyDebugMessenger();
         }
 
-        if (instance_)
+        if (m_instance)
         {
-            vkDestroyInstance(instance_, nullptr);
-            instance_ = VK_NULL_HANDLE;
+            vkDestroyInstance(m_instance, nullptr);
+            m_instance = VK_NULL_HANDLE;
             Logger::getInstance().debug("Vulkan instance destroyed.");
         }
-        validation_enabled_ = false;
+        m_validation_enabled = false;
     }
 
     std::vector<const char*> Instance::getRequiredExtensions() const
@@ -222,16 +222,16 @@ namespace kera
         uint32_t count = 0;
 
         // SDL3 returns the pointer directly
-        const char* const* sdlExtensions = SDL_Vulkan_GetInstanceExtensions(&count);
-        if (!sdlExtensions)
+        const char* const* sdl_extensions = SDL_Vulkan_GetInstanceExtensions(&count);
+        if (!sdl_extensions)
         {
             Logger::getInstance().error("Failed to get SDL Vulkan extensions.");
             return {};
         }
 
-        std::vector<const char*> extensions(sdlExtensions, sdlExtensions + count);
+        std::vector<const char*> extensions(sdl_extensions, sdl_extensions + count);
 
-        if (validation_enabled_)
+        if (m_validation_enabled)
         {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         }
@@ -241,43 +241,43 @@ namespace kera
 
     std::vector<const char*> Instance::getRequiredLayers() const
     {
-        if (validation_enabled_)
+        if (m_validation_enabled)
         {
-            return validationLayers;
+            return kValidationLayers;
         }
         return {};
     }
 
-    bool Instance::createInstance(const std::string& appName, uint32_t appVersion)
+    bool Instance::createInstance(const std::string& app_name, uint32_t app_version)
     {
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = appName.c_str();
-        appInfo.applicationVersion = appVersion;
-        appInfo.pEngineName = "Kera";
-        appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_3;
+        VkApplicationInfo app_info{};
+        app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        app_info.pApplicationName = app_name.c_str();
+        app_info.applicationVersion = app_version;
+        app_info.pEngineName = "Kera";
+        app_info.engineVersion = VK_MAKE_VERSION(0, 1, 0);
+        app_info.apiVersion = VK_API_VERSION_1_3;
 
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
+        VkInstanceCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        create_info.pApplicationInfo = &app_info;
 
         auto extensions = getRequiredExtensions();
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-        createInfo.ppEnabledExtensionNames = extensions.data();
+        create_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+        create_info.ppEnabledExtensionNames = extensions.data();
 
         auto layers = getRequiredLayers();
-        createInfo.enabledLayerCount = static_cast<uint32_t>(layers.size());
-        createInfo.ppEnabledLayerNames = layers.data();
+        create_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
+        create_info.ppEnabledLayerNames = layers.data();
 
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if (validation_enabled_)
+        VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
+        if (m_validation_enabled)
         {
-            populateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.pNext = &debugCreateInfo;
+            populateDebugMessengerCreateInfo(debug_create_info);
+            create_info.pNext = &debug_create_info;
         }
 
-        VkResult result = vkCreateInstance(&createInfo, nullptr, &instance_);
+        VkResult result = vkCreateInstance(&create_info, nullptr, &m_instance);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create Vulkan instance: " + std::to_string(result));
@@ -289,18 +289,18 @@ namespace kera
 
     bool Instance::setupDebugMessenger()
     {
-        VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-        populateDebugMessengerCreateInfo(createInfo);
+        VkDebugUtilsMessengerCreateInfoEXT create_info{};
+        populateDebugMessengerCreateInfo(create_info);
 
-        return createDebugUtilsMessengerEXT(instance_, &createInfo, nullptr, &debug_messenger_) == VK_SUCCESS;
+        return createDebugUtilsMessengerEXT(m_instance, &create_info, nullptr, &m_debug_messenger) == VK_SUCCESS;
     }
 
     void Instance::destroyDebugMessenger()
     {
-        if (debug_messenger_ && instance_)
+        if (m_debug_messenger && m_instance)
         {
-            destroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
-            debug_messenger_ = VK_NULL_HANDLE;
+            destroyDebugUtilsMessengerEXT(m_instance, m_debug_messenger, nullptr);
+            m_debug_messenger = VK_NULL_HANDLE;
         }
     }
 

@@ -34,16 +34,16 @@ namespace kera
 
         VkSurfaceKHR getVulkanSurface() const
         {
-            return surface_;
+            return m_surface;
         }
         bool isValid() const
         {
-            return surface_ != VK_NULL_HANDLE;
+            return m_surface != VK_NULL_HANDLE;
         }
 
     private:
-        VkInstance instance_;
-        VkSurfaceKHR surface_;
+        VkInstance m_instance;
+        VkSurfaceKHR m_surface;
     };
 
 }  // namespace kera

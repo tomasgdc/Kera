@@ -21,22 +21,22 @@ namespace kera
 
         const std::vector<float>& getData() const
         {
-            return data_;
+            return m_data;
         }
         int getFrequency() const
         {
-            return frequency_;
+            return m_frequency;
         }
         int getChannels() const
         {
-            return channels_;
+            return m_channels;
         }
         float getDuration() const;
 
     private:
-        std::vector<float> data_;
-        int frequency_;
-        int channels_;
+        std::vector<float> m_data;
+        int m_frequency;
+        int m_channels;
     };
 
     class AudioSource
@@ -58,13 +58,13 @@ namespace kera
         bool isStopped() const;
 
     private:
-        const AudioBuffer* buffer_;
-        bool playing_;
-        bool paused_;
-        bool loop_;
-        float volume_;
-        float pitch_;
-        size_t position_;
+        const AudioBuffer* m_buffer;
+        bool m_playing;
+        bool m_paused;
+        bool m_loop;
+        float m_volume;
+        float m_pitch;
+        size_t m_position;
     };
 
     class Audio
@@ -88,7 +88,7 @@ namespace kera
         Audio(const Audio&) = delete;
         Audio& operator=(const Audio&) = delete;
 
-        bool initialized_;
+        bool m_initialized;
     };
 
 }  // namespace kera

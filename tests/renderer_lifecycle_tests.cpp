@@ -30,19 +30,19 @@ namespace
 
 TEST(KeraRendererLifecycle, RejectsUninitializedCommandBufferOperations)
 {
-    const kera::LogLevel previousLogLevel = kera::Logger::getInstance().getLogLevel();
-    kera::Logger::getInstance().setLogLevel(kera::LogLevel::Fatal);
+    const kera::ELogLevel previous_log_level = kera::Logger::getInstance().getLogLevel();
+    kera::Logger::getInstance().setLogLevel(kera::ELogLevel::FATAL);
 
-    kera::CommandBuffer commandBuffer;
-    EXPECT_FALSE(commandBuffer.begin());
-    EXPECT_FALSE(commandBuffer.end());
-    EXPECT_FALSE(commandBuffer.reset());
-    EXPECT_FALSE(commandBuffer.markSubmitted());
-    commandBuffer.markCompleted();
-    EXPECT_FALSE(commandBuffer.isRecording());
-    EXPECT_FALSE(commandBuffer.isPending());
+    kera::CommandBuffer command_buffer;
+    EXPECT_FALSE(command_buffer.begin());
+    EXPECT_FALSE(command_buffer.end());
+    EXPECT_FALSE(command_buffer.reset());
+    EXPECT_FALSE(command_buffer.markSubmitted());
+    command_buffer.markCompleted();
+    EXPECT_FALSE(command_buffer.isRecording());
+    EXPECT_FALSE(command_buffer.isPending());
 
-    kera::Logger::getInstance().setLogLevel(previousLogLevel);
+    kera::Logger::getInstance().setLogLevel(previous_log_level);
 }
 
 TEST(KeraRendererLifecycle, ResourceRegistryRejectsStaleHandles)
@@ -59,76 +59,76 @@ TEST(KeraRendererLifecycle, ResourceRegistryRejectsStaleHandles)
 
 TEST(KeraRendererLifecycle, DescriptorLayoutsMatchByBindingNumber)
 {
-    const kera::DescriptorSetLayoutDesc descriptorLayout{
+    const kera::DescriptorSetLayoutDesc descriptor_layout{
         .set = 0,
         .bindings =
             {
-                {.binding = 0, .type = kera::DescriptorType::UniformBuffer, .stage = kera::ShaderStage::Vertex},
-                {.binding = 1, .type = kera::DescriptorType::SampledImage, .stage = kera::ShaderStage::Fragment},
-                {.binding = 2, .type = kera::DescriptorType::Sampler, .stage = kera::ShaderStage::Fragment},
+                {.binding = 0, .type = kera::EDescriptorType::UNIFORM_BUFFER, .stage = kera::EShaderStage::VERTEX},
+                {.binding = 1, .type = kera::EDescriptorType::SAMPLED_IMAGE, .stage = kera::EShaderStage::FRAGMENT},
+                {.binding = 2, .type = kera::EDescriptorType::SAMPLER, .stage = kera::EShaderStage::FRAGMENT},
             },
     };
 
-    EXPECT_TRUE(kera::descriptorBindingAccepts(descriptorLayout, 0, kera::DescriptorType::UniformBuffer));
-    EXPECT_FALSE(kera::descriptorBindingAccepts(descriptorLayout, 0, kera::DescriptorType::SampledImage));
-    EXPECT_TRUE(kera::descriptorBindingAccepts(descriptorLayout, 1, kera::DescriptorType::SampledImage));
-    EXPECT_TRUE(kera::descriptorBindingAccepts(descriptorLayout, 2, kera::DescriptorType::Sampler));
-    EXPECT_FALSE(kera::descriptorBindingAccepts(descriptorLayout, 3, kera::DescriptorType::Sampler));
+    EXPECT_TRUE(kera::descriptorBindingAccepts(descriptor_layout, 0, kera::EDescriptorType::UNIFORM_BUFFER));
+    EXPECT_FALSE(kera::descriptorBindingAccepts(descriptor_layout, 0, kera::EDescriptorType::SAMPLED_IMAGE));
+    EXPECT_TRUE(kera::descriptorBindingAccepts(descriptor_layout, 1, kera::EDescriptorType::SAMPLED_IMAGE));
+    EXPECT_TRUE(kera::descriptorBindingAccepts(descriptor_layout, 2, kera::EDescriptorType::SAMPLER));
+    EXPECT_FALSE(kera::descriptorBindingAccepts(descriptor_layout, 3, kera::EDescriptorType::SAMPLER));
 
-    kera::DescriptorSetLayoutDesc reorderedDescriptorLayout{
+    kera::DescriptorSetLayoutDesc reordered_descriptor_layout{
         .set = 0,
         .bindings =
             {
-                {.binding = 2, .type = kera::DescriptorType::Sampler, .stage = kera::ShaderStage::Fragment},
-                {.binding = 1, .type = kera::DescriptorType::SampledImage, .stage = kera::ShaderStage::Fragment},
-                {.binding = 0, .type = kera::DescriptorType::UniformBuffer, .stage = kera::ShaderStage::Vertex},
+                {.binding = 2, .type = kera::EDescriptorType::SAMPLER, .stage = kera::EShaderStage::FRAGMENT},
+                {.binding = 1, .type = kera::EDescriptorType::SAMPLED_IMAGE, .stage = kera::EShaderStage::FRAGMENT},
+                {.binding = 0, .type = kera::EDescriptorType::UNIFORM_BUFFER, .stage = kera::EShaderStage::VERTEX},
             },
     };
-    EXPECT_TRUE(kera::descriptorSetLayoutsCompatible(descriptorLayout, reorderedDescriptorLayout));
+    EXPECT_TRUE(kera::descriptorSetLayoutsCompatible(descriptor_layout, reordered_descriptor_layout));
 
-    reorderedDescriptorLayout.bindings[0].type = kera::DescriptorType::UniformBuffer;
-    EXPECT_FALSE(kera::descriptorSetLayoutsCompatible(descriptorLayout, reorderedDescriptorLayout));
+    reordered_descriptor_layout.bindings[0].type = kera::EDescriptorType::UNIFORM_BUFFER;
+    EXPECT_FALSE(kera::descriptorSetLayoutsCompatible(descriptor_layout, reordered_descriptor_layout));
 }
 
 TEST(KeraRendererLifecycle, ResourceDescriptorsHaveStableDefaults)
 {
-    kera::GraphicsPipelineDesc defaultPipelineDesc{};
-    EXPECT_EQ(defaultPipelineDesc.blendMode, kera::BlendModeKind::Opaque);
+    kera::GraphicsPipelineDesc default_pipeline_desc{};
+    EXPECT_EQ(default_pipeline_desc.blend_mode, kera::EBlendModeKind::OPAQUE);
 
-    kera::TextureDesc defaultTextureDesc{};
-    EXPECT_EQ(defaultTextureDesc.mipLevels, 1u);
-    EXPECT_FALSE(defaultTextureDesc.generateMipmaps);
+    kera::TextureDesc default_texture_desc{};
+    EXPECT_EQ(default_texture_desc.mip_levels, 1u);
+    EXPECT_FALSE(default_texture_desc.generate_mipmaps);
     EXPECT_EQ(kera::textureFullMipLevelCount(1, 1), 1u);
     EXPECT_EQ(kera::textureFullMipLevelCount(1024, 512), 11u);
 
-    kera::SamplerDesc defaultSamplerDesc{};
-    EXPECT_EQ(defaultSamplerDesc.mipFilter, kera::SamplerMipFilter::Linear);
-    EXPECT_EQ(defaultSamplerDesc.minLod, 0.0f);
-    EXPECT_EQ(defaultSamplerDesc.maxLod, 0.0f);
-    EXPECT_EQ(defaultSamplerDesc.maxAnisotropy, 1.0f);
-    defaultSamplerDesc.addressModeU = kera::SamplerAddressMode::MirroredRepeat;
-    EXPECT_EQ(defaultSamplerDesc.addressModeU, kera::SamplerAddressMode::MirroredRepeat);
+    kera::SamplerDesc default_sampler_desc{};
+    EXPECT_EQ(default_sampler_desc.mip_filter, kera::ESamplerMipFilter::LINEAR);
+    EXPECT_EQ(default_sampler_desc.min_lod, 0.0f);
+    EXPECT_EQ(default_sampler_desc.max_lod, 0.0f);
+    EXPECT_EQ(default_sampler_desc.max_anisotropy, 1.0f);
+    default_sampler_desc.address_mode_u = kera::ESamplerAddressMode::MIRRORED_REPEAT;
+    EXPECT_EQ(default_sampler_desc.address_mode_u, kera::ESamplerAddressMode::MIRRORED_REPEAT);
 }
 
 TEST(KeraRendererLifecycle, RendererResultAndValidationReportPreserveErrors)
 {
     const auto result =
-        kera::RendererResult<void>::failure(kera::RendererErrorCode::InvalidState, "renderer state rejected");
+        kera::RendererResult<void>::failure(kera::ERendererErrorCode::INVALID_STATE, "renderer state rejected");
     EXPECT_FALSE(result.ok());
-    EXPECT_EQ(result.errorCode(), kera::RendererErrorCode::InvalidState);
+    EXPECT_EQ(result.errorCode(), kera::ERendererErrorCode::INVALID_STATE);
     EXPECT_FALSE(result.errorMessage().empty());
 
     kera::RendererValidationReport report;
-    report.addIssue(kera::RendererErrorCode::InvalidHandle, kera::RendererValidationCategory::Descriptor,
+    report.addIssue(kera::ERendererErrorCode::INVALID_HANDLE, kera::ERendererValidationCategory::DESCRIPTOR,
                     "invalid texture", 1, 2, "albedo");
     EXPECT_FALSE(report.ok());
     ASSERT_FALSE(report.issues.empty());
-    EXPECT_EQ(report.issues.front().code, kera::RendererErrorCode::InvalidHandle);
-    EXPECT_EQ(report.issues.front().category, kera::RendererValidationCategory::Descriptor);
+    EXPECT_EQ(report.issues.front().code, kera::ERendererErrorCode::INVALID_HANDLE);
+    EXPECT_EQ(report.issues.front().category, kera::ERendererValidationCategory::DESCRIPTOR);
     EXPECT_EQ(kera::rendererValidationCategoryName(report.issues.front().category), std::string("Descriptor"));
-    EXPECT_EQ(kera::textureFormatBytesPerPixel(kera::TextureFormat::RGBA8), 4u);
-    EXPECT_EQ(kera::textureFormatBytesPerPixel(kera::TextureFormat::RGBA8Srgb), 4u);
-    EXPECT_EQ(kera::textureFormatBytesPerPixel(kera::TextureFormat::Depth32), 4u);
+    EXPECT_EQ(kera::textureFormatBytesPerPixel(kera::ETextureFormat::RGBA8), 4u);
+    EXPECT_EQ(kera::textureFormatBytesPerPixel(kera::ETextureFormat::RGB_A8_SRGB), 4u);
+    EXPECT_EQ(kera::textureFormatBytesPerPixel(kera::ETextureFormat::DEPTH32), 4u);
 }
 
 TEST(KeraRendererLifecycle, VulkanImageLayoutMasksUseSync2Stages)

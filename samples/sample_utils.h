@@ -19,8 +19,8 @@ namespace kera
         glm::vec2 uv;
     };
 
-    std::string resolveShaderPath(const std::string& shaderPath);
-    std::string resolveSampleAssetPath(const std::string& assetPath);
+    std::string resolveShaderPath(const std::string& shader_path);
+    std::string resolveSampleAssetPath(const std::string& asset_path);
     KeraStringView sampleStringView(const std::string& text);
     void sampleLog(KeraLogLevel level, const std::string& message);
     void sampleLogDebug(const std::string& message);

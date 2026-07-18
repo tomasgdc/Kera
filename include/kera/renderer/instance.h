@@ -26,16 +26,16 @@ namespace kera
         Instance(Instance&& other) noexcept;
         Instance& operator=(Instance&& other) noexcept;
 
-        bool initialize(const std::string& appName, uint32_t appVersion, bool enableValidation = true);
+        bool initialize(const std::string& app_name, uint32_t app_version, bool enable_validation = true);
         void shutdown();
 
         VkInstance getVulkanInstance() const
         {
-            return instance_;
+            return m_instance;
         }
         bool isValid() const
         {
-            return instance_ != VK_NULL_HANDLE;
+            return m_instance != VK_NULL_HANDLE;
         }
 
         // Extension and layer queries
@@ -44,21 +44,21 @@ namespace kera
 
         bool isValidationEnabled() const
         {
-            return validation_enabled_;
+            return m_validation_enabled;
         }
         bool isDebugMessengerActive() const
         {
-            return debug_messenger_ != VK_NULL_HANDLE;
+            return m_debug_messenger != VK_NULL_HANDLE;
         }
 
     private:
-        bool createInstance(const std::string& appName, uint32_t appVersion);
+        bool createInstance(const std::string& app_name, uint32_t app_version);
         bool setupDebugMessenger();
         void destroyDebugMessenger();
 
-        VkInstance instance_;
-        VkDebugUtilsMessengerEXT debug_messenger_;
-        bool validation_enabled_;
+        VkInstance m_instance;
+        VkDebugUtilsMessengerEXT m_debug_messenger;
+        bool m_validation_enabled;
     };
 
 }  // namespace kera

@@ -15,10 +15,10 @@ namespace
     struct Options
     {
         std::string path;
-        double minCoverage = 0.05;
-        double maxCoverage = 0.7;
-        double minLumaRange = 0.18;
-        double minDarkCoverage = 0.0;
+        double min_coverage = 0.05;
+        double max_coverage = 0.7;
+        double min_luma_range = 0.18;
+        double min_dark_coverage = 0.0;
     };
 
     bool readToken(std::ifstream& file, std::string& token)
@@ -83,19 +83,19 @@ namespace
             }
             if (arg == "--min-coverage")
             {
-                options.minCoverage = value;
+                options.min_coverage = value;
             }
             else if (arg == "--max-coverage")
             {
-                options.maxCoverage = value;
+                options.max_coverage = value;
             }
             else if (arg == "--min-luma-range")
             {
-                options.minLumaRange = value;
+                options.min_luma_range = value;
             }
             else if (arg == "--min-dark-coverage")
             {
-                options.minDarkCoverage = value;
+                options.min_dark_coverage = value;
             }
             else
             {
@@ -151,15 +151,15 @@ int main(int argc, char** argv)
     {
         return EXIT_FAILURE;
     }
-    const int maxValue = std::atoi(token.c_str());
-    if (width <= 0 || height <= 0 || maxValue != 255)
+    const int max_value = std::atoi(token.c_str());
+    if (width <= 0 || height <= 0 || max_value != 255)
     {
         kera::sampleLogError("Unsupported PPM header in " + options.path);
         return EXIT_FAILURE;
     }
 
-    const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
-    std::vector<uint8_t> pixels(pixelCount * 3);
+    const size_t pixel_count = static_cast<size_t>(width) * static_cast<size_t>(height);
+    std::vector<uint8_t> pixels(pixel_count * 3);
     file.read(reinterpret_cast<char*>(pixels.data()), static_cast<std::streamsize>(pixels.size()));
     if (static_cast<size_t>(file.gcount()) != pixels.size())
     {
@@ -167,69 +167,69 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    const auto samplePixel = [&](int x, int y, int channel) -> double
+    const auto sample_pixel = [&](int x, int y, int channel) -> double
     {
         const size_t offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 3u;
         return static_cast<double>(pixels[offset + static_cast<size_t>(channel)]) / 255.0;
     };
 
     double bg[3] = {};
-    const int cornerSize = std::max(1, std::min(width, height) / 32);
-    int bgSamples = 0;
+    const int corner_size = std::max(1, std::min(width, height) / 32);
+    int bg_samples = 0;
     for (int cy = 0; cy < 2; ++cy)
     {
         for (int cx = 0; cx < 2; ++cx)
         {
-            const int xStart = cx == 0 ? 0 : width - cornerSize;
-            const int yStart = cy == 0 ? 0 : height - cornerSize;
-            for (int y = yStart; y < yStart + cornerSize; ++y)
+            const int x_start = cx == 0 ? 0 : width - corner_size;
+            const int y_start = cy == 0 ? 0 : height - corner_size;
+            for (int y = y_start; y < y_start + corner_size; ++y)
             {
-                for (int x = xStart; x < xStart + cornerSize; ++x)
+                for (int x = x_start; x < x_start + corner_size; ++x)
                 {
-                    bg[0] += samplePixel(x, y, 0);
-                    bg[1] += samplePixel(x, y, 1);
-                    bg[2] += samplePixel(x, y, 2);
-                    ++bgSamples;
+                    bg[0] += sample_pixel(x, y, 0);
+                    bg[1] += sample_pixel(x, y, 1);
+                    bg[2] += sample_pixel(x, y, 2);
+                    ++bg_samples;
                 }
             }
         }
     }
-    bg[0] /= static_cast<double>(bgSamples);
-    bg[1] /= static_cast<double>(bgSamples);
-    bg[2] /= static_cast<double>(bgSamples);
+    bg[0] /= static_cast<double>(bg_samples);
+    bg[1] /= static_cast<double>(bg_samples);
+    bg[2] /= static_cast<double>(bg_samples);
 
     size_t covered = 0;
     size_t dark = 0;
-    double minLuma = 1.0;
-    double maxLuma = 0.0;
-    for (size_t pixel = 0; pixel < pixelCount; ++pixel)
+    double min_luma = 1.0;
+    double max_luma = 0.0;
+    for (size_t pixel = 0; pixel < pixel_count; ++pixel)
     {
         const size_t offset = pixel * 3u;
         const double r = static_cast<double>(pixels[offset + 0u]) / 255.0;
         const double g = static_cast<double>(pixels[offset + 1u]) / 255.0;
         const double b = static_cast<double>(pixels[offset + 2u]) / 255.0;
         const double diff = std::abs(r - bg[0]) + std::abs(g - bg[1]) + std::abs(b - bg[2]);
-        const double pixelLuma = luma(pixels[offset + 0u], pixels[offset + 1u], pixels[offset + 2u]);
-        minLuma = std::min(minLuma, pixelLuma);
-        maxLuma = std::max(maxLuma, pixelLuma);
+        const double pixel_luma = luma(pixels[offset + 0u], pixels[offset + 1u], pixels[offset + 2u]);
+        min_luma = std::min(min_luma, pixel_luma);
+        max_luma = std::max(max_luma, pixel_luma);
         if (diff > 0.08)
         {
             ++covered;
         }
-        if (pixelLuma < 0.18)
+        if (pixel_luma < 0.18)
         {
             ++dark;
         }
     }
 
-    const double coverage = static_cast<double>(covered) / static_cast<double>(pixelCount);
-    const double darkCoverage = static_cast<double>(dark) / static_cast<double>(pixelCount);
-    const double lumaRange = maxLuma - minLuma;
-    kera::sampleLogInfo("PPM metrics coverage=" + std::to_string(coverage) + " dark=" + std::to_string(darkCoverage) +
-                        " luma_range=" + std::to_string(lumaRange));
+    const double coverage = static_cast<double>(covered) / static_cast<double>(pixel_count);
+    const double dark_coverage = static_cast<double>(dark) / static_cast<double>(pixel_count);
+    const double luma_range = max_luma - min_luma;
+    kera::sampleLogInfo("PPM metrics coverage=" + std::to_string(coverage) + " dark=" + std::to_string(dark_coverage) +
+                        " luma_range=" + std::to_string(luma_range));
 
-    if (coverage < options.minCoverage || coverage > options.maxCoverage || lumaRange < options.minLumaRange ||
-        darkCoverage < options.minDarkCoverage)
+    if (coverage < options.min_coverage || coverage > options.max_coverage || luma_range < options.min_luma_range ||
+        dark_coverage < options.min_dark_coverage)
     {
         kera::sampleLogError("PPM metrics failed thresholds for " + options.path);
         return EXIT_FAILURE;

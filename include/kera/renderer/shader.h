@@ -12,14 +12,14 @@
 namespace kera
 {
 
-    enum class ShaderType
+    enum class EShaderType
     {
-        Vertex,
-        Fragment,
-        Compute,
-        Geometry,
-        TessellationControl,
-        TessellationEvaluation
+        VERTEX,
+        FRAGMENT,
+        COMPUTE,
+        GEOMETRY,
+        TESSELLATION_CONTROL,
+        TESSELLATION_EVALUATION
     };
 
     class Device;
@@ -38,33 +38,33 @@ namespace kera
         Shader(Shader&& other) noexcept;
         Shader& operator=(Shader&& other) noexcept;
 
-        bool initialize(const Device& device, ShaderType type, const std::vector<uint32_t>& spirvCode);
-        bool initializeFromFile(const Device& device, ShaderType type, const std::string& filepath);
-        bool initializeFromSlangFile(const Device& device, ShaderType type, const std::string& shaderPath,
-                                     const std::string& entryPoint, const std::vector<std::string>& searchPaths = {});
+        bool initialize(const Device& device, EShaderType type, const std::vector<uint32_t>& spirv_code);
+        bool initializeFromFile(const Device& device, EShaderType type, const std::string& filepath);
+        bool initializeFromSlangFile(const Device& device, EShaderType type, const std::string& shader_path,
+                                     const std::string& entry_point, const std::vector<std::string>& search_paths = {});
         void shutdown();
 
         VkShaderModule getVulkanShaderModule() const
         {
-            return shader_module_;
+            return m_shader_module;
         }
-        ShaderType getType() const
+        EShaderType getType() const
         {
-            return type_;
+            return m_type;
         }
 
         bool isValid() const
         {
-            return shader_module_ != VK_NULL_HANDLE;
+            return m_shader_module != VK_NULL_HANDLE;
         }
 
         // Shader stage info for pipeline creation
         VkPipelineShaderStageCreateInfo getPipelineStageInfo() const;
 
     private:
-        VkDevice device_;
-        VkShaderModule shader_module_;
-        ShaderType type_;
+        VkDevice m_device;
+        VkShaderModule m_shader_module;
+        EShaderType m_type;
     };
 
 }  // namespace kera

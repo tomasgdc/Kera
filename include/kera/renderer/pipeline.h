@@ -31,30 +31,30 @@ namespace kera
         Pipeline(Pipeline&& other) noexcept;
         Pipeline& operator=(Pipeline&& other) noexcept;
 
-        bool initialize(const Device& device, VkPipelineCache pipelineCache, VkFormat colorFormat, VkFormat depthFormat,
+        bool initialize(const Device& device, VkPipelineCache pipeline_cache, VkFormat color_format, VkFormat depth_format,
                         std::span<const Shader* const> shaders, const GraphicsPipelineDesc& desc = {});
         void shutdown();
 
         VkPipeline getVulkanPipeline() const
         {
-            return pipeline_;
+            return m_pipeline;
         }
         VkPipelineLayout getPipelineLayout() const
         {
-            return pipeline_layout_;
+            return m_pipeline_layout;
         }
         VkDescriptorSetLayout getDescriptorSetLayout(uint32_t set) const;
 
         bool isValid() const
         {
-            return pipeline_ != VK_NULL_HANDLE;
+            return m_pipeline != VK_NULL_HANDLE;
         }
 
     private:
-        VkDevice device_;
-        VkPipeline pipeline_;
-        VkPipelineLayout pipeline_layout_;
-        std::vector<VkDescriptorSetLayout> descriptor_set_layouts_;
+        VkDevice m_device;
+        VkPipeline m_pipeline;
+        VkPipelineLayout m_pipeline_layout;
+        std::vector<VkDescriptorSetLayout> m_descriptor_set_layouts;
     };
 
 }  // namespace kera

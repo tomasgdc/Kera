@@ -22,35 +22,35 @@ namespace kera
 
     struct RendererResourceStats
     {
-        uint32_t shaderModules = 0;
-        uint32_t shaderPrograms = 0;
+        uint32_t shader_modules = 0;
+        uint32_t shader_programs = 0;
         uint32_t buffers = 0;
         uint32_t textures = 0;
         uint32_t samplers = 0;
-        uint32_t renderTargets = 0;
-        uint32_t graphicsPipelines = 0;
-        uint32_t descriptorSets = 0;
+        uint32_t render_targets = 0;
+        uint32_t graphics_pipelines = 0;
+        uint32_t descriptor_sets = 0;
         uint32_t frames = 0;
     };
 
     struct RendererStats
     {
         RendererResourceStats resources;
-        uint32_t drawCallsThisFrame = 0;
-        uint32_t pipelinesBoundThisFrame = 0;
-        uint32_t descriptorSetsBoundThisFrame = 0;
-        uint32_t vertexBuffersBoundThisFrame = 0;
-        uint32_t indexBuffersBoundThisFrame = 0;
-        uint32_t bufferUploadsThisFrame = 0;
-        uint32_t textureUploadsThisFrame = 0;
-        uint32_t validationIssuesThisFrame = 0;
-        uint64_t frameIndex = 0;
+        uint32_t draw_calls_this_frame = 0;
+        uint32_t pipelines_bound_this_frame = 0;
+        uint32_t descriptor_sets_bound_this_frame = 0;
+        uint32_t vertex_buffers_bound_this_frame = 0;
+        uint32_t index_buffers_bound_this_frame = 0;
+        uint32_t buffer_uploads_this_frame = 0;
+        uint32_t texture_uploads_this_frame = 0;
+        uint32_t validation_issues_this_frame = 0;
+        uint64_t frame_index = 0;
     };
 
     struct TextureSubresourceUpload
     {
-        uint32_t mipLevel = 0;
-        uint32_t arrayLayer = 0;
+        uint32_t mip_level = 0;
+        uint32_t array_layer = 0;
         uint32_t width = 0;
         uint32_t height = 0;
         std::size_t offset = 0;
@@ -62,14 +62,14 @@ namespace kera
         const void* data = nullptr;
         std::size_t size = 0;
         const TextureSubresourceUpload* subresources = nullptr;
-        std::size_t subresourceCount = 0;
+        std::size_t subresource_count = 0;
     };
 
     struct UniformRingBufferInfo
     {
-        std::size_t elementSize = 0;
-        std::size_t slotStride = 0;
-        uint32_t slotCount = 0;
+        std::size_t element_size = 0;
+        std::size_t slot_stride = 0;
+        uint32_t slot_count = 0;
     };
 
     class IRenderer
@@ -77,13 +77,13 @@ namespace kera
     public:
         virtual ~IRenderer() = default;
 
-        virtual GraphicsBackend getBackend() const = 0;
+        virtual EGraphicsBackend getBackend() const = 0;
         virtual Extent2D getDrawableExtent() const = 0;
         virtual RendererStats getStats() const = 0;
         virtual void shutdown() = 0;
         // Recreates swapchain-dependent backend state. Renderer-owned buffers and
         // shader programs remain valid; live graphics pipelines are recreated.
-        virtual bool resize(Extent2D newExtent) = 0;
+        virtual bool resize(Extent2D new_extent) = 0;
         virtual bool initializeUi() = 0;
         virtual void shutdownUi() = 0;
         virtual void handleUiEvent(const SDL_Event& event) = 0;
@@ -102,15 +102,15 @@ namespace kera
         virtual std::vector<SlangReflectionBinding> getShaderProgramDescriptorBindings(
             ShaderProgramHandle program) const;
         virtual std::vector<SlangReflectionInput> getShaderProgramVertexInputs(ShaderProgramHandle program,
-                                                                               const std::string& entryPoint) const;
+                                                                               const std::string& entry_point) const;
         virtual bool destroyShaderProgram(ShaderProgramHandle program) = 0;
 
         virtual BufferHandle createBuffer(const BufferDesc& desc) = 0;
         virtual bool destroyBuffer(BufferHandle buffer) = 0;
-        virtual bool mapBuffer(BufferHandle bufferHandle, void** data) = 0;
-        virtual void unmapBuffer(BufferHandle bufferHandle) = 0;
+        virtual bool mapBuffer(BufferHandle buffer_handle, void** data) = 0;
+        virtual void unmapBuffer(BufferHandle buffer_handle) = 0;
         virtual bool uploadBuffer(BufferHandle buffer, const void* data, std::size_t size, std::size_t offset = 0) = 0;
-        virtual BufferHandle createUniformRingBuffer(std::size_t elementSize, uint32_t slotCount = 0) = 0;
+        virtual BufferHandle createUniformRingBuffer(std::size_t element_size, uint32_t slot_count = 0) = 0;
         virtual bool uploadUniformRingBuffer(BufferHandle buffer, FrameHandle frame, const void* data,
                                              std::size_t size) = 0;
         virtual UniformRingBufferInfo getUniformRingBufferInfo(BufferHandle buffer) const = 0;
@@ -127,7 +127,7 @@ namespace kera
         virtual SamplerHandle createSampler(const SamplerDesc& desc) = 0;
         virtual bool destroySampler(SamplerHandle sampler) = 0;
         virtual RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) = 0;
-        virtual bool destroyRenderTarget(RenderTargetHandle renderTarget) = 0;
+        virtual bool destroyRenderTarget(RenderTargetHandle render_target) = 0;
 
         virtual GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                               ShaderProgramHandle program) = 0;
@@ -157,7 +157,7 @@ namespace kera
         virtual bool setDebugName(TextureHandle texture, const std::string& name);
         virtual bool setDebugName(SamplerHandle sampler, const std::string& name);
         virtual bool setDebugName(GraphicsPipelineHandle pipeline, const std::string& name);
-        virtual bool setDebugName(DescriptorSetHandle descriptorSet, const std::string& name);
+        virtual bool setDebugName(DescriptorSetHandle descriptor_set, const std::string& name);
 
         virtual FrameHandle beginFrame() = 0;
         virtual void beginRenderPass(FrameHandle frame, const RenderPassDesc& desc) = 0;
@@ -166,13 +166,13 @@ namespace kera
         virtual void bindPipeline(FrameHandle frame, GraphicsPipelineHandle pipeline) = 0;
         virtual void bindVertexBuffer(FrameHandle frame, uint32_t slot, BufferHandle buffer,
                                       std::size_t offset = 0) = 0;
-        virtual void bindIndexBuffer(FrameHandle frame, BufferHandle buffer, IndexFormat format,
+        virtual void bindIndexBuffer(FrameHandle frame, BufferHandle buffer, EIndexFormat format,
                                      std::size_t offset = 0) = 0;
         virtual void bindDescriptorSet(FrameHandle frame, GraphicsPipelineHandle pipeline,
-                                       DescriptorSetHandle descriptorSet) = 0;
+                                       DescriptorSetHandle descriptor_set) = 0;
         virtual void bindDescriptorSet(FrameHandle frame, GraphicsPipelineHandle pipeline, uint32_t set,
-                                       DescriptorSetHandle descriptorSet) = 0;
-        virtual void drawIndexed(FrameHandle frame, uint32_t indexCount, uint32_t instanceCount = 1) = 0;
+                                       DescriptorSetHandle descriptor_set) = 0;
+        virtual void drawIndexed(FrameHandle frame, uint32_t index_count, uint32_t instance_count = 1) = 0;
         virtual bool endFrame(FrameHandle frame) = 0;
 
         RendererResult<ShaderProgramHandle> tryCreateGraphicsShaderProgram(const GraphicsShaderProgramDesc& desc);
@@ -224,7 +224,7 @@ namespace kera
         }
         const std::string& errorMessage() const
         {
-            return m_errorMessage;
+            return m_error_message;
         }
         const RendererValidationReport& report() const
         {
@@ -233,11 +233,11 @@ namespace kera
         RendererResult<void> result() const
         {
             return ok() ? RendererResult<void>::success()
-                        : RendererResult<void>::failure(RendererErrorCode::ValidationFailed, errorMessage());
+                        : RendererResult<void>::failure(ERendererErrorCode::VALIDATION_FAILED, errorMessage());
         }
 
     private:
-        void recordFailure(bool updated, const char* descriptorKind, const std::string& name)
+        void recordFailure(bool updated, const char* descriptor_kind, const std::string& name)
         {
             if (updated)
             {
@@ -245,19 +245,19 @@ namespace kera
             }
 
             const std::string message =
-                std::string("Failed to update ") + descriptorKind + " descriptor '" + name + "'.";
-            m_report.addIssue(RendererErrorCode::ValidationFailed, RendererValidationCategory::Descriptor, message, 0,
+                std::string("Failed to update ") + descriptor_kind + " descriptor '" + name + "'.";
+            m_report.addIssue(ERendererErrorCode::VALIDATION_FAILED, ERendererValidationCategory::DESCRIPTOR, message, 0,
                               0, name);
-            if (m_errorMessage.empty())
+            if (m_error_message.empty())
             {
-                m_errorMessage = message;
+                m_error_message = message;
             }
         }
 
         IRenderer* m_renderer = nullptr;
         DescriptorSetHandle m_set;
         RendererValidationReport m_report;
-        std::string m_errorMessage;
+        std::string m_error_message;
         bool m_success = true;
     };
 
@@ -267,7 +267,7 @@ namespace kera
         ShaderProgramHandle program) const
     {
         const SlangReflectionMetadata* reflection = getShaderProgramReflection(program);
-        return reflection ? reflection->entryPoints : std::vector<SlangReflectionEntryPoint>{};
+        return reflection ? reflection->entry_points : std::vector<SlangReflectionEntryPoint>{};
     }
 
     inline std::vector<SlangReflectionBinding> IRenderer::getShaderProgramDescriptorBindings(
@@ -278,12 +278,12 @@ namespace kera
     }
 
     inline std::vector<SlangReflectionInput> IRenderer::getShaderProgramVertexInputs(
-        ShaderProgramHandle program, const std::string& entryPoint) const
+        ShaderProgramHandle program, const std::string& entry_point) const
     {
         const SlangReflectionMetadata* reflection = getShaderProgramReflection(program);
-        const SlangReflectionEntryPoint* reflectedEntryPoint =
-            reflection ? reflection->findEntryPoint(entryPoint) : nullptr;
-        return reflectedEntryPoint ? reflectedEntryPoint->inputs : std::vector<SlangReflectionInput>{};
+        const SlangReflectionEntryPoint* reflected_entry_point =
+            reflection ? reflection->findEntryPoint(entry_point) : nullptr;
+        return reflected_entry_point ? reflected_entry_point->inputs : std::vector<SlangReflectionInput>{};
     }
 
     inline VertexLayoutDesc IRenderer::getGraphicsPipelineVertexLayout(GraphicsPipelineHandle) const
@@ -304,7 +304,7 @@ namespace kera
     inline RendererValidationReport IRenderer::validateDescriptorSetDetailed(DescriptorSetHandle) const
     {
         RendererValidationReport report;
-        report.addIssue(RendererErrorCode::Unsupported, RendererValidationCategory::Descriptor,
+        report.addIssue(ERendererErrorCode::UNSUPPORTED, ERendererValidationCategory::DESCRIPTOR,
                         "Detailed descriptor-set validation is not supported by this renderer backend.");
         return report;
     }
@@ -313,7 +313,7 @@ namespace kera
         GraphicsPipelineHandle) const
     {
         RendererValidationReport report;
-        report.addIssue(RendererErrorCode::Unsupported, RendererValidationCategory::Descriptor,
+        report.addIssue(ERendererErrorCode::UNSUPPORTED, ERendererValidationCategory::DESCRIPTOR,
                         "Detailed graphics-pipeline descriptor validation is not supported by this renderer backend.");
         return report;
     }
@@ -367,23 +367,23 @@ namespace kera
 
     inline RendererResult<DescriptorSetHandle> IRenderer::tryCreateDescriptorSet(GraphicsPipelineHandle pipeline)
     {
-        DescriptorSetHandle descriptorSet = createDescriptorSet(pipeline);
-        if (!descriptorSet.isValid())
+        DescriptorSetHandle descriptor_set = createDescriptorSet(pipeline);
+        if (!descriptor_set.isValid())
         {
             return RendererResult<DescriptorSetHandle>::failure("Failed to create descriptor set.");
         }
-        return RendererResult<DescriptorSetHandle>::success(descriptorSet);
+        return RendererResult<DescriptorSetHandle>::success(descriptor_set);
     }
 
     inline RendererResult<DescriptorSetHandle> IRenderer::tryCreateDescriptorSet(GraphicsPipelineHandle pipeline,
                                                                                  uint32_t set)
     {
-        DescriptorSetHandle descriptorSet = createDescriptorSet(pipeline, set);
-        if (!descriptorSet.isValid())
+        DescriptorSetHandle descriptor_set = createDescriptorSet(pipeline, set);
+        if (!descriptor_set.isValid())
         {
             return RendererResult<DescriptorSetHandle>::failure("Failed to create descriptor set.");
         }
-        return RendererResult<DescriptorSetHandle>::success(descriptorSet);
+        return RendererResult<DescriptorSetHandle>::success(descriptor_set);
     }
 
     inline DescriptorSetWriter IRenderer::updateDescriptors(DescriptorSetHandle set)

@@ -18,14 +18,14 @@ namespace kera
 
     struct SampleRunOptions
     {
-        uint32_t maxFrames = 0;
-        uint32_t initialSampleIndex = 0;
-        bool resizeSmoke = false;
-        bool zeroResizeSmoke = false;
-        bool showStatsOverlay = true;
-        uint32_t damagedHelmetDebugView = 0;
-        bool damagedHelmetFixedYaw = false;
-        float damagedHelmetYawRadians = 0.0f;
+        uint32_t max_frames = 0;
+        uint32_t initial_sample_index = 0;
+        bool resize_smoke = false;
+        bool zero_resize_smoke = false;
+        bool show_stats_overlay = true;
+        uint32_t damaged_helmet_debug_view = 0;
+        bool damaged_helmet_fixed_yaw = false;
+        float damaged_helmet_yaw_radians = 0.0f;
     };
 
     class SampleApplication
@@ -45,11 +45,11 @@ namespace kera
         void switchActiveSample(int offset);
 
         std::vector<std::unique_ptr<Sample>> m_samples;
-        int m_activeSampleIndex;
+        int m_active_sample_index;
         struct SampleWindow;
         std::unique_ptr<SampleWindow> m_window;
         std::unique_ptr<Renderer> m_renderer;
-        std::unique_ptr<StatsOverlay> m_statsOverlay;
+        std::unique_ptr<StatsOverlay> m_stats_overlay;
     };
 
     class Sample
@@ -64,7 +64,7 @@ namespace kera
         }
 
         virtual void initialize() = 0;
-        virtual void update(float deltaTime) = 0;
+        virtual void update(float delta_time) = 0;
         virtual void resize(Extent2D) {}
         virtual void render(RenderContext& context) = 0;
         virtual void drawUi() {}

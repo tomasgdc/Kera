@@ -13,112 +13,112 @@
 namespace kera
 {
 
-    enum class GraphicsBackend
+    enum class EGraphicsBackend
     {
-        Vulkan
+        VULKAN
     };
 
-    enum class ShaderStage
+    enum class EShaderStage
     {
-        Vertex,
-        Fragment,
-        Compute,
-        AllGraphics
+        VERTEX,
+        FRAGMENT,
+        COMPUTE,
+        ALL_GRAPHICS
     };
 
-    enum class ShaderSourceKind
+    enum class EShaderSourceKind
     {
-        SlangFile,
-        SpirvFile,
-        SpirvBinary
+        SLANG_FILE,
+        SPIRV_FILE,
+        SPIRV_BINARY
     };
 
-    enum class BufferUsageKind
+    enum class EBufferUsageKind
     {
-        Vertex,
-        Index,
-        Uniform,
-        Storage
+        VERTEX,
+        INDEX,
+        UNIFORM,
+        STORAGE
     };
 
-    enum class MemoryAccess
+    enum class EMemoryAccess
     {
-        GpuOnly,
-        CpuWrite
+        GPU_ONLY,
+        CPU_WRITE
     };
 
-    enum class IndexFormat
+    enum class EIndexFormat
     {
-        UInt16,
-        UInt32
+        U_INT16,
+        U_INT32
     };
 
-    enum class VertexFormat
+    enum class EVertexFormat
     {
-        Float2,
-        Float3,
-        Float4
+        FLOAT2,
+        FLOAT3,
+        FLOAT4
     };
 
-    enum class VertexInputRate
+    enum class EVertexInputRate
     {
-        Vertex,
-        Instance
+        VERTEX,
+        INSTANCE
     };
 
-    enum class PrimitiveTopologyKind
+    enum class EPrimitiveTopologyKind
     {
-        TriangleList
+        TRIANGLE_LIST
     };
 
-    enum class CullModeKind
+    enum class ECullModeKind
     {
-        None,
-        Front,
-        Back
+        NONE,
+        FRONT,
+        BACK
     };
 
-    enum class FrontFaceKind
+    enum class EFrontFaceKind
     {
-        Clockwise,
-        CounterClockwise
+        CLOCKWISE,
+        COUNTER_CLOCKWISE
     };
 
-    enum class BlendModeKind
+    enum class EBlendModeKind
     {
-        Opaque,
-        Alpha
+        OPAQUE,
+        ALPHA
     };
 
-    enum class DescriptorType
+    enum class EDescriptorType
     {
-        UniformBuffer,
-        SampledImage,
-        Sampler
+        UNIFORM_BUFFER,
+        SAMPLED_IMAGE,
+        SAMPLER
     };
 
-    enum class TextureFormat
+    enum class ETextureFormat
     {
         RGBA8,
-        RGBA8Srgb,
-        B10G11R11Ufloat,
-        Depth32
+        RGB_A8_SRGB,
+        B10_G11_R11_UFLOAT,
+        DEPTH32
     };
 
-    enum class TextureDimension
+    enum class ETextureDimension
     {
-        Texture2D,
-        TextureCube
+        TEXTURE2_D,
+        TEXTURE_CUBE
     };
 
-    inline std::size_t textureFormatBytesPerPixel(TextureFormat format) noexcept
+    inline std::size_t textureFormatBytesPerPixel(ETextureFormat format) noexcept
     {
         switch (format)
         {
-            case TextureFormat::RGBA8:
-            case TextureFormat::RGBA8Srgb:
-            case TextureFormat::B10G11R11Ufloat:
-            case TextureFormat::Depth32:
+            case ETextureFormat::RGBA8:
+            case ETextureFormat::RGB_A8_SRGB:
+            case ETextureFormat::B10_G11_R11_UFLOAT:
+            case ETextureFormat::DEPTH32:
                 return 4;
             default:
                 return 0;
@@ -142,23 +142,30 @@ namespace kera
         return levels;
     }
 
-    enum class SamplerFilter
+    enum class ESamplerFilter
     {
-        Nearest,
-        Linear
+        NEAREST,
+        LINEAR
     };
 
-    enum class SamplerMipFilter
+    enum class ESamplerMipFilter
     {
-        Nearest,
-        Linear
+        NEAREST,
+        LINEAR
     };
 
-    enum class SamplerAddressMode
+    enum class ESamplerAddressMode
     {
-        ClampToEdge,
-        Repeat,
-        MirroredRepeat
+        CLAMP_TO_EDGE,
+        REPEAT,
+        MIRRORED_REPEAT
+    };
+
+    enum class EGltfAlphaMode
+    {
+        ALPHA_OPAQUE,
+        ALPHA_MASK,
+        ALPHA_BLEND
     };
 
     template <typename Tag>
@@ -190,88 +197,88 @@ namespace kera
     struct ShaderModuleDesc
     {
         std::string path;
-        std::string entryPoint = "main";
-        ShaderStage stage = ShaderStage::Vertex;
-        ShaderSourceKind source = ShaderSourceKind::SlangFile;
-        std::vector<std::string> searchPaths;
-        std::vector<uint32_t> spirvCode;
-        std::string debugName;
+        std::string entry_point = "main";
+        EShaderStage stage = EShaderStage::VERTEX;
+        EShaderSourceKind source = EShaderSourceKind::SLANG_FILE;
+        std::vector<std::string> search_paths;
+        std::vector<uint32_t> spirv_code;
+        std::string debug_name;
     };
 
     struct ShaderProgramDesc
     {
         std::vector<ShaderModuleDesc> stages;
-        std::string debugName;
+        std::string debug_name;
     };
 
     struct GraphicsShaderProgramDesc
     {
         std::string path;
-        std::string vertexEntryPoint = "vertexMain";
-        std::string fragmentEntryPoint = "fragmentMain";
-        ShaderSourceKind source = ShaderSourceKind::SlangFile;
-        std::string debugName;
+        std::string vertex_entry_point = "vertexMain";
+        std::string fragment_entry_point = "fragmentMain";
+        EShaderSourceKind source = EShaderSourceKind::SLANG_FILE;
+        std::string debug_name;
     };
 
     struct BufferDesc
     {
         std::size_t size = 0;
-        BufferUsageKind usage = BufferUsageKind::Vertex;
-        MemoryAccess memoryAccess = MemoryAccess::GpuOnly;
-        std::string debugName;
+        EBufferUsageKind usage = EBufferUsageKind::VERTEX;
+        EMemoryAccess memory_access = EMemoryAccess::GPU_ONLY;
+        std::string debug_name;
     };
 
     struct TextureDesc
     {
         uint32_t width = 0;
         uint32_t height = 0;
-        TextureFormat format = TextureFormat::RGBA8;
-        TextureDimension dimension = TextureDimension::Texture2D;
+        ETextureFormat format = ETextureFormat::RGBA8;
+        ETextureDimension dimension = ETextureDimension::TEXTURE2_D;
         // A value of 1 with generateMipmaps=true requests the full mip chain.
-        uint32_t mipLevels = 1;
+        uint32_t mip_levels = 1;
         // uploadTexture() uploads level 0 and generates the remaining levels when enabled.
-        bool generateMipmaps = false;
-        bool renderTarget = false;
+        bool generate_mipmaps = false;
+        bool render_target = false;
         bool sampled = true;
-        bool depthStencil = false;
-        std::string debugName;
+        bool depth_stencil = false;
+        std::string debug_name;
     };
 
     struct SamplerDesc
     {
-        SamplerFilter minFilter = SamplerFilter::Linear;
-        SamplerFilter magFilter = SamplerFilter::Linear;
-        SamplerMipFilter mipFilter = SamplerMipFilter::Linear;
-        SamplerMipFilter mipmapMopFilter = SamplerMipFilter::Linear;
-        SamplerAddressMode addressModeU = SamplerAddressMode::ClampToEdge;
-        SamplerAddressMode addressModeV = SamplerAddressMode::ClampToEdge;
-        SamplerAddressMode addressModeW = SamplerAddressMode::ClampToEdge;
-        float minLod = 0.0f;
-        float maxLod = 0.0f;
+        ESamplerFilter min_filter = ESamplerFilter::LINEAR;
+        ESamplerFilter mag_filter = ESamplerFilter::LINEAR;
+        ESamplerMipFilter mip_filter = ESamplerMipFilter::LINEAR;
+        ESamplerMipFilter mipmap_mop_filter = ESamplerMipFilter::LINEAR;
+        ESamplerAddressMode address_mode_u = ESamplerAddressMode::CLAMP_TO_EDGE;
+        ESamplerAddressMode address_mode_v = ESamplerAddressMode::CLAMP_TO_EDGE;
+        ESamplerAddressMode address_mode_w = ESamplerAddressMode::CLAMP_TO_EDGE;
+        float min_lod = 0.0f;
+        float max_lod = 0.0f;
         // Values above one request anisotropic filtering, clamped to device limits by the backend.
-        float maxAnisotropy = 1.0f;
-        std::string debugName;
+        float max_anisotropy = 1.0f;
+        std::string debug_name;
     };
 
     struct RenderTargetDesc
     {
-        TextureHandle colorTexture;
-        TextureHandle depthTexture;
-        std::string debugName;
+        TextureHandle color_texture;
+        TextureHandle depth_texture;
+        std::string debug_name;
     };
 
     struct InstanceBufferDesc
     {
         std::size_t size = 0;
-        BufferUsageKind usage = BufferUsageKind::Vertex;
-        MemoryAccess memoryAccess = MemoryAccess::GpuOnly;
+        EBufferUsageKind usage = EBufferUsageKind::VERTEX;
+        EMemoryAccess memory_access = EMemoryAccess::GPU_ONLY;
     };
 
     struct VertexBindingDesc
     {
         uint32_t binding = 0;
         uint32_t stride = 0;
-        VertexInputRate inputRate = VertexInputRate::Vertex;
+        EVertexInputRate input_rate = EVertexInputRate::VERTEX;
     };
 
     struct VertexAttributeDesc
@@ -279,7 +286,7 @@ namespace kera
         uint32_t location = 0;
         uint32_t binding = 0;
         uint32_t offset = 0;
-        VertexFormat format = VertexFormat::Float3;
+        EVertexFormat format = EVertexFormat::FLOAT3;
     };
 
     struct VertexLayoutDesc
@@ -292,8 +299,8 @@ namespace kera
     {
         std::string name;
         uint32_t binding = 0;
-        DescriptorType type = DescriptorType::UniformBuffer;
-        ShaderStage stage = ShaderStage::Vertex;
+        EDescriptorType type = EDescriptorType::UNIFORM_BUFFER;
+        EShaderStage stage = EShaderStage::VERTEX;
         uint32_t count = 1;
     };
 
@@ -305,16 +312,16 @@ namespace kera
 
     struct GraphicsPipelineDesc
     {
-        PrimitiveTopologyKind topology = PrimitiveTopologyKind::TriangleList;
-        CullModeKind cullMode = CullModeKind::Back;
-        FrontFaceKind frontFace = FrontFaceKind::Clockwise;
-        RenderTargetHandle renderTarget;
-        VertexLayoutDesc vertexLayout;
-        std::vector<DescriptorSetLayoutDesc> descriptorSets;
-        BlendModeKind blendMode = BlendModeKind::Opaque;
-        bool depthTest = false;
-        bool depthWrite = false;
-        std::string debugName;
+        EPrimitiveTopologyKind topology = EPrimitiveTopologyKind::TRIANGLE_LIST;
+        ECullModeKind cull_mode = ECullModeKind::BACK;
+        EFrontFaceKind front_face = EFrontFaceKind::CLOCKWISE;
+        RenderTargetHandle render_target;
+        VertexLayoutDesc vertex_layout;
+        std::vector<DescriptorSetLayoutDesc> descriptor_sets;
+        EBlendModeKind blend_mode = EBlendModeKind::OPAQUE;
+        bool depth_test = false;
+        bool depth_write = false;
+        std::string debug_name;
     };
 
     struct ClearColorValue
@@ -327,8 +334,8 @@ namespace kera
 
     struct RenderPassDesc
     {
-        ClearColorValue clearColor;
-        float clearDepth = 1.0f;
+        ClearColorValue clear_color;
+        float clear_depth = 1.0f;
     };
 
 }  // namespace kera

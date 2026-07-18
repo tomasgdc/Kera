@@ -14,56 +14,56 @@
 namespace kera
 {
 
-    enum class SlangReflectionBindingKind
+    enum class ESlangReflectionBindingKind
     {
-        Unknown,
-        ParameterBlock,
-        ConstantBuffer,
-        Resource,
-        SamplerState
+        UNKNOWN,
+        PARAMETER_BLOCK,
+        CONSTANT_BUFFER,
+        RESOURCE,
+        SAMPLER_STATE
     };
 
     struct SlangReflectionBinding
     {
         std::string name;
-        SlangReflectionBindingKind kind = SlangReflectionBindingKind::Unknown;
-        ShaderType stage = ShaderType::Vertex;
+        ESlangReflectionBindingKind kind = ESlangReflectionBindingKind::UNKNOWN;
+        EShaderType stage = EShaderType::VERTEX;
         uint32_t binding = 0;
         uint32_t space = 0;
         uint32_t count = 1;
-        std::string typeName;
-        std::size_t uniformSize = 0;
+        std::string type_name;
+        std::size_t uniform_size = 0;
     };
 
     struct SlangReflectionInput
     {
         std::string name;
-        std::string parameterName;
-        std::string fieldName;
-        std::string semanticName;
+        std::string parameter_name;
+        std::string field_name;
+        std::string semantic_name;
         uint32_t location = 0;
-        uint32_t locationCount = 1;
-        VertexFormat format = VertexFormat::Float3;
-        bool hasFormat = false;
+        uint32_t location_count = 1;
+        EVertexFormat format = EVertexFormat::FLOAT3;
+        bool has_format = false;
     };
 
     struct SlangReflectionEntryPoint
     {
         std::string name;
-        ShaderType stage = ShaderType::Vertex;
+        EShaderType stage = EShaderType::VERTEX;
         std::vector<SlangReflectionInput> inputs;
     };
 
     struct SlangReflectionMetadata
     {
         std::vector<SlangReflectionBinding> bindings;
-        std::vector<SlangReflectionEntryPoint> entryPoints;
+        std::vector<SlangReflectionEntryPoint> entry_points;
 
         const SlangReflectionBinding* findBinding(const std::string& name) const;
         const SlangReflectionEntryPoint* findEntryPoint(const std::string& name) const;
     };
 
-    bool parseSlangReflectionMetadata(const std::string& reflectionJson, SlangReflectionMetadata& outMetadata,
-                                      std::string* outDiagnostics = nullptr);
+    bool parseSlangReflectionMetadata(const std::string& reflection_json, SlangReflectionMetadata& out_metadata,
+                                      std::string* out_diagnostics = nullptr);
 
 }  // namespace kera

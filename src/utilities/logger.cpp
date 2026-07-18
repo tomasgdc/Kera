@@ -20,66 +20,66 @@ namespace kera
 {
     namespace
     {
-        spdlog::level::level_enum toSpdlogLevel(LogLevel level)
+        spdlog::level::level_enum toSpdlogLevel(ELogLevel level)
         {
             switch (level)
             {
-                case LogLevel::Debug:
+                case ELogLevel::DEBUG:
                     return spdlog::level::debug;
-                case LogLevel::Info:
+                case ELogLevel::INFO:
                     return spdlog::level::info;
-                case LogLevel::Warning:
+                case ELogLevel::WARNING:
                     return spdlog::level::warn;
-                case LogLevel::Error:
+                case ELogLevel::ERROR:
                     return spdlog::level::err;
-                case LogLevel::Fatal:
+                case ELogLevel::FATAL:
                     return spdlog::level::critical;
             }
 
             return spdlog::level::info;
         }
 
-        bool parseLogLevel(std::string_view value, LogLevel& outLevel)
+        bool parseLogLevel(std::string_view value, ELogLevel& out_level)
         {
             if (value == "debug" || value == "DEBUG" || value == "Debug")
             {
-                outLevel = LogLevel::Debug;
+                out_level = ELogLevel::DEBUG;
                 return true;
             }
             if (value == "info" || value == "INFO" || value == "Info")
             {
-                outLevel = LogLevel::Info;
+                out_level = ELogLevel::INFO;
                 return true;
             }
             if (value == "warn" || value == "WARN" || value == "warning" || value == "WARNING" || value == "Warning")
             {
-                outLevel = LogLevel::Warning;
+                out_level = ELogLevel::WARNING;
                 return true;
             }
             if (value == "error" || value == "ERROR" || value == "Error")
             {
-                outLevel = LogLevel::Error;
+                out_level = ELogLevel::ERROR;
                 return true;
             }
             if (value == "fatal" || value == "FATAL" || value == "Fatal" || value == "critical" || value == "CRITICAL")
             {
-                outLevel = LogLevel::Fatal;
+                out_level = ELogLevel::FATAL;
                 return true;
             }
             return false;
         }
 
-        bool getEnvironmentValue(const char* name, std::string& outValue)
+        bool getEnvironmentValue(const char* name, std::string& out_value)
         {
 #if defined(_WIN32)
             char* value = nullptr;
-            size_t valueSize = 0;
-            if (_dupenv_s(&value, &valueSize, name) != 0 || !value)
+            size_t value_size = 0;
+            if (_dupenv_s(&value, &value_size, name) != 0 || !value)
             {
                 return false;
             }
 
-            outValue.assign(value);
+            out_value.assign(value);
             std::free(value);
             return true;
 #else
@@ -166,40 +166,40 @@ namespace kera
         class KeraFileSink final : public spdlog::sinks::base_sink<std::mutex>
         {
         public:
-            explicit KeraFileSink(std::FILE* file) : file_(file) {}
+            explicit KeraFileSink(std::FILE* file) : m_file(file) {}
 
             ~KeraFileSink() override
             {
-                if (file_)
+                if (m_file)
                 {
-                    std::fclose(file_);
-                    file_ = nullptr;
+                    std::fclose(m_file);
+                    m_file = nullptr;
                 }
             }
 
         protected:
             void sink_it_(const spdlog::details::log_msg& msg) override
             {
-                if (!file_)
+                if (!m_file)
                 {
                     return;
                 }
 
                 spdlog::memory_buf_t formatted;
                 formatter_->format(msg, formatted);
-                std::fwrite(formatted.data(), 1, formatted.size(), file_);
+                std::fwrite(formatted.data(), 1, formatted.size(), m_file);
             }
 
             void flush_() override
             {
-                if (file_)
+                if (m_file)
                 {
-                    std::fflush(file_);
+                    std::fflush(m_file);
                 }
             }
 
         private:
-            std::FILE* file_ = nullptr;
+            std::FILE* m_file = nullptr;
         };
 
         std::shared_ptr<KeraFileSink>& getFileSink()
@@ -218,12 +218,12 @@ namespace kera
         {
             static auto logger = []
             {
-                auto consoleSink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
-                auto createdLogger = std::make_shared<spdlog::logger>("kera", consoleSink);
-                createdLogger->set_level(spdlog::level::trace);
-                createdLogger->set_formatter(makeFormatter());
-                createdLogger->flush_on(spdlog::level::err);
-                return createdLogger;
+                auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+                auto created_logger = std::make_shared<spdlog::logger>("kera", console_sink);
+                created_logger->set_level(spdlog::level::trace);
+                created_logger->set_formatter(makeFormatter());
+                created_logger->flush_on(spdlog::level::err);
+                return created_logger;
             }();
             return logger;
         }
@@ -251,10 +251,10 @@ namespace kera
         std::string value;
         if (getEnvironmentValue("KERA_LOG_LEVEL", value))
         {
-            LogLevel parsedLevel = log_level_;
-            if (parseLogLevel(value, parsedLevel))
+            ELogLevel parsed_level = m_log_level;
+            if (parseLogLevel(value, parsed_level))
             {
-                setLogLevel(parsedLevel);
+                setLogLevel(parsed_level);
             }
         }
 
@@ -281,34 +281,34 @@ namespace kera
             return false;
         }
 
-        auto newSink = std::make_shared<KeraFileSink>(file);
-        newSink->set_formatter(makeFormatter());
+        auto new_sink = std::make_shared<KeraFileSink>(file);
+        new_sink->set_formatter(makeFormatter());
 
         std::lock_guard<std::mutex> lock(getLoggerMutex());
         std::shared_ptr<spdlog::logger> logger = getSpdlogLoggerPtr();
         std::vector<spdlog::sink_ptr>& sinks = logger->sinks();
-        const std::shared_ptr<KeraFileSink> oldSink = getFileSink();
-        if (oldSink)
+        const std::shared_ptr<KeraFileSink> old_sink = getFileSink();
+        if (old_sink)
         {
-            sinks.erase(std::remove(sinks.begin(), sinks.end(), oldSink), sinks.end());
+            sinks.erase(std::remove(sinks.begin(), sinks.end(), old_sink), sinks.end());
         }
-        sinks.push_back(newSink);
-        getFileSink() = newSink;
+        sinks.push_back(new_sink);
+        getFileSink() = new_sink;
         return true;
     }
 
     void Logger::clearLogFile()
     {
         std::lock_guard<std::mutex> lock(getLoggerMutex());
-        std::shared_ptr<KeraFileSink> oldSink = getFileSink();
-        if (!oldSink)
+        std::shared_ptr<KeraFileSink> old_sink = getFileSink();
+        if (!old_sink)
         {
             return;
         }
 
         std::shared_ptr<spdlog::logger> logger = getSpdlogLoggerPtr();
         std::vector<spdlog::sink_ptr>& sinks = logger->sinks();
-        sinks.erase(std::remove(sinks.begin(), sinks.end(), oldSink), sinks.end());
+        sinks.erase(std::remove(sinks.begin(), sinks.end(), old_sink), sinks.end());
         getFileSink().reset();
     }
 
@@ -317,16 +317,16 @@ namespace kera
         getSpdlogLogger().flush();
     }
 
-    void Logger::log(LogLevel level, const std::string& message)
+    void Logger::log(ELogLevel level, const std::string& message)
     {
-        if (level < log_level_)
+        if (level < m_log_level)
         {
             return;
         }
 
         getSpdlogLogger().log(toSpdlogLevel(level), message);
 
-        if (level == LogLevel::Fatal && abort_on_fatal_)
+        if (level == ELogLevel::FATAL && m_abort_on_fatal)
         {
             getSpdlogLogger().flush();
             std::abort();

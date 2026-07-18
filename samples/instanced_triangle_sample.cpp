@@ -31,22 +31,22 @@ namespace kera
 
         struct BasicInstanceData
         {
-            glm::mat4 modelMatrix;
+            glm::mat4 model_matrix;
         };
 
-        namespace InstancedTriangleShader
+        namespace instanced_triangle_shader
         {
-            constexpr const char* Path = "shaders/instanced_triangle.slang";
-            constexpr const char* VertexEntryPoint = "vertexMain";
-            constexpr const char* FragmentEntryPoint = "fragmentMain";
-            constexpr const char* GlobalParams = "globalParams";
+            constexpr const char* kPath = "shaders/instanced_triangle.slang";
+            constexpr const char* kVertexEntryPoint = "vertexMain";
+            constexpr const char* kFragmentEntryPoint = "fragmentMain";
+            constexpr const char* kGlobalParams = "globalParams";
         }  // namespace InstancedTriangleShader
 
         constexpr uint32_t kUniformRingSlots = 3;
     }  // namespace
 
     InstancedTriangleSample::InstancedTriangleSample(Renderer& renderer)
-        : Sample("Instanced Triangle"), m_renderer(renderer), m_indexCount(0), m_instanceCount(0), m_rotationAngle(0.0f)
+        : Sample("Instanced Triangle"), m_renderer(renderer), m_index_count(0), m_instance_count(0), m_rotation_angle(0.0f)
     {
     }
 
@@ -77,15 +77,15 @@ namespace kera
 
     bool InstancedTriangleSample::createShaderProgram()
     {
-        const std::string shaderPath = resolveShaderPath(InstancedTriangleShader::Path);
-        m_shaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = sampleStringView(shaderPath),
-            .vertexEntryPoint = stringView(InstancedTriangleShader::VertexEntryPoint),
-            .fragmentEntryPoint = stringView(InstancedTriangleShader::FragmentEntryPoint),
-            .source = KERA_SHADER_SOURCE_SLANG_FILE,
-            .debugName = {},
+        const std::string shader_path = resolveShaderPath(instanced_triangle_shader::kPath);
+        m_shader_program = m_renderer.createGraphicsShaderProgram({
+            .path = sampleStringView(shader_path),
+            .vertex_entry_point = stringView(instanced_triangle_shader::kVertexEntryPoint),
+            .fragment_entry_point = stringView(instanced_triangle_shader::kFragmentEntryPoint),
+            .source = EShaderSourceKind::SLANG_FILE,
+            .debug_name = {},
         });
-        return static_cast<bool>(m_shaderProgram.isValid());
+        return static_cast<bool>(m_shader_program.isValid());
     }
 
     bool InstancedTriangleSample::createGeometry()
@@ -97,138 +97,138 @@ namespace kera
         };
 
         std::vector<uint16_t> indices = {0, 1, 2};
-        m_indexCount = static_cast<uint32_t>(indices.size());
+        m_index_count = static_cast<uint32_t>(indices.size());
 
-        m_vertexBuffer = m_renderer.createBuffer({
+        m_vertex_buffer = m_renderer.createBuffer({
             .size = vertices.size() * sizeof(Vertex),
-            .usage = BufferUsageKind::Vertex,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::VERTEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_vertexBuffer.isValid() ||
-            !m_renderer.uploadBuffer(m_vertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex)))
+        if (!m_vertex_buffer.isValid() ||
+            !m_renderer.uploadBuffer(m_vertex_buffer, vertices.data(), vertices.size() * sizeof(Vertex)))
         {
             return false;
         }
 
-        m_indexBuffer = m_renderer.createBuffer({
+        m_index_buffer = m_renderer.createBuffer({
             .size = indices.size() * sizeof(uint16_t),
-            .usage = BufferUsageKind::Index,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::INDEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_indexBuffer.isValid() ||
-            !m_renderer.uploadBuffer(m_indexBuffer, indices.data(), indices.size() * sizeof(uint16_t)))
+        if (!m_index_buffer.isValid() ||
+            !m_renderer.uploadBuffer(m_index_buffer, indices.data(), indices.size() * sizeof(uint16_t)))
         {
             return false;
         }
 
-        m_instanceCount = 50;
-        std::vector<BasicInstanceData> instanceData(m_instanceCount);
-        for (uint32_t i = 0; i < m_instanceCount; ++i)
+        m_instance_count = 50;
+        std::vector<BasicInstanceData> instance_data(m_instance_count);
+        for (uint32_t i = 0; i < m_instance_count; ++i)
         {
             const float x = (static_cast<float>(i % 10) - 4.5f) * 0.9f;
             const float y = (static_cast<float>(i / 10) - 2.0f) * 0.8f;
             const float z = 0.0f;
-            instanceData[i].modelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
+            instance_data[i].model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
         }
 
-        m_instanceBuffer = m_renderer.createBuffer({
-            .size = m_instanceCount * sizeof(BasicInstanceData),
-            .usage = BufferUsageKind::Vertex,
-            .memoryAccess = MemoryAccess::CpuWrite,
+        m_instance_buffer = m_renderer.createBuffer({
+            .size = m_instance_count * sizeof(BasicInstanceData),
+            .usage = EBufferUsageKind::VERTEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_instanceBuffer.isValid() || !m_renderer.uploadBuffer(m_instanceBuffer, instanceData.data(),
-                                                                    instanceData.size() * sizeof(BasicInstanceData)))
+        if (!m_instance_buffer.isValid() || !m_renderer.uploadBuffer(m_instance_buffer, instance_data.data(),
+                                                                    instance_data.size() * sizeof(BasicInstanceData)))
         {
             return false;
         }
 
-        m_uniformBuffer = m_renderer.createUniformRingBuffer(sizeof(Uniforms), kUniformRingSlots);
+        m_uniform_buffer = m_renderer.createUniformRingBuffer(sizeof(Uniforms), kUniformRingSlots);
 
-        return m_uniformBuffer.isValid();
+        return m_uniform_buffer.isValid();
     }
 
     bool InstancedTriangleSample::createPipeline()
     {
-        const VertexInputLayout vertexInput =
+        const VertexInputLayout vertex_input =
             VertexInputLayoutBuilder{}
                 .vertexBinding<Vertex>(0)
-                .vertexBinding<BasicInstanceData>(1, VertexInputRate::Instance)
-                .field(KERA_VERTEX_FIELD(Vertex, position, 0, VertexFormat::Float3))
-                .field(KERA_VERTEX_FIELD(Vertex, color, 0, VertexFormat::Float3))
-                .field(KERA_VERTEX_FIELD(BasicInstanceData, modelMatrix, 1, VertexFormat::Float4))
+                .vertexBinding<BasicInstanceData>(1, static_cast<KeraVertexInputRate>(EVertexInputRate::INSTANCE))
+                .field(KERA_VERTEX_FIELD(Vertex, position, 0, EVertexFormat::FLOAT3))
+                .field(KERA_VERTEX_FIELD(Vertex, color, 0, EVertexFormat::FLOAT3))
+                .field(KERA_VERTEX_FIELD(BasicInstanceData, model_matrix, 1, EVertexFormat::FLOAT4))
                 .layout();
 
         m_pipeline = m_renderer.createGraphicsPipeline({
-            .shaderProgram = m_shaderProgram,
-            .vertexInput = vertexInput,
-            .topology = PrimitiveTopologyKind::TriangleList,
-            .cullMode = CullModeKind::None,
+            .shader_program = m_shader_program,
+            .vertex_input = vertex_input,
+            .topology = EPrimitiveTopologyKind::TRIANGLE_LIST,
+            .cull_mode = ECullModeKind::NONE,
         });
         if (!m_pipeline.isValid())
         {
             return false;
         }
 
-        KeraUniformRingBufferInfo ringInfo = m_renderer.getUniformRingBufferInfo(m_uniformBuffer);
+        KeraUniformRingBufferInfo ring_info = m_renderer.getUniformRingBufferInfo(m_uniform_buffer);
 
-        m_uniformDescriptorSets.clear();
-        m_uniformDescriptorSets.reserve(ringInfo.slotCount);
+        m_uniform_descriptor_sets.clear();
+        m_uniform_descriptor_sets.reserve(ring_info.slot_count);
 
-        for (uint32_t slot = 0; slot < ringInfo.slotCount; ++slot)
+        for (uint32_t slot = 0; slot < ring_info.slot_count; ++slot)
         {
-            DescriptorSetHandle descriptorSet = m_renderer.createDescriptorSet(m_pipeline);
-            if (!descriptorSet.isValid())
+            DescriptorSetHandle descriptor_set = m_renderer.createDescriptorSet(m_pipeline);
+            if (!descriptor_set.isValid())
             {
                 return false;
             }
 
-            const std::size_t uniformOffset = m_renderer.getUniformRingBufferSlotOffset(m_uniformBuffer, slot);
-            if (!m_renderer.updateDescriptors(descriptorSet)
-                     .uniform<Uniforms>(InstancedTriangleShader::GlobalParams, m_uniformBuffer, uniformOffset)
+                const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
+                if (!m_renderer.updateDescriptors(descriptor_set)
+                     .uniform<Uniforms>(instanced_triangle_shader::kGlobalParams, m_uniform_buffer, uniform_offset)
                      .ok())
             {
                 return false;
             }
-            m_uniformDescriptorSets.push_back(descriptorSet);
+            m_uniform_descriptor_sets.push_back(descriptor_set);
         }
 
         return true;
     }
 
-    void InstancedTriangleSample::update(float deltaTime)
+    void InstancedTriangleSample::update(float delta_time)
     {
-        m_rotationAngle += deltaTime * 45.0f;
-        if (m_rotationAngle >= 360.0f)
+        m_rotation_angle += delta_time * 45.0f;
+        if (m_rotation_angle >= 360.0f)
         {
-            m_rotationAngle -= 360.0f;
+            m_rotation_angle -= 360.0f;
         }
 
-        const float angleRadians = glm::radians(m_rotationAngle);
-        void* mappedData = nullptr;
-        if (m_renderer.mapBuffer(m_instanceBuffer, &mappedData))
+        const float angle_radians = glm::radians(m_rotation_angle);
+        void* mapped_data = nullptr;
+        if (m_renderer.mapBuffer(m_instance_buffer, &mapped_data))
         {
-            BasicInstanceData* data = static_cast<BasicInstanceData*>(mappedData);
+            BasicInstanceData* data = static_cast<BasicInstanceData*>(mapped_data);
 
-            for (uint32_t i = 0; i < m_instanceCount; ++i)
+            for (uint32_t i = 0; i < m_instance_count; ++i)
             {
-                const float baseX = (static_cast<float>(i % 10) - 4.5f) * 0.9f;
-                const float baseY = (static_cast<float>(i / 10) - 2.0f) * 0.8f;
+                const float base_x = (static_cast<float>(i % 10) - 4.5f) * 0.9f;
+                const float base_y = (static_cast<float>(i / 10) - 2.0f) * 0.8f;
                 const float phase = static_cast<float>(i) * 0.31f;
-                const float bob = std::sin(angleRadians * 2.0f + phase) * 0.16f;
-                const float drift = std::cos(angleRadians * 1.3f + phase) * 0.08f;
-                const float spin = angleRadians + phase;
-                const float scale = 0.78f + 0.08f * std::sin(angleRadians * 1.7f + phase);
+                const float bob = std::sin(angle_radians * 2.0f + phase) * 0.16f;
+                const float drift = std::cos(angle_radians * 1.3f + phase) * 0.08f;
+                const float spin = angle_radians + phase;
+                const float scale = 0.78f + 0.08f * std::sin(angle_radians * 1.7f + phase);
 
-                glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(baseX + drift, baseY + bob, 0.0f));
+                glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(base_x + drift, base_y + bob, 0.0f));
                 model = glm::rotate(model, spin, glm::vec3(0.0f, 0.0f, 1.0f));
                 model = glm::scale(model, glm::vec3(scale, scale, 1.0f));
-                data[i].modelMatrix = model;
+                data[i].model_matrix = model;
             }
 
-            m_renderer.unmapBuffer(m_instanceBuffer);
+            m_renderer.unmapBuffer(m_instance_buffer);
         }
         else
         {
@@ -238,8 +238,8 @@ namespace kera
 
     void InstancedTriangleSample::render(RenderContext& context)
     {
-        if (!m_pipeline.isValid() || !m_vertexBuffer.isValid() || !m_indexBuffer.isValid() ||
-            !m_instanceBuffer.isValid() || !m_uniformBuffer.isValid() || m_uniformDescriptorSets.empty())
+        if (!m_pipeline.isValid() || !m_vertex_buffer.isValid() || !m_index_buffer.isValid() ||
+            !m_instance_buffer.isValid() || !m_uniform_buffer.isValid() || m_uniform_descriptor_sets.empty())
         {
             sampleLogWarning("Render called before Instanced Triangle resources were initialized");
             return;
@@ -249,26 +249,26 @@ namespace kera
             getClearColor(),
             [this](FrameHandle frame)
             {
-                const float angleRadians = glm::radians(m_rotationAngle);
-                const float timeFactor = std::sin(angleRadians * 0.5f) * 0.05f;
+                const float angle_radians = glm::radians(m_rotation_angle);
+                const float time_factor = std::sin(angle_radians * 0.5f) * 0.05f;
                 Uniforms uniforms{};
                 uniforms.view =
                     glm::lookAt(glm::vec3(0.0f, 0.0f, -7.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
                 uniforms.projection = glm::perspective(glm::radians(45.0f), 16.0f / 9.0f, 0.1f, 100.0f) *
-                                      glm::scale(glm::mat4(1.0f), glm::vec3(1.0f + timeFactor, 1.0f, 1.0f));
-                if (!m_renderer.uploadUniformRingBuffer(m_uniformBuffer, frame, &uniforms, sizeof(Uniforms)))
+                                      glm::scale(glm::mat4(1.0f), glm::vec3(1.0f + time_factor, 1.0f, 1.0f));
+                if (!m_renderer.uploadUniformRingBuffer(m_uniform_buffer, frame, &uniforms, sizeof(Uniforms)))
                 {
                     sampleLogError("Failed to upload instanced triangle uniforms.");
                     return;
                 }
 
-                uint32_t uniformBufferSlot = m_renderer.getUniformRingBufferSlot(m_uniformBuffer, frame);
-                const std::size_t uniformOffset =
-                    m_renderer.getUniformRingBufferSlotOffset(m_uniformBuffer, uniformBufferSlot);
+                uint32_t uniform_buffer_slot = m_renderer.getUniformRingBufferSlot(m_uniform_buffer, frame);
+                const std::size_t uniform_offset =
+                    m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, uniform_buffer_slot);
 
-                DescriptorSetHandle uniformDescriptorSet = m_uniformDescriptorSets[uniformBufferSlot];
-                if (!m_renderer.updateDescriptors(uniformDescriptorSet)
-                         .uniform<Uniforms>(InstancedTriangleShader::GlobalParams, m_uniformBuffer, uniformOffset)
+                DescriptorSetHandle uniform_descriptor_set = m_uniform_descriptor_sets[uniform_buffer_slot];
+                if (!m_renderer.updateDescriptors(uniform_descriptor_set)
+                         .uniform<Uniforms>(instanced_triangle_shader::kGlobalParams, m_uniform_buffer, uniform_offset)
                          .ok())
                 {
                     sampleLogError("Failed to update instanced triangle uniform descriptor.");
@@ -276,25 +276,25 @@ namespace kera
                 }
 
                 m_renderer.bindPipeline(frame, m_pipeline);
-                m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
-                m_renderer.bindVertexBuffer(frame, 1, m_instanceBuffer);
-                m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
-                m_renderer.bindDescriptorSet(frame, m_pipeline, uniformDescriptorSet);
-                m_renderer.drawIndexed(frame, m_indexCount, m_instanceCount);
+                m_renderer.bindVertexBuffer(frame, 0, m_vertex_buffer);
+                m_renderer.bindVertexBuffer(frame, 1, m_instance_buffer);
+                m_renderer.bindIndexBuffer(frame, m_index_buffer, EIndexFormat::U_INT16);
+                m_renderer.bindDescriptorSet(frame, m_pipeline, uniform_descriptor_set);
+                m_renderer.drawIndexed(frame, m_index_count, m_instance_count);
             });
     }
 
     void InstancedTriangleSample::cleanup()
     {
         sampleLogInfo("Cleaning up " + std::string(getName()));
-        for (DescriptorSetHandle descriptorSet : m_uniformDescriptorSets)
+        for (DescriptorSetHandle descriptor_set : m_uniform_descriptor_sets)
         {
-            if (descriptorSet.isValid())
+            if (descriptor_set.isValid())
             {
-                m_renderer.destroyDescriptorSet(descriptorSet);
+                m_renderer.destroyDescriptorSet(descriptor_set);
             }
         }
-        m_uniformDescriptorSets.clear();
+        m_uniform_descriptor_sets.clear();
 
         if (m_pipeline.isValid())
         {
@@ -302,34 +302,34 @@ namespace kera
             m_pipeline = {};
         }
 
-        if (m_uniformBuffer.isValid())
+        if (m_uniform_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_uniformBuffer);
-            m_uniformBuffer = {};
+            m_renderer.destroyBuffer(m_uniform_buffer);
+            m_uniform_buffer = {};
         }
 
-        if (m_instanceBuffer.isValid())
+        if (m_instance_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_instanceBuffer);
-            m_instanceBuffer = {};
+            m_renderer.destroyBuffer(m_instance_buffer);
+            m_instance_buffer = {};
         }
 
-        if (m_indexBuffer.isValid())
+        if (m_index_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_indexBuffer);
-            m_indexBuffer = {};
+            m_renderer.destroyBuffer(m_index_buffer);
+            m_index_buffer = {};
         }
 
-        if (m_vertexBuffer.isValid())
+        if (m_vertex_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_vertexBuffer);
-            m_vertexBuffer = {};
+            m_renderer.destroyBuffer(m_vertex_buffer);
+            m_vertex_buffer = {};
         }
 
-        if (m_shaderProgram.isValid())
+        if (m_shader_program.isValid())
         {
-            m_renderer.destroyShaderProgram(m_shaderProgram);
-            m_shaderProgram = {};
+            m_renderer.destroyShaderProgram(m_shader_program);
+            m_shader_program = {};
         }
     }
 }  // namespace kera

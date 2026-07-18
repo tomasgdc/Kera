@@ -10,11 +10,11 @@ namespace kera
 
     inline const DescriptorBindingDesc* findDescriptorBinding(const DescriptorSetLayoutDesc& layout, uint32_t binding)
     {
-        for (const DescriptorBindingDesc& bindingDesc : layout.bindings)
+        for (const DescriptorBindingDesc& binding_desc : layout.bindings)
         {
-            if (bindingDesc.binding == binding)
+            if (binding_desc.binding == binding)
             {
-                return &bindingDesc;
+                return &binding_desc;
             }
         }
         return nullptr;
@@ -23,21 +23,21 @@ namespace kera
     inline const DescriptorBindingDesc* findDescriptorBinding(const DescriptorSetLayoutDesc& layout,
                                                               const std::string& name)
     {
-        for (const DescriptorBindingDesc& bindingDesc : layout.bindings)
+        for (const DescriptorBindingDesc& binding_desc : layout.bindings)
         {
-            if (bindingDesc.name == name)
+            if (binding_desc.name == name)
             {
-                return &bindingDesc;
+                return &binding_desc;
             }
         }
         return nullptr;
     }
 
-    inline bool descriptorBindingAccepts(const DescriptorSetLayoutDesc& layout, uint32_t binding, DescriptorType type,
-                                         uint32_t descriptorCount = 1)
+    inline bool descriptorBindingAccepts(const DescriptorSetLayoutDesc& layout, uint32_t binding, EDescriptorType type,
+                                         uint32_t descriptor_count = 1)
     {
-        const DescriptorBindingDesc* bindingDesc = findDescriptorBinding(layout, binding);
-        return bindingDesc && bindingDesc->type == type && bindingDesc->count == descriptorCount;
+        const DescriptorBindingDesc* binding_desc = findDescriptorBinding(layout, binding);
+        return binding_desc && binding_desc->type == type && binding_desc->count == descriptor_count;
     }
 
     inline bool descriptorSetLayoutsCompatible(const DescriptorSetLayoutDesc& lhs, const DescriptorSetLayoutDesc& rhs)
@@ -47,11 +47,11 @@ namespace kera
             return false;
         }
 
-        for (const DescriptorBindingDesc& lhsBinding : lhs.bindings)
+        for (const DescriptorBindingDesc& lhs_binding : lhs.bindings)
         {
-            const DescriptorBindingDesc* rhsBinding = findDescriptorBinding(rhs, lhsBinding.binding);
-            if (!rhsBinding || rhsBinding->type != lhsBinding.type || rhsBinding->stage != lhsBinding.stage ||
-                rhsBinding->count != lhsBinding.count)
+            const DescriptorBindingDesc* rhs_binding = findDescriptorBinding(rhs, lhs_binding.binding);
+            if (!rhs_binding || rhs_binding->type != lhs_binding.type || rhs_binding->stage != lhs_binding.stage ||
+                rhs_binding->count != lhs_binding.count)
             {
                 return false;
             }

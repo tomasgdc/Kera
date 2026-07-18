@@ -1,4 +1,4 @@
-// Copyright 2026 Tomas Mikalauskas
+﻿// Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/shader.h"
@@ -17,21 +17,21 @@ namespace kera
     namespace
     {
 
-        VkShaderStageFlagBits shaderTypeToStageFlag(ShaderType type)
+        VkShaderStageFlagBits shaderTypeToStageFlag(EShaderType type)
         {
             switch (type)
             {
-                case ShaderType::Vertex:
+                case EShaderType::VERTEX:
                     return VK_SHADER_STAGE_VERTEX_BIT;
-                case ShaderType::Fragment:
+                case EShaderType::FRAGMENT:
                     return VK_SHADER_STAGE_FRAGMENT_BIT;
-                case ShaderType::Compute:
+                case EShaderType::COMPUTE:
                     return VK_SHADER_STAGE_COMPUTE_BIT;
-                case ShaderType::Geometry:
+                case EShaderType::GEOMETRY:
                     return VK_SHADER_STAGE_GEOMETRY_BIT;
-                case ShaderType::TessellationControl:
+                case EShaderType::TESSELLATION_CONTROL:
                     return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-                case ShaderType::TessellationEvaluation:
+                case EShaderType::TESSELLATION_EVALUATION:
                     return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
                 default:
                     return VK_SHADER_STAGE_VERTEX_BIT;
@@ -40,7 +40,7 @@ namespace kera
 
     }  // anonymous namespace
 
-    Shader::Shader() : device_(VK_NULL_HANDLE), shader_module_(VK_NULL_HANDLE), type_(ShaderType::Vertex) {}
+    Shader::Shader() : m_device(VK_NULL_HANDLE), m_shader_module(VK_NULL_HANDLE), m_type(EShaderType::VERTEX) {}
 
     Shader::~Shader()
     {
@@ -48,11 +48,11 @@ namespace kera
     }
 
     Shader::Shader(Shader&& other) noexcept
-        : device_(other.device_), shader_module_(other.shader_module_), type_(other.type_)
+        : m_device(other.m_device), m_shader_module(other.m_shader_module), m_type(other.m_type)
     {
-        other.device_ = VK_NULL_HANDLE;
-        other.shader_module_ = VK_NULL_HANDLE;
-        other.type_ = ShaderType::Vertex;
+        other.m_device = VK_NULL_HANDLE;
+        other.m_shader_module = VK_NULL_HANDLE;
+        other.m_type = EShaderType::VERTEX;
     }
 
     Shader& Shader::operator=(Shader&& other) noexcept
@@ -60,34 +60,34 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            device_ = other.device_;
-            shader_module_ = other.shader_module_;
-            type_ = other.type_;
+            m_device = other.m_device;
+            m_shader_module = other.m_shader_module;
+            m_type = other.m_type;
 
-            other.device_ = VK_NULL_HANDLE;
-            other.shader_module_ = VK_NULL_HANDLE;
-            other.type_ = ShaderType::Vertex;
+            other.m_device = VK_NULL_HANDLE;
+            other.m_shader_module = VK_NULL_HANDLE;
+            other.m_type = EShaderType::VERTEX;
         }
         return *this;
     }
 
-    bool Shader::initialize(const Device& device, ShaderType type, const std::vector<uint32_t>& spirvCode)
+    bool Shader::initialize(const Device& device, EShaderType type, const std::vector<uint32_t>& spirv_code)
     {
-        if (shader_module_)
+        if (m_shader_module)
         {
             shutdown();
         }
 
-        VkDevice vkDevice = device.getVulkanDevice();
-        device_ = vkDevice;
-        type_ = type;
+        VkDevice vk_device = device.getVulkanDevice();
+        m_device = vk_device;
+        m_type = type;
 
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = spirvCode.size() * sizeof(uint32_t);
-        createInfo.pCode = spirvCode.data();
+        VkShaderModuleCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        create_info.codeSize = spirv_code.size() * sizeof(uint32_t);
+        create_info.pCode = spirv_code.data();
 
-        VkResult result = vkCreateShaderModule(vkDevice, &createInfo, nullptr, &shader_module_);
+        VkResult result = vkCreateShaderModule(vk_device, &create_info, nullptr, &m_shader_module);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create shader module: " + std::to_string(result));
@@ -98,7 +98,7 @@ namespace kera
         return true;
     }
 
-    bool Shader::initializeFromFile(const Device& device, ShaderType type, const std::string& filepath)
+    bool Shader::initializeFromFile(const Device& device, EShaderType type, const std::string& filepath)
     {
         std::ifstream file(filepath, std::ios::ate | std::ios::binary);
 
@@ -108,54 +108,54 @@ namespace kera
             return false;
         }
 
-        size_t fileSize = static_cast<size_t>(file.tellg());
-        std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+        size_t file_size = static_cast<size_t>(file.tellg());
+        std::vector<uint32_t> buffer(file_size / sizeof(uint32_t));
 
         file.seekg(0);
-        file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
+        file.read(reinterpret_cast<char*>(buffer.data()), file_size);
         file.close();
 
         return initialize(device, type, buffer);
     }
 
-    bool Shader::initializeFromSlangFile(const Device& device, ShaderType type, const std::string& shaderPath,
-                                         const std::string& entryPoint, const std::vector<std::string>& searchPaths)
+    bool Shader::initializeFromSlangFile(const Device& device, EShaderType type, const std::string& shader_path,
+                                         const std::string& entry_point, const std::vector<std::string>& search_paths)
     {
-        std::vector<uint32_t> spirvCode;
+        std::vector<uint32_t> spirv_code;
         SlangCompileRequest request{
-            .shaderPath = shaderPath,
-            .entryPoint = entryPoint,
-            .shaderType = type,
-            .searchPaths = searchPaths,
+            .shader_path = shader_path,
+            .entry_point = entry_point,
+            .shader_type = type,
+            .search_paths = search_paths,
         };
 
-        if (!SlangCompiler::compileToSpirv(request, spirvCode))
+        if (!SlangCompiler::compileToSpirv(request, spirv_code))
         {
             return false;
         }
 
-        return initialize(device, type, spirvCode);
+        return initialize(device, type, spirv_code);
     }
 
     void Shader::shutdown()
     {
-        if (shader_module_ != VK_NULL_HANDLE && device_ != VK_NULL_HANDLE)
+        if (m_shader_module != VK_NULL_HANDLE && m_device != VK_NULL_HANDLE)
         {
-            vkDestroyShaderModule(device_, shader_module_, nullptr);
-            shader_module_ = VK_NULL_HANDLE;
+            vkDestroyShaderModule(m_device, m_shader_module, nullptr);
+            m_shader_module = VK_NULL_HANDLE;
         }
-        device_ = VK_NULL_HANDLE;
+        m_device = VK_NULL_HANDLE;
     }
 
     VkPipelineShaderStageCreateInfo Shader::getPipelineStageInfo() const
     {
-        VkPipelineShaderStageCreateInfo shaderStageInfo{};
-        shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStageInfo.stage = shaderTypeToStageFlag(type_);
-        shaderStageInfo.module = shader_module_;
-        shaderStageInfo.pName = "main";
+        VkPipelineShaderStageCreateInfo shader_stage_info{};
+        shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        shader_stage_info.stage = shaderTypeToStageFlag(m_type);
+        shader_stage_info.module = m_shader_module;
+        shader_stage_info.pName = "main";
 
-        return shaderStageInfo;
+        return shader_stage_info;
     }
 
 }  // namespace kera

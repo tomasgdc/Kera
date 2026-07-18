@@ -18,7 +18,7 @@ namespace kera
         explicit InstancedTriangleSample(Renderer& renderer);
 
         void initialize() override;
-        void update(float deltaTime) override;
+        void update(float delta_time) override;
         void render(RenderContext& context) override;
         void cleanup() override;
 
@@ -28,16 +28,16 @@ namespace kera
         bool createPipeline();
 
         Renderer& m_renderer;
-        ShaderProgramHandle m_shaderProgram;
-        BufferHandle m_vertexBuffer;
-        BufferHandle m_indexBuffer;
-        BufferHandle m_instanceBuffer;
-        BufferHandle m_uniformBuffer;
-        std::vector<DescriptorSetHandle> m_uniformDescriptorSets;
-        uint32_t m_indexCount;
-        uint32_t m_instanceCount;
+        ShaderProgramHandle m_shader_program;
+        BufferHandle m_vertex_buffer;
+        BufferHandle m_index_buffer;
+        BufferHandle m_instance_buffer;
+        BufferHandle m_uniform_buffer;
+        std::vector<DescriptorSetHandle> m_uniform_descriptor_sets;
+        uint32_t m_index_count;
+        uint32_t m_instance_count;
         GraphicsPipelineHandle m_pipeline;
-        float m_rotationAngle;
+        float m_rotation_angle;
     };
 
 }  // namespace kera

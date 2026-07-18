@@ -7,35 +7,35 @@
 
 namespace kera
 {
-    Validation::AssertHandler Validation::assert_handler_ = nullptr;
+    Validation::AssertHandler Validation::g_assertHandler = nullptr;
 
     void Validation::setAssertHandler(AssertHandler handler)
     {
-        assert_handler_ = handler;
+        g_assertHandler = handler;
     }
 
-    void Validation::assertCondition(bool condition, const std::string& conditionStr, const std::string& message,
+    void Validation::assertCondition(bool condition, const std::string& condition_str, const std::string& message,
                                      const char* file, int line)
     {
         if (!condition)
         {
-            std::string fullMessage = "Assertion failed: " + conditionStr;
+            std::string full_message = "Assertion failed: " + condition_str;
             if (!message.empty())
             {
-                fullMessage += " (" + message + ")";
+                full_message += " (" + message + ")";
             }
 
             if (file && line > 0)
             {
-                fullMessage += " at " + std::string(file) + ":" + std::to_string(line);
+                full_message += " at " + std::string(file) + ":" + std::to_string(line);
             }
 
-            if (assert_handler_)
+            if (g_assertHandler)
             {
-                assert_handler_(conditionStr, message, file, line);
+                g_assertHandler(condition_str, message, file, line);
             }
 
-            Logger::getInstance().fatal(fullMessage);
+            Logger::getInstance().fatal(full_message);
         }
     }
 }  // namespace kera
