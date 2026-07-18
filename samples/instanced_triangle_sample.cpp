@@ -167,6 +167,7 @@ namespace kera
             .topology = EPrimitiveTopologyKind::TRIANGLE_LIST,
             .cull_mode = ECullModeKind::NONE,
         });
+
         if (!m_pipeline.isValid())
         {
             return false;

@@ -7,7 +7,7 @@ struct VertexInput {
 };
 
 struct InstanceInput {
-    float4x4 modelMatrix : TRANSFORM;
+    float4x4 model_matrix : TRANSFORM;
 };
 
 struct GeometryUniforms {
@@ -26,7 +26,7 @@ struct GeometryVertexOutput {
 GeometryVertexOutput geometryVertexMain(VertexInput vertex,
                                         InstanceInput instance) {
     GeometryVertexOutput output;
-    float4 worldPos = mul(float4(vertex.position, 1.0), instance.modelMatrix);
+    float4 worldPos = mul(float4(vertex.position, 1.0), instance.model_matrix);
     float4 viewPos = mul(worldPos, geometryParams.view);
     output.sv_position = mul(viewPos, geometryParams.projection);
     output.color = vertex.color;
