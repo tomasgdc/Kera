@@ -1529,17 +1529,14 @@ namespace kera
             return true;
         }
 
+        discardPendingUploads();
         return false;
     }
 
     void VulkanRenderer::cancelUploadBatch()
     {
-        if (m_uploadContext.batchActive)
-        {
-            m_uploadContext.batchActive = false;
-        }
-
         m_uploadContext.batchActive = false;
+        discardPendingUploads();
     }
 
     bool VulkanRenderer::uploadTexture(TextureHandle textureHandle, const void* data, std::size_t size)
@@ -4325,17 +4322,17 @@ namespace kera
             return false;
         }
 
-        struct RecordTextureLayout
+        struct RecordedTextureLayout
         {
             VulkanTextureResource* texture = nullptr;
             VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
         };
 
-        std::vector<RecordTextureLayout> recordLayouts;
-        recordLayouts.reserve(pendingUpload.size());
-        const auto restoreRecordedLayouts = [&recordLayouts, this]
+        std::vector<RecordedTextureLayout> recordedLayouts;
+        recordedLayouts.reserve(pendingUpload.size());
+        const auto restoreRecordedLayouts = [&recordedLayouts, this]
         {
-            for (const RecordTextureLayout& record : recordLayouts)
+            for (const RecordedTextureLayout& record : recordedLayouts)
             {
                 record.texture->m_currentLayout = record.layout;
             }
@@ -4346,14 +4343,28 @@ namespace kera
             VulkanTextureResource* texture = m_textures.get(upload.texture);
             if (!texture)
             {
+                vkEndCommandBuffer(commandBuffer);
+                vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+                restoreRecordedLayouts();
+
                 Logger::getInstance().error("Failed to find Vulkan texture for pending upload.");
-                continue;
+                return false;
+            }
+
+            const auto recordedLayoutIt =
+                std::find_if(recordedLayouts.begin(), recordedLayouts.end(),
+                             [texture](const RecordedTextureLayout& record) { return record.texture == texture; });
+
+            if (recordedLayoutIt == recordedLayouts.end())
+            {
+                recordedLayouts.push_back({texture, texture->m_currentLayout});
             }
 
             if (!recordTextureUpload(commandBuffer, upload, *texture))
             {
                 vkEndCommandBuffer(commandBuffer);
                 vkFreeCommandBuffers(m_device->getVulkanDevice(), m_device->getCommandPool(), 1, &commandBuffer);
+                restoreRecordedLayouts();
 
                 Logger::getInstance().error("Failed to record Vulkan texture upload command.");
                 return false;

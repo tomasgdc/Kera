@@ -54,10 +54,7 @@ namespace kera
             {
                 if (m_active)
                 {
-                    if (!m_renderer.endUploadBatch())
-                    {
-                        m_renderer.cancelUploadBatch();
-                    }
+                    m_renderer.cancelUploadBatch();
                 }
             }
 
