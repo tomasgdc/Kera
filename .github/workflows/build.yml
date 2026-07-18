@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+          lfs: true
 
       - name: Add LLVM to PATH
         shell: powershell
@@ -52,6 +53,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+          lfs: true
 
       - name: Configure CMake
         shell: powershell
@@ -78,6 +80,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+          lfs: true
 
       - name: Configure CMake
         shell: powershell
