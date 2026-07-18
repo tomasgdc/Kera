@@ -116,10 +116,10 @@ namespace kera
     bool BasicTriangleSample::createPipeline()
     {
         const VertexInputLayout vertex_input = VertexInputLayoutBuilder{}
-                                                  .vertexBinding<Vertex>(0)
-                                                  .field(KERA_VERTEX_FIELD(Vertex, position, 0, EVertexFormat::FLOAT3))
-                                                  .field(KERA_VERTEX_FIELD(Vertex, color, 0, EVertexFormat::FLOAT3))
-                                                  .layout();
+                                                   .vertexBinding<Vertex>(0)
+                                                   .field(KERA_VERTEX_FIELD(Vertex, position, 0, EVertexFormat::FLOAT3))
+                                                   .field(KERA_VERTEX_FIELD(Vertex, color, 0, EVertexFormat::FLOAT3))
+                                                   .layout();
 
         m_pipeline = m_renderer.createGraphicsPipeline({
             .shader_program = m_shader_program,
@@ -151,7 +151,7 @@ namespace kera
                                    {
                                        m_renderer.bindPipeline(frame, m_pipeline);
                                        m_renderer.bindVertexBuffer(frame, 0, m_vertex_buffer);
-                                        m_renderer.bindIndexBuffer(frame, m_index_buffer, EIndexFormat::U_INT16);
+                                       m_renderer.bindIndexBuffer(frame, m_index_buffer, EIndexFormat::U_INT16);
                                        m_renderer.drawIndexed(frame, m_index_count);
                                    });
     }

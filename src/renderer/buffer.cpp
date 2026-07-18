@@ -24,7 +24,8 @@ namespace kera
 
             for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
             {
-                if ((type_filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
+                if ((type_filter & (1 << i)) &&
+                    (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
                 {
                     out_memory_type = i;
                     return true;
@@ -153,7 +154,8 @@ namespace kera
         VkMemoryAllocateInfo alloc_info{};
         alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         alloc_info.allocationSize = mem_requirements.size;
-        if (!findMemoryType(vk_physical_device, mem_requirements.memoryTypeBits, properties, alloc_info.memoryTypeIndex))
+        if (!findMemoryType(vk_physical_device, mem_requirements.memoryTypeBits, properties,
+                            alloc_info.memoryTypeIndex))
         {
             Logger::getInstance().error("Failed to find suitable buffer memory type");
             vkDestroyBuffer(vk_device, m_buffer, nullptr);

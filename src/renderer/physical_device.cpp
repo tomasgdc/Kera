@@ -122,7 +122,8 @@ namespace kera
             QueueFamilyIndices indices = findQueueFamilies(device, surface);
 
             return device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-                   device_features.geometryShader && indices.isComplete() && extensions_supported && swap_chain_adequate;
+                   device_features.geometryShader && indices.isComplete() && extensions_supported &&
+                   swap_chain_adequate;
         }
 
     }  // anonymous namespace

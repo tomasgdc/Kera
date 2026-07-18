@@ -340,7 +340,8 @@ namespace kera
 
             const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
             if (!m_renderer.updateDescriptors(descriptor_set)
-                     .uniform<HelmetUniforms>(damaged_helmet_ibl_shader::kHelmetParams, m_uniform_buffer, uniform_offset)
+                     .uniform<HelmetUniforms>(damaged_helmet_ibl_shader::kHelmetParams, m_uniform_buffer,
+                                              uniform_offset)
                      .sampledImage(damaged_helmet_ibl_shader::kBaseColorTexture, m_model.material_textures.base_color)
                      .sampledImage(damaged_helmet_ibl_shader::kMetalRoughnessTexture,
                                    m_model.material_textures.metal_roughness)
@@ -415,7 +416,8 @@ namespace kera
 
             const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
             if (!m_renderer.updateDescriptors(descriptor_set)
-                     .uniform<HelmetUniforms>(damaged_helmet_ibl_shader::kHelmetParams, m_uniform_buffer, uniform_offset)
+                     .uniform<HelmetUniforms>(damaged_helmet_ibl_shader::kHelmetParams, m_uniform_buffer,
+                                              uniform_offset)
                      .sampledImage("skyboxTexture", m_ibl_environment.skybox_texture)
                      .sampler("skyboxSampler", m_ibl_environment.sampler)
                      .ok())
@@ -470,13 +472,15 @@ namespace kera
             {
                 HelmetUniforms uniforms{};
                 const float aspect = m_render_extent.height == 0 ? 16.0f / 9.0f
-                                                                : static_cast<float>(m_render_extent.width) /
-                                                                      static_cast<float>(m_render_extent.height);
+                                                                 : static_cast<float>(m_render_extent.width) /
+                                                                       static_cast<float>(m_render_extent.height);
                 const glm::vec3 camera_position(0.36f, 0.08f, -3.0f);
-                const float yaw_radians = m_fixed_yaw ? m_initial_yaw_radians : m_initial_yaw_radians + m_elapsed_time * 0.25f;
+                const float yaw_radians =
+                    m_fixed_yaw ? m_initial_yaw_radians : m_initial_yaw_radians + m_elapsed_time * 0.25f;
                 uniforms.model = glm::rotate(glm::mat4(1.0f), yaw_radians, glm::vec3(0.0f, 1.0f, 0.0f)) *
                                  glm::make_mat4(m_model.transform);
-                uniforms.view = glm::lookAt(camera_position, glm::vec3(0.0f, -0.05f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                uniforms.view =
+                    glm::lookAt(camera_position, glm::vec3(0.0f, -0.05f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
                 uniforms.projection = glm::perspective(glm::radians(42.0f), aspect, 0.1f, 100.0f);
                 uniforms.inverse_view = glm::inverse(uniforms.view);
                 uniforms.inverse_projection = glm::inverse(uniforms.projection);
@@ -492,8 +496,8 @@ namespace kera
                     glm::vec4(m_model.material_factors.metallic, m_model.material_factors.roughness,
                               m_model.material_factors.occlusion_strength, 0.0f);
                 uniforms.alpha_mode_cutoff_reflection_exposure =
-                    glm::vec4(toShaderAlphaMode(m_model.material_factors.alpha_mode), m_model.material_factors.alpha_cutoff,
-                              1.22f, 0.86f);
+                    glm::vec4(toShaderAlphaMode(m_model.material_factors.alpha_mode),
+                              m_model.material_factors.alpha_cutoff, 1.22f, 0.86f);
                 uniforms.debug_view_gamma = glm::vec4(static_cast<float>(m_debug_view), 2.2f, 1.0f / 2.2f, 0.0f);
                 uniforms.padding2 = glm::vec4(m_model.material_factors.double_sided ? 1.0f : 0.0f,
                                               static_cast<float>(m_ibl_environment.ibl_mip_levels),
@@ -501,9 +505,10 @@ namespace kera
 
                 for (uint32_t i = 0; i < 9; ++i)
                 {
-                    uniforms.sh_coefficient[i] = glm::vec4(m_ibl_environment.spherical_harmonics.coefficients[i][0],
-                                                           m_ibl_environment.spherical_harmonics.coefficients[i][1],
-                                                           m_ibl_environment.spherical_harmonics.coefficients[i][2], 0.0f);
+                    uniforms.sh_coefficient[i] =
+                        glm::vec4(m_ibl_environment.spherical_harmonics.coefficients[i][0],
+                                  m_ibl_environment.spherical_harmonics.coefficients[i][1],
+                                  m_ibl_environment.spherical_harmonics.coefficients[i][2], 0.0f);
                 }
 
                 if (!m_renderer.uploadUniformRingBuffer(m_uniform_buffer, frame, &uniforms, sizeof(uniforms)))
@@ -522,20 +527,22 @@ namespace kera
 
                 m_renderer.bindPipeline(frame, m_mesh_pipeline);
                 m_renderer.bindVertexBuffer(frame, 0, m_model.vertex_buffer);
-                m_renderer.bindIndexBuffer(frame, m_model.index_buffer, static_cast<EIndexFormat>(m_model.index_format));
+                m_renderer.bindIndexBuffer(frame, m_model.index_buffer,
+                                           static_cast<EIndexFormat>(m_model.index_format));
                 m_renderer.bindDescriptorSet(frame, m_mesh_pipeline, m_mesh_descriptor_sets[uniform_buffer_slot]);
                 m_renderer.drawIndexed(frame, m_model.index_count);
             });
 
-        context.renderToBackbuffer(getClearColor(),
-                                   [this](FrameHandle frame)
-                                   {
-                                       m_renderer.bindPipeline(frame, m_display_pipeline);
-                                       m_renderer.bindVertexBuffer(frame, 0, m_fullscreen_vertex_buffer);
-                                       m_renderer.bindIndexBuffer(frame, m_fullscreen_index_buffer, EIndexFormat::U_INT16);
-                                       m_renderer.bindDescriptorSet(frame, m_display_pipeline, m_display_descriptor_set);
-                                       m_renderer.drawIndexed(frame, m_fullscreen_index_count);
-                                   });
+        context.renderToBackbuffer(
+            getClearColor(),
+            [this](FrameHandle frame)
+            {
+                m_renderer.bindPipeline(frame, m_display_pipeline);
+                m_renderer.bindVertexBuffer(frame, 0, m_fullscreen_vertex_buffer);
+                m_renderer.bindIndexBuffer(frame, m_fullscreen_index_buffer, EIndexFormat::U_INT16);
+                m_renderer.bindDescriptorSet(frame, m_display_pipeline, m_display_descriptor_set);
+                m_renderer.drawIndexed(frame, m_fullscreen_index_count);
+            });
     }
 
     ClearColorValue DamagedHelmetIBLLightingSample::getClearColor() const

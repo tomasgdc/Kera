@@ -246,8 +246,8 @@ namespace kera
 
             const std::string message =
                 std::string("Failed to update ") + descriptor_kind + " descriptor '" + name + "'.";
-            m_report.addIssue(ERendererErrorCode::VALIDATION_FAILED, ERendererValidationCategory::DESCRIPTOR, message, 0,
-                              0, name);
+            m_report.addIssue(ERendererErrorCode::VALIDATION_FAILED, ERendererValidationCategory::DESCRIPTOR, message,
+                              0, 0, name);
             if (m_error_message.empty())
             {
                 m_error_message = message;

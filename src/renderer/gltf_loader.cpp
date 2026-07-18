@@ -608,9 +608,9 @@ namespace kera
         {
             GltfMaterialFactors factors;
             factors.base_color = glm::vec4(readFactor(material.pbrMetallicRoughness.baseColorFactor, 0, 1.0f),
-                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 1, 1.0f),
-                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 2, 1.0f),
-                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 3, 1.0f));
+                                           readFactor(material.pbrMetallicRoughness.baseColorFactor, 1, 1.0f),
+                                           readFactor(material.pbrMetallicRoughness.baseColorFactor, 2, 1.0f),
+                                           readFactor(material.pbrMetallicRoughness.baseColorFactor, 3, 1.0f));
             factors.emissive =
                 glm::vec3(readFactor(material.emissiveFactor, 0, 0.0f), readFactor(material.emissiveFactor, 1, 0.0f),
                           readFactor(material.emissiveFactor, 2, 0.0f));
@@ -642,7 +642,8 @@ namespace kera
         GltfLoadedModel loaded_model;
         if (desc.path.empty())
         {
-            return RendererResult<GltfLoadedModel>::failure(ERendererErrorCode::VALIDATION_FAILED, "glTF path is empty.");
+            return RendererResult<GltfLoadedModel>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                            "glTF path is empty.");
         }
 
         tinygltf::TinyGLTF loader;
@@ -775,8 +776,8 @@ namespace kera
                                   base_color_mip_levels) &&
             createMaterialTexture(renderer, tiny_model, material.pbrMetallicRoughness.metallicRoughnessTexture.index,
                                   ETextureFormat::RGBA8, makeDebugName(desc, "Metal Roughness"),
-                                  loaded_model.material_textures.metal_roughness, loaded_model.texture_names.metal_roughness,
-                                  metal_roughness_mip_levels) &&
+                                  loaded_model.material_textures.metal_roughness,
+                                  loaded_model.texture_names.metal_roughness, metal_roughness_mip_levels) &&
             createMaterialTexture(renderer, tiny_model, material.emissiveTexture.index, ETextureFormat::RGB_A8_SRGB,
                                   makeDebugName(desc, "Emissive"), loaded_model.material_textures.emissive,
                                   loaded_model.texture_names.emissive, emissive_mip_levels) &&
@@ -799,8 +800,8 @@ namespace kera
                             "Failed to submit glTF material textures upload batch.");
         }
 
-        max_material_mip_levels = std::max(
-            {base_color_mip_levels, metal_roughness_mip_levels, emissive_mip_levels, occlusion_mip_levels, normal_mip_levels});
+        max_material_mip_levels = std::max({base_color_mip_levels, metal_roughness_mip_levels, emissive_mip_levels,
+                                            occlusion_mip_levels, normal_mip_levels});
 
         loaded_model.material_sampler = renderer.createSampler(
             createMaterialSamplerDesc(tiny_model, material.pbrMetallicRoughness.baseColorTexture.index,

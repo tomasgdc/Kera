@@ -411,9 +411,9 @@ namespace kera
         }
 
         GeometryUniforms* uniforms = static_cast<GeometryUniforms*>(mapped_data);
-        const float aspect = m_render_extent.height == 0
-                                 ? 16.0f / 9.0f
-                                 : static_cast<float>(m_render_extent.width) / static_cast<float>(m_render_extent.height);
+        const float aspect = m_render_extent.height == 0 ? 16.0f / 9.0f
+                                                         : static_cast<float>(m_render_extent.width) /
+                                                               static_cast<float>(m_render_extent.height);
         uniforms->view =
             glm::lookAt(glm::vec3(0.0f, 0.0f, -8.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         uniforms->projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
@@ -478,15 +478,16 @@ namespace kera
                                     m_renderer.drawIndexed(frame, m_index_count, m_instance_count);
                                 });
 
-        context.renderToBackbuffer(getClearColor(),
-                                   [this](FrameHandle frame)
-                                   {
-                                       m_renderer.bindPipeline(frame, m_lighting_pipeline);
-                                       m_renderer.bindVertexBuffer(frame, 0, m_fullscreen_vertex_buffer);
-                                       m_renderer.bindIndexBuffer(frame, m_fullscreen_index_buffer, EIndexFormat::U_INT16);
-                                       m_renderer.bindDescriptorSet(frame, m_lighting_pipeline, m_lighting_descriptor_set);
-                                       m_renderer.drawIndexed(frame, m_fullscreen_index_count);
-                                   });
+        context.renderToBackbuffer(
+            getClearColor(),
+            [this](FrameHandle frame)
+            {
+                m_renderer.bindPipeline(frame, m_lighting_pipeline);
+                m_renderer.bindVertexBuffer(frame, 0, m_fullscreen_vertex_buffer);
+                m_renderer.bindIndexBuffer(frame, m_fullscreen_index_buffer, EIndexFormat::U_INT16);
+                m_renderer.bindDescriptorSet(frame, m_lighting_pipeline, m_lighting_descriptor_set);
+                m_renderer.drawIndexed(frame, m_fullscreen_index_count);
+            });
     }
 
     void InstancedTriangleManyLightsSample::destroyRenderResources()

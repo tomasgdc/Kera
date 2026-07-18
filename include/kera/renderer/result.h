@@ -86,8 +86,8 @@ namespace kera
 
         void addIssue(std::string message, uint32_t set = 0, uint32_t binding = 0, std::string name = {})
         {
-            addIssue(ERendererErrorCode::VALIDATION_FAILED, ERendererValidationCategory::GENERAL, std::move(message), set,
-                     binding, std::move(name));
+            addIssue(ERendererErrorCode::VALIDATION_FAILED, ERendererValidationCategory::GENERAL, std::move(message),
+                     set, binding, std::move(name));
         }
 
         void addIssue(ERendererErrorCode code, std::string message, uint32_t set = 0, uint32_t binding = 0,
@@ -99,7 +99,8 @@ namespace kera
         void addIssue(ERendererValidationCategory category, std::string message, uint32_t set = 0, uint32_t binding = 0,
                       std::string name = {})
         {
-            addIssue(ERendererErrorCode::VALIDATION_FAILED, category, std::move(message), set, binding, std::move(name));
+            addIssue(ERendererErrorCode::VALIDATION_FAILED, category, std::move(message), set, binding,
+                     std::move(name));
         }
 
         void addIssue(ERendererErrorCode code, ERendererValidationCategory category, std::string message,

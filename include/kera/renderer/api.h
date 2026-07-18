@@ -192,18 +192,14 @@ namespace kera
         KeraGraphicsShaderProgramDesc view() const noexcept
         {
             return {
-                path,
-                vertex_entry_point,
-                fragment_entry_point,
-                static_cast<KeraShaderSourceKind>(source),
-                debug_name,
+                path, vertex_entry_point, fragment_entry_point, static_cast<KeraShaderSourceKind>(source), debug_name,
             };
         }
     };
 
-#define KERA_VERTEX_FIELD(VertexType, member, bindingIndex, vertexFormat) \
+#define KERA_VERTEX_FIELD(VertexType, member, bindingIndex, vertexFormat)       \
     #member, bindingIndex, static_cast<uint32_t>(offsetof(VertexType, member)), \
-    static_cast<KeraVertexFormat>(vertexFormat)
+        static_cast<KeraVertexFormat>(vertexFormat)
 
     struct VertexInputLayout
     {
@@ -434,7 +430,8 @@ namespace kera
 
         KeraBufferHandle createUniformRingBuffer(size_t element_size, uint32_t slot_count) noexcept
         {
-            return isValid() ? m_api->create_uniform_ring_buffer(m_renderer, element_size, slot_count) : KeraBufferHandle{};
+            return isValid() ? m_api->create_uniform_ring_buffer(m_renderer, element_size, slot_count)
+                             : KeraBufferHandle{};
         }
 
         bool destroyBuffer(KeraBufferHandle buffer) noexcept
@@ -660,14 +657,14 @@ namespace kera
         DescriptorSetWriter& sampledImage(const char* name, KeraTextureHandle texture) noexcept
         {
             m_success = m_success && m_renderer->api()->update_descriptor_texture(m_renderer->native(), m_set,
-                                                                                stringView(name), texture) != 0;
+                                                                                  stringView(name), texture) != 0;
             return *this;
         }
 
         DescriptorSetWriter& sampler(const char* name, KeraSamplerHandle sampler) noexcept
         {
             m_success = m_success && m_renderer->api()->update_descriptor_sampler(m_renderer->native(), m_set,
-                                                                                stringView(name), sampler) != 0;
+                                                                                  stringView(name), sampler) != 0;
             return *this;
         }
 

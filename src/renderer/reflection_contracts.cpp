@@ -345,7 +345,7 @@ namespace kera
     }
 
     VertexInputLayoutBuilder& VertexInputLayoutBuilder::vertexBinding(uint32_t binding, uint32_t stride,
-                                                                       EVertexInputRate input_rate)
+                                                                      EVertexInputRate input_rate)
     {
         m_vertex_bindings.push_back({
             .binding = binding,
@@ -412,7 +412,8 @@ namespace kera
     }
 
     const SlangReflectionBinding* requireReflectedDescriptorBinding(const SlangReflectionMetadata* reflection,
-                                                                    const std::string& binding_name, EDescriptorType type)
+                                                                    const std::string& binding_name,
+                                                                    EDescriptorType type)
     {
         if (!reflection)
         {

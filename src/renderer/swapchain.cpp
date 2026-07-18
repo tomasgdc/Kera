@@ -79,7 +79,8 @@ namespace kera
         m_device = vk_device;
 
         uint32_t image_count = swap_chain_support.capabilities.minImageCount + 1;
-        if (swap_chain_support.capabilities.maxImageCount > 0 && image_count > swap_chain_support.capabilities.maxImageCount)
+        if (swap_chain_support.capabilities.maxImageCount > 0 &&
+            image_count > swap_chain_support.capabilities.maxImageCount)
         {
             image_count = swap_chain_support.capabilities.maxImageCount;
         }
@@ -96,7 +97,7 @@ namespace kera
 
         const auto& indices = physical_device.getQueueFamilyIndices();
         uint32_t queue_family_indices[] = {static_cast<uint32_t>(indices.graphics_family),
-                                         static_cast<uint32_t>(indices.present_family)};
+                                           static_cast<uint32_t>(indices.present_family)};
 
         if (indices.graphics_family != indices.present_family)
         {
@@ -164,7 +165,8 @@ namespace kera
         m_extent = {0, 0};
     }
 
-    VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats) const
+    VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(
+        const std::vector<VkSurfaceFormatKHR>& available_formats) const
     {
         for (const auto& available_format : available_formats)
         {
@@ -177,7 +179,8 @@ namespace kera
         return available_formats[0];
     }
 
-    VkPresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& available_present_modes) const
+    VkPresentModeKHR SwapChain::chooseSwapPresentMode(
+        const std::vector<VkPresentModeKHR>& available_present_modes) const
     {
         for (const auto& available_present_mode : available_present_modes)
         {
@@ -201,8 +204,8 @@ namespace kera
             VkExtent2D actual_extent = {width, height};
             actual_extent.width =
                 std::clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-            actual_extent.height =
-                std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+            actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height,
+                                              capabilities.maxImageExtent.height);
             return actual_extent;
         }
     }
@@ -238,13 +241,15 @@ namespace kera
         return true;
     }
 
-    VkResult SwapChain::acquireNextImage(VkSemaphore image_available_semaphore, VkFence fence, uint32_t* image_index) const
+    VkResult SwapChain::acquireNextImage(VkSemaphore image_available_semaphore, VkFence fence,
+                                         uint32_t* image_index) const
     {
         return vkAcquireNextImageKHR(m_device, m_swap_chain, std::numeric_limits<uint64_t>::max(),
                                      image_available_semaphore, fence, image_index);
     }
 
-    VkResult SwapChain::present(uint32_t image_index, VkSemaphore render_finished_semaphore, VkQueue present_queue) const
+    VkResult SwapChain::present(uint32_t image_index, VkSemaphore render_finished_semaphore,
+                                VkQueue present_queue) const
     {
         VkPresentInfoKHR present_info{};
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

@@ -145,7 +145,8 @@ TEST(KeraSlangReflectionMetadata, GeneratedJsonContracts)
         lighting_spirv, runtime_lighting_reflection, &diagnostics);
 
     EXPECT_TRUE(lighting_compiled) << diagnostics;
-    const kera::SlangReflectionBinding* runtime_lighting_params = runtime_lighting_reflection.findBinding("lightingParams");
+    const kera::SlangReflectionBinding* runtime_lighting_params =
+        runtime_lighting_reflection.findBinding("lightingParams");
     ASSERT_NE(runtime_lighting_params, nullptr);
     EXPECT_EQ(runtime_lighting_params->stage, kera::EShaderType::FRAGMENT);
 }

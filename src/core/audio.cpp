@@ -69,7 +69,13 @@ namespace kera
 
     // AudioSource implementation
     AudioSource::AudioSource()
-        : m_buffer(nullptr), m_playing(false), m_paused(false), m_loop(false), m_volume(1.0f), m_pitch(1.0f), m_position(0)
+        : m_buffer(nullptr)
+        , m_playing(false)
+        , m_paused(false)
+        , m_loop(false)
+        , m_volume(1.0f)
+        , m_pitch(1.0f)
+        , m_position(0)
     {
     }
 

@@ -253,7 +253,8 @@ namespace kera
         VkPipelineVertexInputStateCreateInfo vertex_input_info{};
         vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         vertex_input_info.vertexBindingDescriptionCount = static_cast<uint32_t>(binding_descriptions.size());
-        vertex_input_info.pVertexBindingDescriptions = binding_descriptions.empty() ? nullptr : binding_descriptions.data();
+        vertex_input_info.pVertexBindingDescriptions =
+            binding_descriptions.empty() ? nullptr : binding_descriptions.data();
         vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size());
         vertex_input_info.pVertexAttributeDescriptions =
             attribute_descriptions.empty() ? nullptr : attribute_descriptions.data();

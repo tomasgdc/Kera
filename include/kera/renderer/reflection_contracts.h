@@ -95,11 +95,13 @@ namespace kera
         VertexInputLayoutBuilder& vertexBinding(uint32_t binding, uint32_t stride,
                                                 EVertexInputRate input_rate = EVertexInputRate::VERTEX);
         template <typename VertexT>
-        VertexInputLayoutBuilder& vertexBinding(uint32_t binding, EVertexInputRate input_rate = EVertexInputRate::VERTEX)
+        VertexInputLayoutBuilder& vertexBinding(uint32_t binding,
+                                                EVertexInputRate input_rate = EVertexInputRate::VERTEX)
         {
             return vertexBinding(binding, static_cast<uint32_t>(sizeof(VertexT)), input_rate);
         }
-        VertexInputLayoutBuilder& field(std::string field_name, uint32_t binding, uint32_t offset, EVertexFormat format);
+        VertexInputLayoutBuilder& field(std::string field_name, uint32_t binding, uint32_t offset,
+                                        EVertexFormat format);
         VertexInputLayoutBuilder& fieldIn(std::string parameter_name, std::string field_name, uint32_t binding,
                                           uint32_t offset, EVertexFormat format);
         VertexInputLayoutBuildResult build(const SlangReflectionMetadata& reflection) &&;

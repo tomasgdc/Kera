@@ -891,9 +891,9 @@ namespace
         }
 
         kera::IblEnvironmentLoadDesc load_desc{.ibl_ktx_path = toString(desc->ibl_ktx_path),
-                                              .skybox_ktx_path = toString(desc->skybox_ktx_path),
-                                              .spherical_harmonics_path = toString(desc->spherical_harmonics_path),
-                                              .debug_name = toString(desc->debug_name)};
+                                               .skybox_ktx_path = toString(desc->skybox_ktx_path),
+                                               .spherical_harmonics_path = toString(desc->spherical_harmonics_path),
+                                               .debug_name = toString(desc->debug_name)};
 
         kera::RendererResult<kera::IblEnvironment> result = kera::loadIblEnvironment(*renderer->renderer, load_desc);
         if (!result)

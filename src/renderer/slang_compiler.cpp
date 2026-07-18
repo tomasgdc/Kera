@@ -72,11 +72,12 @@ namespace kera
             owned_search_paths = request.search_paths;
 
             const std::filesystem::path shader_path(request.shader_path);
-            const std::string shader_directory = shader_path.has_parent_path() ? shader_path.parent_path().string()
-                                                                             : std::filesystem::current_path().string();
+            const std::string shader_directory = shader_path.has_parent_path()
+                                                     ? shader_path.parent_path().string()
+                                                     : std::filesystem::current_path().string();
 
-            const bool has_shader_directory =
-                std::find(owned_search_paths.begin(), owned_search_paths.end(), shader_directory) != owned_search_paths.end();
+            const bool has_shader_directory = std::find(owned_search_paths.begin(), owned_search_paths.end(),
+                                                        shader_directory) != owned_search_paths.end();
 
             if (!has_shader_directory)
             {
@@ -173,7 +174,8 @@ namespace kera
             const std::filesystem::path shader_path(request.shader_path);
             const std::string module_name = shader_path.stem().string();
             Slang::ComPtr<slang::IBlob> diagnostics_blob;
-            slang::IModule* raw_module = out_context.session->loadModule(module_name.c_str(), diagnostics_blob.writeRef());
+            slang::IModule* raw_module =
+                out_context.session->loadModule(module_name.c_str(), diagnostics_blob.writeRef());
             appendDiagnostics(out_diagnostics, diagnostics_blob);
 
             if (!raw_module)
@@ -209,7 +211,8 @@ namespace kera
             }
 
             diagnostics_blob = nullptr;
-            result = out_context.composite_program->link(out_context.linked_program.writeRef(), diagnostics_blob.writeRef());
+            result =
+                out_context.composite_program->link(out_context.linked_program.writeRef(), diagnostics_blob.writeRef());
             appendDiagnostics(out_diagnostics, diagnostics_blob);
 
             if (SLANG_FAILED(result))
@@ -252,7 +255,7 @@ namespace kera
             }
 
             const std::string reflection_json(static_cast<const char*>(json_blob->getBufferPointer()),
-                                             json_blob->getBufferSize());
+                                              json_blob->getBufferSize());
             return parseSlangReflectionMetadata(reflection_json, out_reflection, out_diagnostics);
         }
 

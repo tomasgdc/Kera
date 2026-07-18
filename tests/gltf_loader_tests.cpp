@@ -380,7 +380,8 @@ namespace
                  << "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 48, \"target\": 34962}";
         }
         gltf << ",\n"
-             << "    {\"buffer\": 0, \"byteOffset\": " << index_byte_offset << ", \"byteLength\": 6, \"target\": 34963}\n"
+             << "    {\"buffer\": 0, \"byteOffset\": " << index_byte_offset
+             << ", \"byteLength\": 6, \"target\": 34963}\n"
              << "  ],\n"
              << "  \"accessors\": [\n"
              << "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"

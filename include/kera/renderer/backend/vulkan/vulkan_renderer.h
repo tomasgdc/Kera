@@ -453,7 +453,7 @@ namespace kera
         const DescriptorSetLayoutDesc* resolveDescriptorSetLayout(const VulkanGraphicsPipelineResource& pipeline,
                                                                   uint32_t set) const;
         bool validateDescriptorBinding(const VulkanDescriptorSetResource& descriptor_set, uint32_t binding,
-                                        EDescriptorType type) const;
+                                       EDescriptorType type) const;
         RendererValidationReport validateDescriptorSetResource(const VulkanDescriptorSetResource& descriptor_set) const;
         bool resolvePipelineRenderingFormats(RenderTargetHandle render_target, VkFormat& color_format,
                                              VkFormat& depth_format) const;

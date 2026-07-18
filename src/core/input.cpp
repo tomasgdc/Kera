@@ -91,7 +91,7 @@ namespace kera
                     if (m_mouse_move_callback)
                     {
                         m_mouse_move_callback(static_cast<int>(event.motion.x), static_cast<int>(event.motion.y),
-                                             static_cast<int>(event.motion.xrel), static_cast<int>(event.motion.yrel));
+                                              static_cast<int>(event.motion.xrel), static_cast<int>(event.motion.yrel));
                     }
                     break;
                 }

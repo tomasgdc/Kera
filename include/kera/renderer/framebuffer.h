@@ -30,8 +30,9 @@ namespace kera
         Framebuffer& operator=(Framebuffer&& other) noexcept;
 
         bool initialize(const Device& device, const RenderPass& render_pass, const SwapChain& swap_chain);
-        bool initializeSingleColorTarget(const Device& device, const RenderPass& render_pass, VkImageView color_image_view,
-                                         VkExtent2D extent, VkImageView depth_image_view = VK_NULL_HANDLE);
+        bool initializeSingleColorTarget(const Device& device, const RenderPass& render_pass,
+                                         VkImageView color_image_view, VkExtent2D extent,
+                                         VkImageView depth_image_view = VK_NULL_HANDLE);
         void shutdown();
 
         const std::vector<VkFramebuffer>& getVulkanFramebuffers() const

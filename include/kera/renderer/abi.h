@@ -465,19 +465,21 @@ extern "C"
         void (*render_ui)(KeraRenderer* renderer, KeraFrameHandle frame);
         int (*is_ui_available)(const KeraRenderer* renderer);
         KeraShaderProgramHandle (*create_graphics_shader_program)(KeraRenderer* renderer,
-                                                               const KeraGraphicsShaderProgramDesc* desc);
+                                                                  const KeraGraphicsShaderProgramDesc* desc);
         int (*destroy_shader_program)(KeraRenderer* renderer, KeraShaderProgramHandle program);
         KeraBufferHandle (*create_buffer)(KeraRenderer* renderer, const KeraBufferDesc* desc);
-        KeraBufferHandle (*create_uniform_ring_buffer)(KeraRenderer* renderer, size_t element_size, uint32_t slot_count);
+        KeraBufferHandle (*create_uniform_ring_buffer)(KeraRenderer* renderer, size_t element_size,
+                                                       uint32_t slot_count);
         int (*destroy_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer);
         int (*map_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer, void** data);
         void (*unmap_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer);
         int (*upload_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer, const void* data, size_t size,
-                            size_t offset);
+                             size_t offset);
         int (*upload_uniform_ring_buffer)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame,
-                                       const void* data, size_t size);
+                                          const void* data, size_t size);
         KeraUniformRingBufferInfo (*get_uniform_ring_buffer_info)(KeraRenderer* renderer, KeraBufferHandle buffer);
-        uint32_t (*get_uniform_ring_buffer_slot)(KeraRenderer* renderer, KeraBufferHandle buffer, KeraFrameHandle frame);
+        uint32_t (*get_uniform_ring_buffer_slot)(KeraRenderer* renderer, KeraBufferHandle buffer,
+                                                 KeraFrameHandle frame);
         size_t (*get_uniform_ring_buffer_slot_offset)(KeraRenderer* renderer, KeraBufferHandle buffer, uint32_t slot);
         KeraTextureHandle (*create_texture)(KeraRenderer* renderer, const KeraTextureDesc* desc);
         int (*upload_texture)(KeraRenderer* renderer, KeraTextureHandle texture, const void* data, size_t size);
@@ -487,41 +489,42 @@ extern "C"
         KeraRenderTargetHandle (*create_render_target)(KeraRenderer* renderer, const KeraRenderTargetDesc* desc);
         int (*destroy_render_target)(KeraRenderer* renderer, KeraRenderTargetHandle target);
         KeraRendererValidationReport (*validate_vertex_input_layout)(const KeraRenderer* renderer,
-                                                                  KeraShaderProgramHandle shader_program,
-                                                                  KeraVertexInputLayout vertex_input);
+                                                                     KeraShaderProgramHandle shader_program,
+                                                                     KeraVertexInputLayout vertex_input);
         KeraGraphicsPipelineHandle (*create_graphics_pipeline)(KeraRenderer* renderer,
-                                                             const KeraGraphicsPipelineCreateDesc* desc);
+                                                               const KeraGraphicsPipelineCreateDesc* desc);
         int (*destroy_graphics_pipeline)(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline);
         KeraDescriptorSetHandle (*create_descriptor_set)(KeraRenderer* renderer, KeraGraphicsPipelineHandle pipeline,
-                                                       uint32_t set);
+                                                         uint32_t set);
         int (*destroy_descriptor_set)(KeraRenderer* renderer, KeraDescriptorSetHandle set);
         int (*update_descriptor_buffer)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
-                                      KeraBufferHandle buffer, size_t offset, size_t range);
+                                        KeraBufferHandle buffer, size_t offset, size_t range);
         int (*update_descriptor_texture)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
-                                       KeraTextureHandle texture);
+                                         KeraTextureHandle texture);
         int (*update_descriptor_sampler)(KeraRenderer* renderer, KeraDescriptorSetHandle set, KeraStringView name,
-                                       KeraSamplerHandle sampler);
+                                         KeraSamplerHandle sampler);
         KeraRendererValidationReport (*validate_descriptor_set)(const KeraRenderer* renderer,
-                                                              KeraDescriptorSetHandle descriptor_set);
+                                                                KeraDescriptorSetHandle descriptor_set);
         int (*set_debug_name)(KeraRenderer* renderer, KeraHandle handle, KeraStringView name);
         KeraFrameHandle (*begin_frame)(KeraRenderer* renderer);
         void (*begin_render_pass)(KeraRenderer* renderer, KeraFrameHandle frame, const KeraRenderPassDesc* desc);
         void (*begin_render_pass_target)(KeraRenderer* renderer, KeraFrameHandle frame, KeraRenderTargetHandle target,
-                                      const KeraRenderPassDesc* desc);
+                                         const KeraRenderPassDesc* desc);
         void (*end_render_pass)(KeraRenderer* renderer, KeraFrameHandle frame);
         void (*bind_pipeline)(KeraRenderer* renderer, KeraFrameHandle frame, KeraGraphicsPipelineHandle pipeline);
-        void (*bind_vertex_buffer)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t slot, KeraBufferHandle buffer,
-                                 size_t offset);
+        void (*bind_vertex_buffer)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t slot,
+                                   KeraBufferHandle buffer, size_t offset);
         void (*bind_index_buffer)(KeraRenderer* renderer, KeraFrameHandle frame, KeraBufferHandle buffer,
-                                KeraIndexFormat format, size_t offset);
+                                  KeraIndexFormat format, size_t offset);
         void (*bind_descriptor_set)(KeraRenderer* renderer, KeraFrameHandle frame, KeraGraphicsPipelineHandle pipeline,
-                                  uint32_t set_index, KeraDescriptorSetHandle descriptor_set);
-        void (*draw_indexed)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t index_count, uint32_t instance_count);
+                                    uint32_t set_index, KeraDescriptorSetHandle descriptor_set);
+        void (*draw_indexed)(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t index_count,
+                             uint32_t instance_count);
         int (*end_frame)(KeraRenderer* renderer, KeraFrameHandle frame);
         int (*load_gltf_model)(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedModel* out_model);
         void (*destroy_gltf_model)(KeraRenderer* renderer, KeraGltfLoadedModel* model);
         int (*load_ibl_environment)(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
-                                  KeraIblEnvironment* out_environment);
+                                    KeraIblEnvironment* out_environment);
         void (*destroy_ibl_environment)(KeraRenderer* renderer, KeraIblEnvironment* env);
     } KeraRendererApiV1;
 

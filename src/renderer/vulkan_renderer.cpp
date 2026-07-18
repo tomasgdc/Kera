@@ -1056,7 +1056,8 @@ namespace kera
             return {};
         }
 
-        const SlangReflectionEntryPoint* reflected_entry_point = shader_program->m_reflection.findEntryPoint(entry_point);
+        const SlangReflectionEntryPoint* reflected_entry_point =
+            shader_program->m_reflection.findEntryPoint(entry_point);
         return reflected_entry_point ? reflected_entry_point->inputs : std::vector<SlangReflectionInput>{};
     }
 
@@ -1190,9 +1191,9 @@ namespace kera
         }
 
         const uint32_t resolved_slot_count =
-            slot_count == 0
-                ? static_cast<uint32_t>(m_frame_sync_resources.empty() ? kMaxFramesInFlight : m_frame_sync_resources.size())
-                : slot_count;
+            slot_count == 0 ? static_cast<uint32_t>(m_frame_sync_resources.empty() ? kMaxFramesInFlight
+                                                                                   : m_frame_sync_resources.size())
+                            : slot_count;
 
         VkPhysicalDeviceProperties physical_device_properties{};
         vkGetPhysicalDeviceProperties(m_device->getVulkanPhysicalDevice(), &physical_device_properties);
@@ -1391,8 +1392,8 @@ namespace kera
             vkGetPhysicalDeviceFormatProperties(m_device->getVulkanPhysicalDevice(), resource.m_format,
                                                 &format_properties);
             const VkFormatFeatureFlags required_features = VK_FORMAT_FEATURE_BLIT_SRC_BIT |
-                                                          VK_FORMAT_FEATURE_BLIT_DST_BIT |
-                                                          VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+                                                           VK_FORMAT_FEATURE_BLIT_DST_BIT |
+                                                           VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
             if ((format_properties.optimalTilingFeatures & required_features) != required_features)
             {
                 Logger::getInstance().error("Texture format does not support generated mipmaps.");
@@ -1411,10 +1412,10 @@ namespace kera
         resource.m_current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
         resource.m_descriptor_layout =
             desc.sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-        resource.m_render_target_final_layout = desc.render_target
-                                                 ? (desc.depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                                                      : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-                                                 : VK_IMAGE_LAYOUT_UNDEFINED;
+        resource.m_render_target_final_layout =
+            desc.render_target ? (desc.depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                                     : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                               : VK_IMAGE_LAYOUT_UNDEFINED;
 
         const bool is_cube = desc.dimension == ETextureDimension::TEXTURE_CUBE;
         const uint32_t array_layers = is_cube ? 6 : 1;
@@ -1591,7 +1592,7 @@ namespace kera
         }
 
         const std::size_t expected_size = static_cast<std::size_t>(texture->m_extent.width) *
-                                         static_cast<std::size_t>(texture->m_extent.height) * bytes_per_pixel;
+                                          static_cast<std::size_t>(texture->m_extent.height) * bytes_per_pixel;
         if (size < expected_size)
         {
             Logger::getInstance().error("Texture upload data is smaller than the texture extent requires.");
@@ -1740,9 +1741,9 @@ namespace kera
 
     bool VulkanRenderer::destroyTexture(TextureHandle texture)
     {
-        const auto pending_upload =
-            std::find_if(m_upload_context.pending_texture_uploads.begin(), m_upload_context.pending_texture_uploads.end(),
-                         [texture](const PendingTextureUpload& upload) { return upload.texture == texture; });
+        const auto pending_upload = std::find_if(
+            m_upload_context.pending_texture_uploads.begin(), m_upload_context.pending_texture_uploads.end(),
+            [texture](const PendingTextureUpload& upload) { return upload.texture == texture; });
 
         if (pending_upload != m_upload_context.pending_texture_uploads.end())
         {
@@ -1797,7 +1798,8 @@ namespace kera
         VkPhysicalDeviceProperties physical_device_properties{};
         vkGetPhysicalDeviceProperties(m_device->getVulkanPhysicalDevice(), &physical_device_properties);
         const float requested_anisotropy = std::max(desc.max_anisotropy, 1.0f);
-        const float max_anisotropy = std::min(requested_anisotropy, physical_device_properties.limits.maxSamplerAnisotropy);
+        const float max_anisotropy =
+            std::min(requested_anisotropy, physical_device_properties.limits.maxSamplerAnisotropy);
         sampler_info.anisotropyEnable = max_anisotropy > 1.0f ? VK_TRUE : VK_FALSE;
         sampler_info.maxAnisotropy = max_anisotropy;
         sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
@@ -2111,16 +2113,16 @@ namespace kera
         }
         resource.m_layout = *layout_desc;
         resource.m_debug_name = pipeline->m_desc.debug_name.empty()
-                                   ? "Kera Descriptor Set"
-                                   : pipeline->m_desc.debug_name + " Descriptor Set " + std::to_string(set);
+                                    ? "Kera Descriptor Set"
+                                    : pipeline->m_desc.debug_name + " Descriptor Set " + std::to_string(set);
         DescriptorSetHandle descriptor_set_handle = m_descriptor_sets.emplace(resource);
         setDebugObjectName(m_device->getVulkanDevice(), VK_OBJECT_TYPE_DESCRIPTOR_SET, (uint64_t)descriptor_set,
                            resource.m_debug_name);
         return descriptor_set_handle;
     }
 
-    bool VulkanRenderer::updateDescriptorSet(DescriptorSetHandle set_handle, uint32_t binding, BufferHandle buffer_handle,
-                                             std::size_t offset, std::size_t range)
+    bool VulkanRenderer::updateDescriptorSet(DescriptorSetHandle set_handle, uint32_t binding,
+                                             BufferHandle buffer_handle, std::size_t offset, std::size_t range)
     {
         if (!m_device)
         {
@@ -2434,7 +2436,7 @@ namespace kera
         std::vector<uint32_t> allocated_sets;
         m_descriptor_sets.forEach(
             [this, pipeline_handle, &allocated_sets, &report](DescriptorSetHandle,
-                                                            const VulkanDescriptorSetResource& descriptor_set)
+                                                              const VulkanDescriptorSetResource& descriptor_set)
             {
                 if (descriptor_set.m_pipeline != pipeline_handle)
                 {
@@ -2581,7 +2583,8 @@ namespace kera
         collectDeferredDeletions();
 
         const uint32_t swapchain_image_count = m_swapchain->getImageCount();
-        if (m_images_in_flight.size() != swapchain_image_count || m_swapchain_image_layouts.size() != swapchain_image_count ||
+        if (m_images_in_flight.size() != swapchain_image_count ||
+            m_swapchain_image_layouts.size() != swapchain_image_count ||
             m_swapchain->getImageViews().size() < swapchain_image_count)
         {
             Logger::getInstance().error("Swapchain frame resources do not match swapchain image count.");
@@ -2850,7 +2853,8 @@ namespace kera
         }
         else
         {
-            transitionSwapchainImageLayout(frame->m_command_buffer, frame->m_image_index, frame->m_render_pass_final_layout);
+            transitionSwapchainImageLayout(frame->m_command_buffer, frame->m_image_index,
+                                           frame->m_render_pass_final_layout);
         }
         if (frame->m_active_depth_texture.isValid())
         {
@@ -2942,8 +2946,8 @@ namespace kera
         bindDescriptorSet(frame_handle, pipeline_handle, descriptor_set->m_set, descriptor_set_handle);
     }
 
-    void VulkanRenderer::bindDescriptorSet(FrameHandle frame_handle, GraphicsPipelineHandle pipeline_handle, uint32_t set,
-                                           DescriptorSetHandle descriptor_set_handle)
+    void VulkanRenderer::bindDescriptorSet(FrameHandle frame_handle, GraphicsPipelineHandle pipeline_handle,
+                                           uint32_t set, DescriptorSetHandle descriptor_set_handle)
     {
         VulkanFrameResource* frame = m_frames.get(frame_handle);
         VulkanGraphicsPipelineResource* pipeline = m_graphics_pipelines.get(pipeline_handle);
@@ -3097,8 +3101,8 @@ namespace kera
             m_swapchain->present(image_index, frame_sync.m_render_finished_semaphore, m_device->getPresentQueue());
 
         const bool should_recreate_swapchain = m_swapchain_recreate_requested ||
-                                             present_result == VK_ERROR_OUT_OF_DATE_KHR ||
-                                             present_result == VK_SUBOPTIMAL_KHR;
+                                               present_result == VK_ERROR_OUT_OF_DATE_KHR ||
+                                               present_result == VK_SUBOPTIMAL_KHR;
 
         if (present_result != VK_SUCCESS && present_result != VK_SUBOPTIMAL_KHR &&
             present_result != VK_ERROR_OUT_OF_DATE_KHR)
@@ -3109,7 +3113,8 @@ namespace kera
         }
 
         releaseFrame(frame_handle, sync_index);
-        m_current_frame_sync_index = (m_current_frame_sync_index + 1) % static_cast<uint32_t>(m_frame_sync_resources.size());
+        m_current_frame_sync_index =
+            (m_current_frame_sync_index + 1) % static_cast<uint32_t>(m_frame_sync_resources.size());
         if (should_recreate_swapchain)
         {
             Logger::getInstance().info("Vulkan swapchain needs recreation after present.");
@@ -3364,7 +3369,8 @@ namespace kera
         uint64_t timeline_value = 0;
         for (const VulkanFrameSyncResource& frame_sync : m_frame_sync_resources)
         {
-            timeline_value = timeline_value < frame_sync.m_timeline_value ? frame_sync.m_timeline_value : timeline_value;
+            timeline_value =
+                timeline_value < frame_sync.m_timeline_value ? frame_sync.m_timeline_value : timeline_value;
         }
         for (const uint64_t image_timeline_value : m_images_in_flight)
         {
@@ -3467,7 +3473,8 @@ namespace kera
             {
                 VulkanDescriptorPoolResource& pool = m_descriptor_pools.back();
                 allocate_info.descriptorPool = pool.m_pool;
-                allocate_result = vkAllocateDescriptorSets(m_device->getVulkanDevice(), &allocate_info, &descriptor_set);
+                allocate_result =
+                    vkAllocateDescriptorSets(m_device->getVulkanDevice(), &allocate_info, &descriptor_set);
                 if (allocate_result == VK_SUCCESS)
                 {
                     descriptor_pool = pool.m_pool;
@@ -3485,7 +3492,7 @@ namespace kera
         bool success = true;
         m_descriptor_sets.forEach(
             [this, pipeline_handle, &pipeline, &success](DescriptorSetHandle descriptor_set_handle,
-                                                        VulkanDescriptorSetResource& descriptor_set)
+                                                         VulkanDescriptorSetResource& descriptor_set)
             {
                 if (descriptor_set.m_pipeline != pipeline_handle)
                 {
@@ -3645,7 +3652,8 @@ namespace kera
             }
             for (VulkanDescriptorSetResource& descriptor_set : deletion.m_descriptor_sets)
             {
-                if (descriptor_set.m_descriptor_set != VK_NULL_HANDLE && descriptor_set.m_descriptor_pool != VK_NULL_HANDLE)
+                if (descriptor_set.m_descriptor_set != VK_NULL_HANDLE &&
+                    descriptor_set.m_descriptor_pool != VK_NULL_HANDLE)
                 {
                     vkFreeDescriptorSets(m_device->getVulkanDevice(), descriptor_set.m_descriptor_pool, 1,
                                          &descriptor_set.m_descriptor_set);
@@ -4459,8 +4467,8 @@ namespace kera
         }
 
         const uint32_t frame_sync_count = m_command_buffers.size() < kMaxFramesInFlight
-                                            ? static_cast<uint32_t>(m_command_buffers.size())
-                                            : kMaxFramesInFlight;
+                                              ? static_cast<uint32_t>(m_command_buffers.size())
+                                              : kMaxFramesInFlight;
         if (frame_sync_count == 0)
         {
             return false;

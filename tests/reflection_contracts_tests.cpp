@@ -31,8 +31,8 @@ namespace
     };
 
     kera::SlangReflectionInput makeInput(const std::string& parameter_name, const std::string& field_name,
-                                         const std::string& semantic_name, uint32_t location, kera::EVertexFormat format,
-                                         uint32_t location_count = 1)
+                                         const std::string& semantic_name, uint32_t location,
+                                         kera::EVertexFormat format, uint32_t location_count = 1)
     {
         return {
             .name = field_name,

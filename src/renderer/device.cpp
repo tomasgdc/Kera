@@ -136,7 +136,7 @@ namespace kera
 
         std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
         std::set<uint32_t> unique_queue_families = {static_cast<uint32_t>(queue_families.graphics_family),
-                                                  static_cast<uint32_t>(queue_families.present_family)};
+                                                    static_cast<uint32_t>(queue_families.present_family)};
 
         float queue_priority = 1.0f;
         for (uint32_t queue_family : unique_queue_families)

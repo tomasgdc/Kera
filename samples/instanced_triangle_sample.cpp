@@ -46,7 +46,11 @@ namespace kera
     }  // namespace
 
     InstancedTriangleSample::InstancedTriangleSample(Renderer& renderer)
-        : Sample("Instanced Triangle"), m_renderer(renderer), m_index_count(0), m_instance_count(0), m_rotation_angle(0.0f)
+        : Sample("Instanced Triangle")
+        , m_renderer(renderer)
+        , m_index_count(0)
+        , m_instance_count(0)
+        , m_rotation_angle(0.0f)
     {
     }
 
@@ -140,7 +144,7 @@ namespace kera
         });
 
         if (!m_instance_buffer.isValid() || !m_renderer.uploadBuffer(m_instance_buffer, instance_data.data(),
-                                                                    instance_data.size() * sizeof(BasicInstanceData)))
+                                                                     instance_data.size() * sizeof(BasicInstanceData)))
         {
             return false;
         }
@@ -186,8 +190,8 @@ namespace kera
                 return false;
             }
 
-                const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
-                if (!m_renderer.updateDescriptors(descriptor_set)
+            const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
+            if (!m_renderer.updateDescriptors(descriptor_set)
                      .uniform<Uniforms>(instanced_triangle_shader::kGlobalParams, m_uniform_buffer, uniform_offset)
                      .ok())
             {
