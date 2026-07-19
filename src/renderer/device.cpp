@@ -1,4 +1,4 @@
-// Copyright 2026 Tomas Mikalauskas
+﻿// Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/device.h"
@@ -17,26 +17,26 @@ namespace kera
     {
 
         // Required device extensions
-        const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        const std::vector<const char*> kDeviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
         struct VulkanRequiredFeaturePolicy
         {
             VkPhysicalDeviceFeatures2 features{};
             VkPhysicalDeviceSynchronization2Features synchronization2{};
-            VkPhysicalDeviceDynamicRenderingFeatures dynamicRendering{};
-            VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphore{};
+            VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering{};
+            VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore{};
         };
 
         void linkRequiredFeaturePolicy(VulkanRequiredFeaturePolicy& policy)
         {
             policy.features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
             policy.synchronization2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
-            policy.dynamicRendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
-            policy.timelineSemaphore.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+            policy.dynamic_rendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+            policy.timeline_semaphore.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
 
             policy.features.pNext = &policy.synchronization2;
-            policy.synchronization2.pNext = &policy.dynamicRendering;
-            policy.dynamicRendering.pNext = &policy.timelineSemaphore;
+            policy.synchronization2.pNext = &policy.dynamic_rendering;
+            policy.dynamic_rendering.pNext = &policy.timeline_semaphore;
         }
 
         bool validateRequiredFeaturePolicy(const VulkanRequiredFeaturePolicy& policy)
@@ -46,12 +46,12 @@ namespace kera
                 Logger::getInstance().error("Kera requires Vulkan 1.3 synchronization2 support.");
                 return false;
             }
-            if (policy.dynamicRendering.dynamicRendering != VK_TRUE)
+            if (policy.dynamic_rendering.dynamicRendering != VK_TRUE)
             {
                 Logger::getInstance().error("Kera requires Vulkan 1.3 dynamic rendering support.");
                 return false;
             }
-            if (policy.timelineSemaphore.timelineSemaphore != VK_TRUE)
+            if (policy.timeline_semaphore.timelineSemaphore != VK_TRUE)
             {
                 Logger::getInstance().error("Kera requires Vulkan 1.3 timeline semaphore support.");
                 return false;
@@ -62,12 +62,12 @@ namespace kera
     }  // anonymous namespace
 
     Device::Device()
-        : physical_device_(VK_NULL_HANDLE)
-        , device_(VK_NULL_HANDLE)
-        , graphics_queue_(VK_NULL_HANDLE)
-        , present_queue_(VK_NULL_HANDLE)
-        , command_pool_(VK_NULL_HANDLE)
-        , graphics_queue_family_index_(0)
+        : m_physical_device(VK_NULL_HANDLE)
+        , m_device(VK_NULL_HANDLE)
+        , m_graphics_queue(VK_NULL_HANDLE)
+        , m_present_queue(VK_NULL_HANDLE)
+        , m_command_pool(VK_NULL_HANDLE)
+        , m_graphics_queue_family_index(0)
     {
     }
 
@@ -77,19 +77,19 @@ namespace kera
     }
 
     Device::Device(Device&& other) noexcept
-        : physical_device_(other.physical_device_)
-        , device_(other.device_)
-        , graphics_queue_(other.graphics_queue_)
-        , present_queue_(other.present_queue_)
-        , command_pool_(other.command_pool_)
-        , graphics_queue_family_index_(other.graphics_queue_family_index_)
+        : m_physical_device(other.m_physical_device)
+        , m_device(other.m_device)
+        , m_graphics_queue(other.m_graphics_queue)
+        , m_present_queue(other.m_present_queue)
+        , m_command_pool(other.m_command_pool)
+        , m_graphics_queue_family_index(other.m_graphics_queue_family_index)
     {
-        other.physical_device_ = VK_NULL_HANDLE;
-        other.device_ = VK_NULL_HANDLE;
-        other.graphics_queue_ = VK_NULL_HANDLE;
-        other.present_queue_ = VK_NULL_HANDLE;
-        other.command_pool_ = VK_NULL_HANDLE;
-        other.graphics_queue_family_index_ = 0;
+        other.m_physical_device = VK_NULL_HANDLE;
+        other.m_device = VK_NULL_HANDLE;
+        other.m_graphics_queue = VK_NULL_HANDLE;
+        other.m_present_queue = VK_NULL_HANDLE;
+        other.m_command_pool = VK_NULL_HANDLE;
+        other.m_graphics_queue_family_index = 0;
     }
 
     Device& Device::operator=(Device&& other) noexcept
@@ -97,83 +97,83 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            physical_device_ = other.physical_device_;
-            device_ = other.device_;
-            graphics_queue_ = other.graphics_queue_;
-            present_queue_ = other.present_queue_;
-            command_pool_ = other.command_pool_;
-            graphics_queue_family_index_ = other.graphics_queue_family_index_;
+            m_physical_device = other.m_physical_device;
+            m_device = other.m_device;
+            m_graphics_queue = other.m_graphics_queue;
+            m_present_queue = other.m_present_queue;
+            m_command_pool = other.m_command_pool;
+            m_graphics_queue_family_index = other.m_graphics_queue_family_index;
 
-            other.physical_device_ = VK_NULL_HANDLE;
-            other.device_ = VK_NULL_HANDLE;
-            other.graphics_queue_ = VK_NULL_HANDLE;
-            other.present_queue_ = VK_NULL_HANDLE;
-            other.command_pool_ = VK_NULL_HANDLE;
-            other.graphics_queue_family_index_ = 0;
+            other.m_physical_device = VK_NULL_HANDLE;
+            other.m_device = VK_NULL_HANDLE;
+            other.m_graphics_queue = VK_NULL_HANDLE;
+            other.m_present_queue = VK_NULL_HANDLE;
+            other.m_command_pool = VK_NULL_HANDLE;
+            other.m_graphics_queue_family_index = 0;
         }
         return *this;
     }
 
-    bool Device::initialize(const PhysicalDevice& physicalDevice)
+    bool Device::initialize(const PhysicalDevice& physical_device)
     {
-        if (device_)
+        if (m_device)
         {
             shutdown();
         }
 
-        VkPhysicalDevice vkPhysicalDevice = physicalDevice.getVulkanPhysicalDevice();
-        const auto& queueFamilies = physicalDevice.getQueueFamilyIndices();
-        physical_device_ = vkPhysicalDevice;
-        graphics_queue_family_index_ = static_cast<uint32_t>(queueFamilies.graphicsFamily);
+        VkPhysicalDevice vk_physical_device = physical_device.getVulkanPhysicalDevice();
+        const auto& queue_families = physical_device.getQueueFamilyIndices();
+        m_physical_device = vk_physical_device;
+        m_graphics_queue_family_index = static_cast<uint32_t>(queue_families.graphics_family);
 
-        VkPhysicalDeviceProperties physicalDeviceProperties{};
-        vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
-        if (physicalDeviceProperties.apiVersion < VK_API_VERSION_1_3)
+        VkPhysicalDeviceProperties physical_device_properties{};
+        vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device_properties);
+        if (physical_device_properties.apiVersion < VK_API_VERSION_1_3)
         {
             Logger::getInstance().error("Kera requires a Vulkan 1.3 physical device.");
             return false;
         }
 
-        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        std::set<uint32_t> uniqueQueueFamilies = {static_cast<uint32_t>(queueFamilies.graphicsFamily),
-                                                  static_cast<uint32_t>(queueFamilies.presentFamily)};
+        std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
+        std::set<uint32_t> unique_queue_families = {static_cast<uint32_t>(queue_families.graphics_family),
+                                                    static_cast<uint32_t>(queue_families.present_family)};
 
-        float queuePriority = 1.0f;
-        for (uint32_t queueFamily : uniqueQueueFamilies)
+        float queue_priority = 1.0f;
+        for (uint32_t queue_family : unique_queue_families)
         {
-            VkDeviceQueueCreateInfo queueCreateInfo{};
-            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            queueCreateInfo.queueFamilyIndex = queueFamily;
-            queueCreateInfo.queueCount = 1;
-            queueCreateInfo.pQueuePriorities = &queuePriority;
-            queueCreateInfos.push_back(queueCreateInfo);
+            VkDeviceQueueCreateInfo queue_create_info{};
+            queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queue_create_info.queueFamilyIndex = queue_family;
+            queue_create_info.queueCount = 1;
+            queue_create_info.pQueuePriorities = &queue_priority;
+            queue_create_infos.push_back(queue_create_info);
         }
 
-        VulkanRequiredFeaturePolicy supportedFeaturePolicy{};
-        linkRequiredFeaturePolicy(supportedFeaturePolicy);
-        vkGetPhysicalDeviceFeatures2(vkPhysicalDevice, &supportedFeaturePolicy.features);
-        if (!validateRequiredFeaturePolicy(supportedFeaturePolicy))
+        VulkanRequiredFeaturePolicy supported_feature_policy{};
+        linkRequiredFeaturePolicy(supported_feature_policy);
+        vkGetPhysicalDeviceFeatures2(vk_physical_device, &supported_feature_policy.features);
+        if (!validateRequiredFeaturePolicy(supported_feature_policy))
         {
             return false;
         }
 
-        VulkanRequiredFeaturePolicy enabledFeaturePolicy{};
-        linkRequiredFeaturePolicy(enabledFeaturePolicy);
-        enabledFeaturePolicy.features.features.samplerAnisotropy = VK_TRUE;
-        enabledFeaturePolicy.synchronization2.synchronization2 = VK_TRUE;
-        enabledFeaturePolicy.dynamicRendering.dynamicRendering = VK_TRUE;
-        enabledFeaturePolicy.timelineSemaphore.timelineSemaphore = VK_TRUE;
+        VulkanRequiredFeaturePolicy enabled_feature_policy{};
+        linkRequiredFeaturePolicy(enabled_feature_policy);
+        enabled_feature_policy.features.features.samplerAnisotropy = VK_TRUE;
+        enabled_feature_policy.synchronization2.synchronization2 = VK_TRUE;
+        enabled_feature_policy.dynamic_rendering.dynamicRendering = VK_TRUE;
+        enabled_feature_policy.timeline_semaphore.timelineSemaphore = VK_TRUE;
 
-        VkDeviceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.pNext = &enabledFeaturePolicy.features;
-        createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-        createInfo.pQueueCreateInfos = queueCreateInfos.data();
-        createInfo.pEnabledFeatures = nullptr;
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-        createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+        VkDeviceCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        create_info.pNext = &enabled_feature_policy.features;
+        create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
+        create_info.pQueueCreateInfos = queue_create_infos.data();
+        create_info.pEnabledFeatures = nullptr;
+        create_info.enabledExtensionCount = static_cast<uint32_t>(kDeviceExtensions.size());
+        create_info.ppEnabledExtensionNames = kDeviceExtensions.data();
 
-        VkResult result = vkCreateDevice(vkPhysicalDevice, &createInfo, nullptr, &device_);
+        VkResult result = vkCreateDevice(vk_physical_device, &create_info, nullptr, &m_device);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create logical device: " + std::to_string(result));
@@ -181,8 +181,8 @@ namespace kera
         }
 
         // Get queue handles
-        vkGetDeviceQueue(device_, static_cast<uint32_t>(queueFamilies.graphicsFamily), 0, &graphics_queue_);
-        vkGetDeviceQueue(device_, static_cast<uint32_t>(queueFamilies.presentFamily), 0, &present_queue_);
+        vkGetDeviceQueue(m_device, static_cast<uint32_t>(queue_families.graphics_family), 0, &m_graphics_queue);
+        vkGetDeviceQueue(m_device, static_cast<uint32_t>(queue_families.present_family), 0, &m_present_queue);
 
         // Create command pool
         if (!createCommandPool())
@@ -200,31 +200,31 @@ namespace kera
     {
         destroyCommandPool();
 
-        if (device_)
+        if (m_device)
         {
-            vkDestroyDevice(device_, nullptr);
-            physical_device_ = VK_NULL_HANDLE;
-            device_ = VK_NULL_HANDLE;
-            graphics_queue_ = VK_NULL_HANDLE;
-            present_queue_ = VK_NULL_HANDLE;
-            graphics_queue_family_index_ = 0;
+            vkDestroyDevice(m_device, nullptr);
+            m_physical_device = VK_NULL_HANDLE;
+            m_device = VK_NULL_HANDLE;
+            m_graphics_queue = VK_NULL_HANDLE;
+            m_present_queue = VK_NULL_HANDLE;
+            m_graphics_queue_family_index = 0;
             Logger::getInstance().debug("Logical device destroyed");
         }
     }
 
     bool Device::createCommandPool()
     {
-        if (!device_)
+        if (!m_device)
         {
             return false;
         }
 
-        VkCommandPoolCreateInfo poolInfo{};
-        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolInfo.queueFamilyIndex = graphics_queue_family_index_;
+        VkCommandPoolCreateInfo pool_info{};
+        pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        pool_info.queueFamilyIndex = m_graphics_queue_family_index;
 
-        VkResult result = vkCreateCommandPool(device_, &poolInfo, nullptr, &command_pool_);
+        VkResult result = vkCreateCommandPool(m_device, &pool_info, nullptr, &m_command_pool);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create command pool: " + std::to_string(result));
@@ -236,10 +236,10 @@ namespace kera
 
     void Device::destroyCommandPool()
     {
-        if (command_pool_ && device_)
+        if (m_command_pool && m_device)
         {
-            vkDestroyCommandPool(device_, command_pool_, nullptr);
-            command_pool_ = VK_NULL_HANDLE;
+            vkDestroyCommandPool(m_device, m_command_pool, nullptr);
+            m_command_pool = VK_NULL_HANDLE;
         }
     }
 

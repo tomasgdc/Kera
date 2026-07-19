@@ -14,12 +14,12 @@ namespace kera
 
     struct QueueFamilyIndices
     {
-        int graphicsFamily = -1;
-        int presentFamily = -1;
+        int graphics_family = -1;
+        int present_family = -1;
 
         bool isComplete() const
         {
-            return graphicsFamily >= 0 && presentFamily >= 0;
+            return graphics_family >= 0 && present_family >= 0;
         }
     };
 
@@ -27,7 +27,7 @@ namespace kera
     {
         VkSurfaceCapabilitiesKHR capabilities;
         std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> presentModes;
+        std::vector<VkPresentModeKHR> present_modes;
     };
 
     class PhysicalDevice
@@ -41,24 +41,24 @@ namespace kera
 
         VkPhysicalDevice getVulkanPhysicalDevice() const
         {
-            return physical_device_;
+            return m_physical_device;
         }
         const VkPhysicalDeviceProperties& getProperties() const
         {
-            return properties_;
+            return m_properties;
         }
         const VkPhysicalDeviceFeatures& getFeatures() const
         {
-            return features_;
+            return m_features;
         }
 
         const QueueFamilyIndices& getQueueFamilyIndices() const
         {
-            return queue_families_;
+            return m_queue_families;
         }
         const SwapChainSupportDetails& getSwapChainSupport() const
         {
-            return swap_chain_support_;
+            return m_swap_chain_support;
         }
 
         bool isSuitable() const;
@@ -72,11 +72,11 @@ namespace kera
         QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const;
         SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) const;
 
-        VkPhysicalDevice physical_device_;
-        VkPhysicalDeviceProperties properties_;
-        VkPhysicalDeviceFeatures features_;
-        QueueFamilyIndices queue_families_;
-        SwapChainSupportDetails swap_chain_support_;
+        VkPhysicalDevice m_physical_device;
+        VkPhysicalDeviceProperties m_properties;
+        VkPhysicalDeviceFeatures m_features;
+        QueueFamilyIndices m_queue_families;
+        SwapChainSupportDetails m_swap_chain_support;
     };
 
 }  // namespace kera

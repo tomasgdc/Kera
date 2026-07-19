@@ -1,4 +1,4 @@
-// Copyright 2026 Tomas Mikalauskas
+﻿// Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/surface.h"
@@ -13,17 +13,17 @@
 
 namespace kera
 {
-    Surface::Surface() : instance_(VK_NULL_HANDLE), surface_(VK_NULL_HANDLE) {}
+    Surface::Surface() : m_instance(VK_NULL_HANDLE), m_surface(VK_NULL_HANDLE) {}
 
     Surface::~Surface()
     {
         destroy();
     }
 
-    Surface::Surface(Surface&& other) noexcept : instance_(other.instance_), surface_(other.surface_)
+    Surface::Surface(Surface&& other) noexcept : m_instance(other.m_instance), m_surface(other.m_surface)
     {
-        other.instance_ = VK_NULL_HANDLE;
-        other.surface_ = VK_NULL_HANDLE;
+        other.m_instance = VK_NULL_HANDLE;
+        other.m_surface = VK_NULL_HANDLE;
     }
 
     Surface& Surface::operator=(Surface&& other) noexcept
@@ -31,11 +31,11 @@ namespace kera
         if (this != &other)
         {
             destroy();
-            instance_ = other.instance_;
-            surface_ = other.surface_;
+            m_instance = other.m_instance;
+            m_surface = other.m_surface;
 
-            other.instance_ = VK_NULL_HANDLE;
-            other.surface_ = VK_NULL_HANDLE;
+            other.m_instance = VK_NULL_HANDLE;
+            other.m_surface = VK_NULL_HANDLE;
         }
         return *this;
     }
@@ -47,15 +47,15 @@ namespace kera
 
     bool Surface::create(VkInstance instance, SDL_Window* window)
     {
-        if (surface_)
+        if (m_surface)
         {
             destroy();
         }
 
-        instance_ = instance;
+        m_instance = instance;
 
         // Create Vulkan surface from SDL window
-        if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface_))
+        if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &m_surface))
         {
             Logger::getInstance().error("Failed to create Vulkan surface: " + std::string(SDL_GetError()));
             return false;
@@ -67,11 +67,11 @@ namespace kera
 
     void Surface::destroy()
     {
-        if (surface_ && instance_)
+        if (m_surface && m_instance)
         {
-            vkDestroySurfaceKHR(instance_, surface_, nullptr);
-            surface_ = VK_NULL_HANDLE;
-            instance_ = VK_NULL_HANDLE;
+            vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
+            m_surface = VK_NULL_HANDLE;
+            m_instance = VK_NULL_HANDLE;
             Logger::getInstance().debug("Vulkan surface destroyed");
         }
     }

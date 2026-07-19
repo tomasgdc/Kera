@@ -24,7 +24,7 @@ namespace kera
             }
         }
 
-        bool parseString(const std::string& text, size_t& offset, std::string& outValue)
+        bool parseString(const std::string& text, size_t& offset, std::string& out_value)
         {
             if (offset >= text.size() || text[offset] != '"')
             {
@@ -33,7 +33,7 @@ namespace kera
             }
 
             ++offset;
-            outValue.clear();
+            out_value.clear();
 
             while (offset < text.size())
             {
@@ -54,28 +54,28 @@ namespace kera
                     switch (escape)
                     {
                         case '"':
-                            outValue.push_back('"');
+                            out_value.push_back('"');
                             break;
                         case '\\':
-                            outValue.push_back('\\');
+                            out_value.push_back('\\');
                             break;
                         case '/':
-                            outValue.push_back('/');
+                            out_value.push_back('/');
                             break;
                         case 'b':
-                            outValue.push_back('\b');
+                            out_value.push_back('\b');
                             break;
                         case 'f':
-                            outValue.push_back('\f');
+                            out_value.push_back('\f');
                             break;
                         case 'n':
-                            outValue.push_back('\n');
+                            out_value.push_back('\n');
                             break;
                         case 'r':
-                            outValue.push_back('\r');
+                            out_value.push_back('\r');
                             break;
                         case 't':
-                            outValue.push_back('\t');
+                            out_value.push_back('\t');
                             break;
                         default:
                             Logger::getInstance().error("Unsupported JSON escape sequence");
@@ -84,7 +84,7 @@ namespace kera
                 }
                 else
                 {
-                    outValue.push_back(current);
+                    out_value.push_back(current);
                 }
             }
 
@@ -92,9 +92,9 @@ namespace kera
             return false;
         }
 
-        bool parseValue(const std::string& text, size_t& offset, JsonValue& outValue);
+        bool parseValue(const std::string& text, size_t& offset, JsonValue& out_value);
 
-        bool parseArray(const std::string& text, size_t& offset, JsonValue& outValue)
+        bool parseArray(const std::string& text, size_t& offset, JsonValue& out_value)
         {
             if (offset >= text.size() || text[offset] != '[')
             {
@@ -109,7 +109,7 @@ namespace kera
             if (offset < text.size() && text[offset] == ']')
             {
                 ++offset;
-                outValue = JsonValue(std::move(elements));
+                out_value = JsonValue(std::move(elements));
                 return true;
             }
 
@@ -146,11 +146,11 @@ namespace kera
                 skipWhitespace(text, offset);
             }
 
-            outValue = JsonValue(std::move(elements));
+            out_value = JsonValue(std::move(elements));
             return true;
         }
 
-        bool parseObject(const std::string& text, size_t& offset, JsonValue& outValue)
+        bool parseObject(const std::string& text, size_t& offset, JsonValue& out_value)
         {
             if (offset >= text.size() || text[offset] != '{')
             {
@@ -165,7 +165,7 @@ namespace kera
             if (offset < text.size() && text[offset] == '}')
             {
                 ++offset;
-                outValue = JsonValue(std::move(members));
+                out_value = JsonValue(std::move(members));
                 return true;
             }
 
@@ -218,11 +218,11 @@ namespace kera
                 skipWhitespace(text, offset);
             }
 
-            outValue = JsonValue(std::move(members));
+            out_value = JsonValue(std::move(members));
             return true;
         }
 
-        bool parseNumber(const std::string& text, size_t& offset, JsonValue& outValue)
+        bool parseNumber(const std::string& text, size_t& offset, JsonValue& out_value)
         {
             const size_t start = offset;
             if (offset < text.size() && (text[offset] == '-' || text[offset] == '+'))
@@ -264,40 +264,40 @@ namespace kera
                 return false;
             }
 
-            const std::string numberText = text.substr(start, offset - start);
+            const std::string number_text = text.substr(start, offset - start);
             double value = 0.0;
-            const char* numberBegin = numberText.data();
-            const char* numberEnd = numberBegin + numberText.size();
-            const std::from_chars_result result = std::from_chars(numberBegin, numberEnd, value);
-            if (result.ec != std::errc{} || result.ptr != numberEnd)
+            const char* number_begin = number_text.data();
+            const char* number_end = number_begin + number_text.size();
+            const std::from_chars_result result = std::from_chars(number_begin, number_end, value);
+            if (result.ec != std::errc{} || result.ptr != number_end)
             {
                 Logger::getInstance().error("Failed to parse JSON number");
                 return false;
             }
-            outValue = JsonValue(value);
+            out_value = JsonValue(value);
             return true;
         }
 
-        bool parseLiteral(const std::string& text, size_t& offset, JsonValue& outValue)
+        bool parseLiteral(const std::string& text, size_t& offset, JsonValue& out_value)
         {
             if (text.compare(offset, 4, "null") == 0)
             {
                 offset += 4;
-                outValue = JsonValue(nullptr);
+                out_value = JsonValue(nullptr);
                 return true;
             }
 
             if (text.compare(offset, 4, "true") == 0)
             {
                 offset += 4;
-                outValue = JsonValue(true);
+                out_value = JsonValue(true);
                 return true;
             }
 
             if (text.compare(offset, 5, "false") == 0)
             {
                 offset += 5;
-                outValue = JsonValue(false);
+                out_value = JsonValue(false);
                 return true;
             }
 
@@ -305,7 +305,7 @@ namespace kera
             return false;
         }
 
-        bool parseValue(const std::string& text, size_t& offset, JsonValue& outValue)
+        bool parseValue(const std::string& text, size_t& offset, JsonValue& out_value)
         {
             skipWhitespace(text, offset);
 
@@ -318,9 +318,9 @@ namespace kera
             switch (text[offset])
             {
                 case '{':
-                    return parseObject(text, offset, outValue);
+                    return parseObject(text, offset, out_value);
                 case '[':
-                    return parseArray(text, offset, outValue);
+                    return parseArray(text, offset, out_value);
                 case '"':
                 {
                     std::string str;
@@ -328,25 +328,25 @@ namespace kera
                     {
                         return false;
                     }
-                    outValue = JsonValue(std::move(str));
+                    out_value = JsonValue(std::move(str));
                     return true;
                 }
                 case 't':
                 case 'f':
                 case 'n':
-                    return parseLiteral(text, offset, outValue);
+                    return parseLiteral(text, offset, out_value);
                 default:
-                    return parseNumber(text, offset, outValue);
+                    return parseNumber(text, offset, out_value);
             }
         }
 
     }  // namespace
 
-    bool Json::parse(const std::string& text, JsonValue& outValue)
+    bool Json::parse(const std::string& text, JsonValue& out_value)
     {
         size_t offset = 0;
         skipWhitespace(text, offset);
-        if (!parseValue(text, offset, outValue))
+        if (!parseValue(text, offset, out_value))
         {
             return false;
         }

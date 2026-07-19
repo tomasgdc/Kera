@@ -13,6 +13,6 @@ namespace kera
 
     class Window;
 
-    std::unique_ptr<IRenderer> CreateRenderer(GraphicsBackend backend, Window& window);
+    std::unique_ptr<IRenderer> createRenderer(EGraphicsBackend backend, Window& window);
 
 }  // namespace kera

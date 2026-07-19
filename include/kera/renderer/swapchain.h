@@ -28,65 +28,65 @@ namespace kera
         SwapChain(SwapChain&& other) noexcept;
         SwapChain& operator=(SwapChain&& other) noexcept;
 
-        bool initialize(const PhysicalDevice& physicalDevice, const Device& device, VkSurfaceKHR surface,
+        bool initialize(const PhysicalDevice& physical_device, const Device& device, VkSurfaceKHR surface,
                         uint32_t width, uint32_t height);
         void shutdown();
 
         VkSwapchainKHR getVulkanSwapChain() const
         {
-            return swap_chain_;
+            return m_swap_chain;
         }
         VkFormat getImageFormat() const
         {
-            return image_format_;
+            return m_image_format;
         }
         VkExtent2D getExtent() const
         {
-            return extent_;
+            return m_extent;
         }
         const std::vector<VkImage>& getImages() const
         {
-            return images_;
+            return m_images;
         }
         const std::vector<VkImageView>& getImageViews() const
         {
-            return image_views_;
+            return m_image_views;
         }
 
         uint32_t getImageCount() const
         {
-            return static_cast<uint32_t>(images_.size());
+            return static_cast<uint32_t>(m_images.size());
         }
 
         bool isValid() const
         {
-            return swap_chain_ != VK_NULL_HANDLE;
+            return m_swap_chain != VK_NULL_HANDLE;
         }
 
-        VkResult acquireNextImage(VkSemaphore imageAvailableSemaphore, VkFence fence, uint32_t* imageIndex) const;
-        VkResult present(uint32_t imageIndex, VkSemaphore renderFinishedSemaphore, VkQueue presentQueue) const;
+        VkResult acquireNextImage(VkSemaphore image_available_semaphore, VkFence fence, uint32_t* image_index) const;
+        VkResult present(uint32_t image_index, VkSemaphore render_finished_semaphore, VkQueue present_queue) const;
 
     private:
         struct SwapChainSupportDetails
         {
             VkSurfaceCapabilitiesKHR capabilities;
             std::vector<VkSurfaceFormatKHR> formats;
-            std::vector<VkPresentModeKHR> presentModes;
+            std::vector<VkPresentModeKHR> present_modes;
         };
 
-        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const;
-        VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) const;
+        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& available_formats) const;
+        VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& available_present_modes) const;
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, uint32_t width,
                                     uint32_t height) const;
 
         bool createImageViews();
 
-        VkDevice device_;
-        VkSwapchainKHR swap_chain_;
-        VkFormat image_format_;
-        VkExtent2D extent_;
-        std::vector<VkImage> images_;
-        std::vector<VkImageView> image_views_;
+        VkDevice m_device;
+        VkSwapchainKHR m_swap_chain;
+        VkFormat m_image_format;
+        VkExtent2D m_extent;
+        std::vector<VkImage> m_images;
+        std::vector<VkImageView> m_image_views;
     };
 
 }  // namespace kera

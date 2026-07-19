@@ -32,19 +32,19 @@ namespace kera
 
         VkCommandBuffer getVulkanCommandBuffer() const
         {
-            return command_buffer_;
+            return m_command_buffer;
         }
         bool isValid() const
         {
-            return command_buffer_ != VK_NULL_HANDLE;
+            return m_command_buffer != VK_NULL_HANDLE;
         }
         bool isRecording() const
         {
-            return state_ == State::Recording;
+            return m_state == EState::RECORDING;
         }
         bool isPending() const
         {
-            return state_ == State::Pending;
+            return m_state == EState::PENDING;
         }
 
         // Command buffer operations
@@ -55,19 +55,19 @@ namespace kera
         void markCompleted();
 
     private:
-        enum class State
+        enum class EState
         {
-            Uninitialized,
-            Ready,
-            Recording,
-            Executable,
-            Pending
+            UNINITIALIZED,
+            READY,
+            RECORDING,
+            EXECUTABLE,
+            PENDING
         };
 
-        VkDevice device_;
-        VkCommandPool command_pool_;
-        VkCommandBuffer command_buffer_;
-        State state_;
+        VkDevice m_device;
+        VkCommandPool m_command_pool;
+        VkCommandBuffer m_command_buffer;
+        EState m_state;
     };
 
 }  // namespace kera

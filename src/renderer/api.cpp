@@ -16,9 +16,9 @@
 struct KeraRenderer
 {
     std::unique_ptr<kera::IRenderer> renderer;
-    mutable std::vector<KeraRendererValidationIssue> validationIssues;
-    mutable std::vector<std::string> validationMessages;
-    mutable std::vector<std::string> validationNames;
+    mutable std::vector<KeraRendererValidationIssue> validation_issues;
+    mutable std::vector<std::string> validation_messages;
+    mutable std::vector<std::string> validation_names;
 };
 
 namespace
@@ -45,89 +45,89 @@ namespace
         return {handle.m_index, handle.m_generation};
     }
 
-    kera::BufferUsageKind fromKera(KeraBufferUsageKind value)
+    kera::EBufferUsageKind fromKera(KeraBufferUsageKind value)
     {
-        return static_cast<kera::BufferUsageKind>(value);
+        return static_cast<kera::EBufferUsageKind>(value);
     }
 
-    kera::MemoryAccess fromKera(KeraMemoryAccess value)
+    kera::EMemoryAccess fromKera(KeraMemoryAccess value)
     {
-        return static_cast<kera::MemoryAccess>(value);
+        return static_cast<kera::EMemoryAccess>(value);
     }
 
-    kera::IndexFormat fromKera(KeraIndexFormat value)
+    kera::EIndexFormat fromKera(KeraIndexFormat value)
     {
-        return static_cast<kera::IndexFormat>(value);
+        return static_cast<kera::EIndexFormat>(value);
     }
 
-    kera::VertexFormat fromKera(KeraVertexFormat value)
+    kera::EVertexFormat fromKera(KeraVertexFormat value)
     {
-        return static_cast<kera::VertexFormat>(value);
+        return static_cast<kera::EVertexFormat>(value);
     }
 
-    kera::VertexInputRate fromKera(KeraVertexInputRate value)
+    kera::EVertexInputRate fromKera(KeraVertexInputRate value)
     {
-        return static_cast<kera::VertexInputRate>(value);
+        return static_cast<kera::EVertexInputRate>(value);
     }
 
-    kera::DescriptorType fromKera(KeraDescriptorType value)
+    [[maybe_unused]] kera::EDescriptorType fromKera(KeraDescriptorType value)
     {
-        return static_cast<kera::DescriptorType>(value);
+        return static_cast<kera::EDescriptorType>(value);
     }
 
-    kera::TextureFormat fromKera(KeraTextureFormat value)
+    kera::ETextureFormat fromKera(KeraTextureFormat value)
     {
-        return static_cast<kera::TextureFormat>(value);
+        return static_cast<kera::ETextureFormat>(value);
     }
 
-    kera::SamplerFilter fromKera(KeraSamplerFilter value)
+    kera::ESamplerFilter fromKera(KeraSamplerFilter value)
     {
-        return static_cast<kera::SamplerFilter>(value);
+        return static_cast<kera::ESamplerFilter>(value);
     }
 
-    kera::SamplerMipFilter fromKera(KeraSamplerMipFilter value)
+    kera::ESamplerMipFilter fromKera(KeraSamplerMipFilter value)
     {
-        return static_cast<kera::SamplerMipFilter>(value);
+        return static_cast<kera::ESamplerMipFilter>(value);
     }
 
-    kera::SamplerAddressMode fromKera(KeraSamplerAddressMode value)
+    kera::ESamplerAddressMode fromKera(KeraSamplerAddressMode value)
     {
-        return static_cast<kera::SamplerAddressMode>(value);
+        return static_cast<kera::ESamplerAddressMode>(value);
     }
 
-    kera::PrimitiveTopologyKind fromKera(KeraPrimitiveTopologyKind value)
+    kera::EPrimitiveTopologyKind fromKera(KeraPrimitiveTopologyKind value)
     {
-        return static_cast<kera::PrimitiveTopologyKind>(value);
+        return static_cast<kera::EPrimitiveTopologyKind>(value);
     }
 
-    kera::CullModeKind fromKera(KeraCullModeKind value)
+    kera::ECullModeKind fromKera(KeraCullModeKind value)
     {
-        return static_cast<kera::CullModeKind>(value);
+        return static_cast<kera::ECullModeKind>(value);
     }
 
-    kera::FrontFaceKind fromKera(KeraFrontFaceKind value)
+    kera::EFrontFaceKind fromKera(KeraFrontFaceKind value)
     {
-        return static_cast<kera::FrontFaceKind>(value);
+        return static_cast<kera::EFrontFaceKind>(value);
     }
 
-    kera::BlendModeKind fromKera(KeraBlendModeKind value)
+    kera::EBlendModeKind fromKera(KeraBlendModeKind value)
     {
-        return static_cast<kera::BlendModeKind>(value);
+        return static_cast<kera::EBlendModeKind>(value);
     }
 
-    KeraIndexFormat toKera(kera::IndexFormat value)
+    KeraIndexFormat toKera(kera::EIndexFormat value)
     {
         return static_cast<KeraIndexFormat>(value);
     }
 
-    KeraGltfAlphaMode toKera(kera::GltfAlphaMode value)
+    KeraGltfAlphaMode toKera(kera::EGltfAlphaMode value)
     {
         return static_cast<KeraGltfAlphaMode>(value);
     }
 
-    kera::GltfAlphaMode fromKera(KeraGltfAlphaMode value)
+    [[maybe_unused]] kera::EGltfAlphaMode fromKera(KeraGltfAlphaMode value)
     {
-        return static_cast<kera::GltfAlphaMode>(value);
+        return static_cast<kera::EGltfAlphaMode>(value);
     }
 
     kera::Extent2D fromKera(KeraExtent2D value)
@@ -150,8 +150,8 @@ namespace
         return {
             .size = desc.size,
             .usage = fromKera(desc.usage),
-            .memoryAccess = fromKera(desc.memoryAccess),
-            .debugName = toString(desc.debugName),
+            .memory_access = fromKera(desc.memory_access),
+            .debug_name = toString(desc.debug_name),
         };
     }
 
@@ -161,50 +161,50 @@ namespace
             .width = desc.width,
             .height = desc.height,
             .format = fromKera(desc.format),
-            .mipLevels = desc.mipLevels == 0 ? 1u : desc.mipLevels,
-            .generateMipmaps = desc.generateMipmaps != 0,
-            .renderTarget = desc.renderTarget != 0,
+            .mip_levels = desc.mip_levels == 0 ? 1u : desc.mip_levels,
+            .generate_mipmaps = desc.generate_mipmaps != 0,
+            .render_target = desc.render_target != 0,
             .sampled = desc.sampled != 0,
-            .depthStencil = desc.depthStencil != 0,
-            .debugName = toString(desc.debugName),
+            .depth_stencil = desc.depth_stencil != 0,
+            .debug_name = toString(desc.debug_name),
         };
     }
 
     kera::SamplerDesc fromKera(const KeraSamplerDesc& desc)
     {
         return {
-            .minFilter = fromKera(desc.minFilter),
-            .magFilter = fromKera(desc.magFilter),
-            .mipFilter = fromKera(desc.mipFilter),
-            .addressModeU = fromKera(desc.addressModeU),
-            .addressModeV = fromKera(desc.addressModeV),
-            .minLod = desc.minLod,
-            .maxLod = desc.maxLod,
-            .maxAnisotropy = desc.maxAnisotropy == 0.0f ? 1.0f : desc.maxAnisotropy,
-            .debugName = toString(desc.debugName),
+            .min_filter = fromKera(desc.min_filter),
+            .mag_filter = fromKera(desc.mag_filter),
+            .mip_filter = fromKera(desc.mip_filter),
+            .address_mode_u = fromKera(desc.address_mode_u),
+            .address_mode_v = fromKera(desc.address_mode_v),
+            .min_lod = desc.min_lod,
+            .max_lod = desc.max_lod,
+            .max_anisotropy = desc.max_anisotropy == 0.0f ? 1.0f : desc.max_anisotropy,
+            .debug_name = toString(desc.debug_name),
         };
     }
 
     kera::RenderTargetDesc fromKera(const KeraRenderTargetDesc& desc)
     {
         return {
-            .colorTexture = fromKera<kera::TextureHandle>(desc.colorTexture),
-            .depthTexture = fromKera<kera::TextureHandle>(desc.depthTexture),
-            .debugName = toString(desc.debugName),
+            .color_texture = fromKera<kera::TextureHandle>(desc.color_texture),
+            .depth_texture = fromKera<kera::TextureHandle>(desc.depth_texture),
+            .debug_name = toString(desc.debug_name),
         };
     }
 
     std::vector<kera::ReflectedVertexBindingDesc> fromKeraVertexBindings(const KeraVertexInputLayout& layout)
     {
         std::vector<kera::ReflectedVertexBindingDesc> bindings;
-        bindings.reserve(layout.bindingCount);
-        for (size_t i = 0; i < layout.bindingCount; ++i)
+        bindings.reserve(layout.binding_count);
+        for (size_t i = 0; i < layout.binding_count; ++i)
         {
             const KeraVertexInputBindingDesc& binding = layout.bindings[i];
             bindings.push_back({
                 .binding = binding.binding,
                 .stride = binding.stride,
-                .inputRate = fromKera(binding.inputRate),
+                .input_rate = fromKera(binding.input_rate),
             });
         }
         return bindings;
@@ -213,13 +213,13 @@ namespace
     std::vector<kera::ReflectedVertexFieldDesc> fromKeraVertexFields(const KeraVertexInputLayout& layout)
     {
         std::vector<kera::ReflectedVertexFieldDesc> fields;
-        fields.reserve(layout.fieldCount);
-        for (size_t i = 0; i < layout.fieldCount; ++i)
+        fields.reserve(layout.field_count);
+        for (size_t i = 0; i < layout.field_count; ++i)
         {
             const KeraVertexInputFieldDesc& field = layout.fields[i];
             fields.push_back({
-                .parameterName = toString(field.parameterName),
-                .fieldName = toString(field.fieldName),
+                .parameter_name = toString(field.parameter_name),
+                .field_name = toString(field.field_name),
                 .binding = field.binding,
                 .offset = field.offset,
                 .format = fromKera(field.format),
@@ -231,46 +231,48 @@ namespace
     kera::GraphicsPipelineCreateDesc fromKera(const KeraGraphicsPipelineCreateDesc& desc)
     {
         return {
-            .shaderProgram = fromKera<kera::ShaderProgramHandle>(desc.shaderProgram),
-            .renderTarget = fromKera<kera::RenderTargetHandle>(desc.renderTarget),
+            .shader_program = fromKera<kera::ShaderProgramHandle>(desc.shader_program),
+            .render_target = fromKera<kera::RenderTargetHandle>(desc.render_target),
             .topology = fromKera(desc.topology),
-            .cullMode = fromKera(desc.cullMode),
-            .frontFace = fromKera(desc.frontFace),
-            .blendMode = fromKera(desc.blendMode),
-            .depthTest = desc.depthTest != 0,
-            .depthWrite = desc.depthWrite != 0,
-            .vertexBindings = fromKeraVertexBindings(desc.vertexInput),
-            .vertexFields = fromKeraVertexFields(desc.vertexInput),
-            .debugName = toString(desc.debugName),
+            .cull_mode = fromKera(desc.cull_mode),
+            .front_face = fromKera(desc.front_face),
+            .blend_mode = fromKera(desc.blend_mode),
+            .depth_test = desc.depth_test != 0,
+            .depth_write = desc.depth_write != 0,
+            .vertex_bindings = fromKeraVertexBindings(desc.vertex_input),
+            .vertex_fields = fromKeraVertexFields(desc.vertex_input),
+            .vertex_layout = {},
+            .descriptor_sets = {},
+            .debug_name = toString(desc.debug_name),
         };
     }
 
     KeraRendererValidationReport storeValidationReport(const KeraRenderer* renderer,
                                                        const kera::RendererValidationReport& report)
     {
-        renderer->validationIssues.clear();
-        renderer->validationMessages.clear();
-        renderer->validationNames.clear();
+        renderer->validation_issues.clear();
+        renderer->validation_messages.clear();
+        renderer->validation_names.clear();
 
-        renderer->validationIssues.reserve(report.issues.size());
-        renderer->validationMessages.reserve(report.issues.size());
-        renderer->validationNames.reserve(report.issues.size());
+        renderer->validation_issues.reserve(report.issues.size());
+        renderer->validation_messages.reserve(report.issues.size());
+        renderer->validation_names.reserve(report.issues.size());
 
         for (const kera::RendererValidationIssue& issue : report.issues)
         {
-            renderer->validationMessages.push_back(issue.message);
-            renderer->validationNames.push_back(issue.name);
-            renderer->validationIssues.push_back({
-                .message = toView(renderer->validationMessages.back()),
-                .name = toView(renderer->validationNames.back()),
+            renderer->validation_messages.push_back(issue.message);
+            renderer->validation_names.push_back(issue.name);
+            renderer->validation_issues.push_back({
+                .message = toView(renderer->validation_messages.back()),
+                .name = toView(renderer->validation_names.back()),
                 .set = issue.set,
                 .binding = issue.binding,
             });
         }
 
         return {
-            .issues = renderer->validationIssues.data(),
-            .issueCount = renderer->validationIssues.size(),
+            .issues = renderer->validation_issues.data(),
+            .issue_count = renderer->validation_issues.size(),
         };
     }
 
@@ -279,74 +281,74 @@ namespace
         return {
             .resources =
                 {
-                    .shaderModules = stats.resources.shaderModules,
-                    .shaderPrograms = stats.resources.shaderPrograms,
+                    .shader_modules = stats.resources.shader_modules,
+                    .shader_programs = stats.resources.shader_programs,
                     .buffers = stats.resources.buffers,
                     .textures = stats.resources.textures,
                     .samplers = stats.resources.samplers,
-                    .renderTargets = stats.resources.renderTargets,
-                    .graphicsPipelines = stats.resources.graphicsPipelines,
-                    .descriptorSets = stats.resources.descriptorSets,
+                    .render_targets = stats.resources.render_targets,
+                    .graphics_pipelines = stats.resources.graphics_pipelines,
+                    .descriptor_sets = stats.resources.descriptor_sets,
                     .frames = stats.resources.frames,
                 },
-            .drawCallsThisFrame = stats.drawCallsThisFrame,
-            .pipelinesBoundThisFrame = stats.pipelinesBoundThisFrame,
-            .descriptorSetsBoundThisFrame = stats.descriptorSetsBoundThisFrame,
-            .vertexBuffersBoundThisFrame = stats.vertexBuffersBoundThisFrame,
-            .indexBuffersBoundThisFrame = stats.indexBuffersBoundThisFrame,
-            .bufferUploadsThisFrame = stats.bufferUploadsThisFrame,
-            .textureUploadsThisFrame = stats.textureUploadsThisFrame,
-            .validationIssuesThisFrame = stats.validationIssuesThisFrame,
-            .frameIndex = stats.frameIndex,
+            .draw_calls_this_frame = stats.draw_calls_this_frame,
+            .pipelines_bound_this_frame = stats.pipelines_bound_this_frame,
+            .descriptor_sets_bound_this_frame = stats.descriptor_sets_bound_this_frame,
+            .vertex_buffers_bound_this_frame = stats.vertex_buffers_bound_this_frame,
+            .index_buffers_bound_this_frame = stats.index_buffers_bound_this_frame,
+            .buffer_uploads_this_frame = stats.buffer_uploads_this_frame,
+            .texture_uploads_this_frame = stats.texture_uploads_this_frame,
+            .validation_issues_this_frame = stats.validation_issues_this_frame,
+            .frame_index = stats.frame_index,
         };
     }
 
     KeraGltfLoadedModel toKera(const kera::GltfLoadedModel& model)
     {
         KeraGltfLoadedModel out{};
-        out.vertexBuffer = toKera(model.vertexBuffer);
-        out.indexBuffer = toKera(model.indexBuffer);
-        out.materialTextures.baseColor = toKera(model.materialTextures.baseColor);
-        out.materialTextures.metalRoughness = toKera(model.materialTextures.metalRoughness);
-        out.materialTextures.emissive = toKera(model.materialTextures.emissive);
-        out.materialTextures.occlusion = toKera(model.materialTextures.occlusion);
-        out.materialTextures.normal = toKera(model.materialTextures.normal);
-        out.materialSampler = toKera(model.materialSampler);
-        out.indexFormat = toKera(model.indexFormat);
-        out.indexCount = model.indexCount;
+        out.vertex_buffer = toKera(model.vertex_buffer);
+        out.index_buffer = toKera(model.index_buffer);
+        out.material_textures.base_color = toKera(model.material_textures.base_color);
+        out.material_textures.metal_roughness = toKera(model.material_textures.metal_roughness);
+        out.material_textures.emissive = toKera(model.material_textures.emissive);
+        out.material_textures.occlusion = toKera(model.material_textures.occlusion);
+        out.material_textures.normal = toKera(model.material_textures.normal);
+        out.material_sampler = toKera(model.material_sampler);
+        out.index_format = toKera(model.index_format);
+        out.index_count = model.index_count;
         const float* transform = &model.transform[0][0];
         for (size_t i = 0; i < 16; ++i)
         {
             out.transform[i] = transform[i];
         }
-        out.materialFactors.baseColor[0] = model.materialFactors.baseColor.r;
-        out.materialFactors.baseColor[1] = model.materialFactors.baseColor.g;
-        out.materialFactors.baseColor[2] = model.materialFactors.baseColor.b;
-        out.materialFactors.baseColor[3] = model.materialFactors.baseColor.a;
-        out.materialFactors.emissive[0] = model.materialFactors.emissive.x;
-        out.materialFactors.emissive[1] = model.materialFactors.emissive.y;
-        out.materialFactors.emissive[2] = model.materialFactors.emissive.z;
-        out.materialFactors.metallic = model.materialFactors.metallic;
-        out.materialFactors.roughness = model.materialFactors.roughness;
-        out.materialFactors.normalScale = model.materialFactors.normalScale;
-        out.materialFactors.occlusionStrength = model.materialFactors.occlusionStrength;
-        out.materialFactors.alphaCutoff = model.materialFactors.alphaCutoff;
-        out.materialFactors.alphaMode = toKera(model.materialFactors.alphaMode);
-        out.materialFactors.doubleSided = model.materialFactors.doubleSided ? 1u : 0u;
+        out.material_factors.base_color[0] = model.material_factors.base_color.r;
+        out.material_factors.base_color[1] = model.material_factors.base_color.g;
+        out.material_factors.base_color[2] = model.material_factors.base_color.b;
+        out.material_factors.base_color[3] = model.material_factors.base_color.a;
+        out.material_factors.emissive[0] = model.material_factors.emissive.x;
+        out.material_factors.emissive[1] = model.material_factors.emissive.y;
+        out.material_factors.emissive[2] = model.material_factors.emissive.z;
+        out.material_factors.metallic = model.material_factors.metallic;
+        out.material_factors.roughness = model.material_factors.roughness;
+        out.material_factors.normal_scale = model.material_factors.normal_scale;
+        out.material_factors.occlusion_strength = model.material_factors.occlusion_strength;
+        out.material_factors.alpha_cutoff = model.material_factors.alpha_cutoff;
+        out.material_factors.alpha_mode = toKera(model.material_factors.alpha_mode);
+        out.material_factors.double_sided = model.material_factors.double_sided ? 1u : 0u;
         return out;
     }
 
     kera::GltfLoadedModel fromKeraModel(const KeraGltfLoadedModel& model)
     {
         kera::GltfLoadedModel out{};
-        out.vertexBuffer = fromKera<kera::BufferHandle>(model.vertexBuffer);
-        out.indexBuffer = fromKera<kera::BufferHandle>(model.indexBuffer);
-        out.materialTextures.baseColor = fromKera<kera::TextureHandle>(model.materialTextures.baseColor);
-        out.materialTextures.metalRoughness = fromKera<kera::TextureHandle>(model.materialTextures.metalRoughness);
-        out.materialTextures.emissive = fromKera<kera::TextureHandle>(model.materialTextures.emissive);
-        out.materialTextures.occlusion = fromKera<kera::TextureHandle>(model.materialTextures.occlusion);
-        out.materialTextures.normal = fromKera<kera::TextureHandle>(model.materialTextures.normal);
-        out.materialSampler = fromKera<kera::SamplerHandle>(model.materialSampler);
+        out.vertex_buffer = fromKera<kera::BufferHandle>(model.vertex_buffer);
+        out.index_buffer = fromKera<kera::BufferHandle>(model.index_buffer);
+        out.material_textures.base_color = fromKera<kera::TextureHandle>(model.material_textures.base_color);
+        out.material_textures.metal_roughness = fromKera<kera::TextureHandle>(model.material_textures.metal_roughness);
+        out.material_textures.emissive = fromKera<kera::TextureHandle>(model.material_textures.emissive);
+        out.material_textures.occlusion = fromKera<kera::TextureHandle>(model.material_textures.occlusion);
+        out.material_textures.normal = fromKera<kera::TextureHandle>(model.material_textures.normal);
+        out.material_sampler = fromKera<kera::SamplerHandle>(model.material_sampler);
         return out;
     }
 
@@ -360,12 +362,12 @@ namespace
     KeraIblEnvironment toKera(const kera::IblEnvironment& value)
     {
         return {
-            .iblTexture = toKera(value.iblTexture),
-            .skyboxTexture = toKera(value.skyboxTexture),
+            .ibl_texture = toKera(value.ibl_texture),
+            .skybox_texture = toKera(value.skybox_texture),
             .sampler = toKera(value.sampler),
-            .sphericalHarmonics = toKera(value.sphericalHarmonics),
-            .iblMipLevels = value.iblMiplevels,
-            .skyboxMipLevels = value.skyboxMiplevels,
+            .spherical_harmonics = toKera(value.spherical_harmonics),
+            .ibl_mip_levels = value.ibl_miplevels,
+            .skybox_mip_levels = value.skybox_miplevels,
         };
     }
 
@@ -379,42 +381,42 @@ namespace
     kera::IblEnvironment fromKera(const KeraIblEnvironment& value)
     {
         return {
-            .iblTexture = fromKera<kera::TextureHandle>(value.iblTexture),
-            .skyboxTexture = fromKera<kera::TextureHandle>(value.skyboxTexture),
+            .ibl_texture = fromKera<kera::TextureHandle>(value.ibl_texture),
+            .skybox_texture = fromKera<kera::TextureHandle>(value.skybox_texture),
             .sampler = fromKera<kera::SamplerHandle>(value.sampler),
-            .sphericalHarmonics = fromKera(value.sphericalHarmonics),
-            .iblMiplevels = value.iblMipLevels,
-            .skyboxMiplevels = value.skyboxMipLevels,
+            .spherical_harmonics = fromKera(value.spherical_harmonics),
+            .ibl_miplevels = value.ibl_mip_levels,
+            .skybox_miplevels = value.skybox_mip_levels,
         };
     }
 
     KeraUniformRingBufferInfo toKera(const kera::UniformRingBufferInfo& value)
     {
         return {
-            .elementSize = value.elementSize,
-            .slotStride = value.slotStride,
-            .slotCount = value.slotCount,
+            .element_size = value.element_size,
+            .slot_stride = value.slot_stride,
+            .slot_count = value.slot_count,
         };
     }
 
-    kera::UniformRingBufferInfo fromKera(const KeraUniformRingBufferInfo& value)
+    [[maybe_unused]] kera::UniformRingBufferInfo fromKera(const KeraUniformRingBufferInfo& value)
     {
         return {
-            .elementSize = value.elementSize,
-            .slotStride = value.slotStride,
-            .slotCount = value.slotCount,
+            .element_size = value.element_size,
+            .slot_stride = value.slot_stride,
+            .slot_count = value.slot_count,
         };
     }
 
     KeraRenderer* createRenderer(const KeraRendererCreateDesc* desc)
     {
-        if (!desc || !desc->sdlWindow || desc->backend != KERA_GRAPHICS_BACKEND_VULKAN)
+        if (!desc || !desc->sdl_window || desc->backend != KERA_GRAPHICS_BACKEND_VULKAN)
         {
             return nullptr;
         }
 
         auto renderer = std::make_unique<kera::VulkanRenderer>();
-        if (!renderer->initialize(static_cast<SDL_Window*>(desc->sdlWindow), desc->width, desc->height))
+        if (!renderer->initialize(static_cast<SDL_Window*>(desc->sdl_window), desc->width, desc->height))
         {
             return nullptr;
         }
@@ -472,11 +474,11 @@ namespace
         if (renderer && renderer->renderer) renderer->renderer->shutdownUi();
     }
 
-    void handleUiEvent(KeraRenderer* renderer, const void* sdlEvent)
+    void handleUiEvent(KeraRenderer* renderer, const void* sdl_event)
     {
-        if (renderer && renderer->renderer && sdlEvent)
+        if (renderer && renderer->renderer && sdl_event)
         {
-            renderer->renderer->handleUiEvent(*static_cast<const SDL_Event*>(sdlEvent));
+            renderer->renderer->handleUiEvent(*static_cast<const SDL_Event*>(sdl_event));
         }
     }
 
@@ -506,10 +508,10 @@ namespace
         if (!renderer || !renderer->renderer || !desc) return {};
         return toKera(renderer->renderer->createGraphicsShaderProgram({
             .path = toString(desc->path),
-            .vertexEntryPoint = toString(desc->vertexEntryPoint),
-            .fragmentEntryPoint = toString(desc->fragmentEntryPoint),
-            .source = static_cast<kera::ShaderSourceKind>(desc->source),
-            .debugName = toString(desc->debugName),
+            .vertex_entry_point = toString(desc->vertex_entry_point),
+            .fragment_entry_point = toString(desc->fragment_entry_point),
+            .source = static_cast<kera::EShaderSourceKind>(desc->source),
+            .debug_name = toString(desc->debug_name),
         }));
     }
 
@@ -527,10 +529,10 @@ namespace
                                                       : KeraBufferHandle{};
     }
 
-    KeraBufferHandle createUniformRingBuffer(KeraRenderer* renderer, size_t elementSize, uint32_t slotCount)
+    KeraBufferHandle createUniformRingBuffer(KeraRenderer* renderer, size_t element_size, uint32_t slot_count)
     {
         return renderer && renderer->renderer
-                   ? toKera(renderer->renderer->createUniformRingBuffer(elementSize, slotCount))
+                   ? toKera(renderer->renderer->createUniformRingBuffer(element_size, slot_count))
                    : KeraBufferHandle{};
     }
 
@@ -656,8 +658,8 @@ namespace
     }
 
     KeraRendererValidationReport validateVertexInputLayout(const KeraRenderer* renderer,
-                                                           KeraShaderProgramHandle shaderProgram,
-                                                           KeraVertexInputLayout vertexInput)
+                                                           KeraShaderProgramHandle shader_program,
+                                                           KeraVertexInputLayout vertex_input)
     {
         if (!renderer || !renderer->renderer)
         {
@@ -666,18 +668,18 @@ namespace
 
         kera::RendererValidationReport report;
         const kera::SlangReflectionMetadata* reflection =
-            renderer->renderer->getShaderProgramReflection(fromKera<kera::ShaderProgramHandle>(shaderProgram));
+            renderer->renderer->getShaderProgramReflection(fromKera<kera::ShaderProgramHandle>(shader_program));
         if (!reflection)
         {
             report.addIssue("Shader program reflection is missing while validating vertex input layout.");
             return storeValidationReport(renderer, report);
         }
 
-        const std::vector<kera::ReflectedVertexBindingDesc> bindings = fromKeraVertexBindings(vertexInput);
-        const std::vector<kera::ReflectedVertexFieldDesc> fields = fromKeraVertexFields(vertexInput);
+        const std::vector<kera::ReflectedVertexBindingDesc> bindings = fromKeraVertexBindings(vertex_input);
+        const std::vector<kera::ReflectedVertexFieldDesc> fields = fromKeraVertexFields(vertex_input);
         const kera::VertexInputLayoutBuildResult result =
             kera::buildValidatedVertexInputLayout(*reflection, {
-                                                                   .debugName = {},
+                                                                   .debug_name = {},
                                                                    .bindings = bindings,
                                                                    .fields = fields,
                                                                });
@@ -772,7 +774,7 @@ namespace
         {
             renderer->renderer->beginRenderPass(
                 fromKera<kera::FrameHandle>(frame),
-                {.clearColor = fromKera(desc->clearColor), .clearDepth = desc->clearDepth});
+                {.clear_color = fromKera(desc->clear_color), .clear_depth = desc->clear_depth});
         }
     }
 
@@ -783,7 +785,7 @@ namespace
         {
             renderer->renderer->beginRenderPass(
                 fromKera<kera::FrameHandle>(frame), fromKera<kera::RenderTargetHandle>(target),
-                {.clearColor = fromKera(desc->clearColor), .clearDepth = desc->clearDepth});
+                {.clear_color = fromKera(desc->clear_color), .clear_depth = desc->clear_depth});
         }
     }
 
@@ -822,21 +824,21 @@ namespace
     }
 
     void bindDescriptorSet(KeraRenderer* renderer, KeraFrameHandle frame, KeraGraphicsPipelineHandle pipeline,
-                           uint32_t setIndex, KeraDescriptorSetHandle descriptorSet)
+                           uint32_t set_index, KeraDescriptorSetHandle descriptor_set)
     {
         if (renderer && renderer->renderer)
         {
             renderer->renderer->bindDescriptorSet(fromKera<kera::FrameHandle>(frame),
-                                                  fromKera<kera::GraphicsPipelineHandle>(pipeline), setIndex,
-                                                  fromKera<kera::DescriptorSetHandle>(descriptorSet));
+                                                  fromKera<kera::GraphicsPipelineHandle>(pipeline), set_index,
+                                                  fromKera<kera::DescriptorSetHandle>(descriptor_set));
         }
     }
 
-    void drawIndexed(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t indexCount, uint32_t instanceCount)
+    void drawIndexed(KeraRenderer* renderer, KeraFrameHandle frame, uint32_t index_count, uint32_t instance_count)
     {
         if (renderer && renderer->renderer)
         {
-            renderer->renderer->drawIndexed(fromKera<kera::FrameHandle>(frame), indexCount, instanceCount);
+            renderer->renderer->drawIndexed(fromKera<kera::FrameHandle>(frame), index_count, instance_count);
         }
     }
 
@@ -846,26 +848,26 @@ namespace
                                                                                                                   : 0;
     }
 
-    int loadGltfModel(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedModel* outModel)
+    int loadGltfModel(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedModel* out_model)
     {
-        if (!renderer || !renderer->renderer || !desc || !outModel)
+        if (!renderer || !renderer->renderer || !desc || !out_model)
         {
             return 0;
         }
 
-        kera::GltfLoadDesc loadDesc{
+        kera::GltfLoadDesc load_desc{
             .path = toString(desc->path),
-            .debugName = toString(desc->debugName),
-            .requireMaterialTextures = desc->requireMaterialTextures != 0,
+            .debug_name = toString(desc->debug_name),
+            .require_material_textures = desc->require_material_textures != 0,
         };
-        kera::RendererResult<kera::GltfLoadedModel> result = kera::loadGltfModel(*renderer->renderer, loadDesc);
+        kera::RendererResult<kera::GltfLoadedModel> result = kera::loadGltfModel(*renderer->renderer, load_desc);
         if (!result)
         {
             kera::Logger::getInstance().error("glTF load failed: " + result.errorMessage());
             return 0;
         }
 
-        *outModel = toKera(result.value());
+        *out_model = toKera(result.value());
         return 1;
     }
 
@@ -875,32 +877,32 @@ namespace
         {
             return;
         }
-        kera::GltfLoadedModel internalModel = fromKeraModel(*model);
-        kera::destroyGltfModel(*renderer->renderer, internalModel);
+        kera::GltfLoadedModel internal_model = fromKeraModel(*model);
+        kera::destroyGltfModel(*renderer->renderer, internal_model);
         *model = {};
     }
 
     int loadIblEnvironment(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
-                           KeraIblEnvironment* outEnvironment)
+                           KeraIblEnvironment* out_environment)
     {
-        if (!renderer || !renderer->renderer || !desc || !outEnvironment)
+        if (!renderer || !renderer->renderer || !desc || !out_environment)
         {
             return 0;
         }
 
-        kera::IblEnvironmentLoadDesc loadDesc{.iblKtxPath = toString(desc->iblKtxPath),
-                                              .skyboxKtxPath = toString(desc->skyboxKtxPath),
-                                              .sphericalHarmonicsPath = toString(desc->sphericalHarmonicsPath),
-                                              .debugName = toString(desc->debugName)};
+        kera::IblEnvironmentLoadDesc load_desc{.ibl_ktx_path = toString(desc->ibl_ktx_path),
+                                               .skybox_ktx_path = toString(desc->skybox_ktx_path),
+                                               .spherical_harmonics_path = toString(desc->spherical_harmonics_path),
+                                               .debug_name = toString(desc->debug_name)};
 
-        kera::RendererResult<kera::IblEnvironment> result = kera::loadIblEnvironment(*renderer->renderer, loadDesc);
+        kera::RendererResult<kera::IblEnvironment> result = kera::loadIblEnvironment(*renderer->renderer, load_desc);
         if (!result)
         {
             kera::Logger::getInstance().error("IBL environment load failed: " + result.errorMessage());
             return 0;
         }
 
-        *outEnvironment = toKera(result.value());
+        *out_environment = toKera(result.value());
         return 1;
     }
 
@@ -911,76 +913,76 @@ namespace
             return;
         }
 
-        kera::IblEnvironment internalEnv = fromKera(*environment);
-        kera::destroyIblEnvironment(*renderer->renderer, internalEnv);
+        kera::IblEnvironment internal_env = fromKera(*environment);
+        kera::destroyIblEnvironment(*renderer->renderer, internal_env);
         *environment = {};
     }
 
-    const KeraRendererApiV1 g_api{
-        .abiVersion = KERA_RENDERER_ABI_VERSION,
-        .createRenderer = createRenderer,
+    const KeraRendererApiV1 kGApi{
+        .abi_version = KERA_RENDERER_ABI_VERSION,
+        .create_renderer = createRenderer,
         .destroy = destroy,
         .shutdown = shutdown,
-        .getBackend = getBackend,
-        .getDrawableExtent = getDrawableExtent,
-        .getStats = getStats,
+        .get_backend = getBackend,
+        .get_drawable_extent = getDrawableExtent,
+        .get_stats = getStats,
         .resize = resize,
-        .initializeUi = initializeUi,
-        .shutdownUi = shutdownUi,
-        .handleUiEvent = handleUiEvent,
-        .beginUi = beginUi,
-        .endUi = endUi,
-        .renderUi = renderUi,
-        .isUiAvailable = isUiAvailable,
-        .createGraphicsShaderProgram = createGraphicsShaderProgram,
-        .destroyShaderProgram = destroyShaderProgram,
-        .createBuffer = createBuffer,
-        .createUniformRingBuffer = createUniformRingBuffer,
-        .destroyBuffer = destroyBuffer,
-        .mapBuffer = mapBuffer,
-        .unmapBuffer = unmapBuffer,
-        .uploadBuffer = uploadBuffer,
-        .uploadUniformRingBuffer = uploadUniformRingBuffer,
-        .getUniformRingBufferInfo = getUniformRingBufferInfo,
-        .getUniformRingBufferSlot = getUniformRingBufferSlot,
-        .getUniformRingBufferSlotOffset = getUniformRingBufferSlotOffset,
-        .createTexture = createTexture,
-        .uploadTexture = uploadTexture,
-        .destroyTexture = destroyTexture,
-        .createSampler = createSampler,
-        .destroySampler = destroySampler,
-        .createRenderTarget = createRenderTarget,
-        .destroyRenderTarget = destroyRenderTarget,
-        .validateVertexInputLayout = validateVertexInputLayout,
-        .createGraphicsPipeline = createGraphicsPipeline,
-        .destroyGraphicsPipeline = destroyGraphicsPipeline,
-        .createDescriptorSet = createDescriptorSet,
-        .destroyDescriptorSet = destroyDescriptorSet,
-        .updateDescriptorBuffer = updateDescriptorBuffer,
-        .updateDescriptorTexture = updateDescriptorTexture,
-        .updateDescriptorSampler = updateDescriptorSampler,
-        .validateDescriptorSet = validateDescriptorSet,
-        .setDebugName = setDebugName,
-        .beginFrame = beginFrame,
-        .beginRenderPass = beginRenderPass,
-        .beginRenderPassTarget = beginRenderPassTarget,
-        .endRenderPass = endRenderPass,
-        .bindPipeline = bindPipeline,
-        .bindVertexBuffer = bindVertexBuffer,
-        .bindIndexBuffer = bindIndexBuffer,
-        .bindDescriptorSet = bindDescriptorSet,
-        .drawIndexed = drawIndexed,
-        .endFrame = endFrame,
-        .loadGltfModel = loadGltfModel,
-        .destroyGltfModel = destroyGltfModel,
-        .loadIblEnvironment = loadIblEnvironment,
-        .destroyIblEnvironment = destroyIblEnvironment,
+        .initialize_ui = initializeUi,
+        .shutdown_ui = shutdownUi,
+        .handle_ui_event = handleUiEvent,
+        .begin_ui = beginUi,
+        .end_ui = endUi,
+        .render_ui = renderUi,
+        .is_ui_available = isUiAvailable,
+        .create_graphics_shader_program = createGraphicsShaderProgram,
+        .destroy_shader_program = destroyShaderProgram,
+        .create_buffer = createBuffer,
+        .create_uniform_ring_buffer = createUniformRingBuffer,
+        .destroy_buffer = destroyBuffer,
+        .map_buffer = mapBuffer,
+        .unmap_buffer = unmapBuffer,
+        .upload_buffer = uploadBuffer,
+        .upload_uniform_ring_buffer = uploadUniformRingBuffer,
+        .get_uniform_ring_buffer_info = getUniformRingBufferInfo,
+        .get_uniform_ring_buffer_slot = getUniformRingBufferSlot,
+        .get_uniform_ring_buffer_slot_offset = getUniformRingBufferSlotOffset,
+        .create_texture = createTexture,
+        .upload_texture = uploadTexture,
+        .destroy_texture = destroyTexture,
+        .create_sampler = createSampler,
+        .destroy_sampler = destroySampler,
+        .create_render_target = createRenderTarget,
+        .destroy_render_target = destroyRenderTarget,
+        .validate_vertex_input_layout = validateVertexInputLayout,
+        .create_graphics_pipeline = createGraphicsPipeline,
+        .destroy_graphics_pipeline = destroyGraphicsPipeline,
+        .create_descriptor_set = createDescriptorSet,
+        .destroy_descriptor_set = destroyDescriptorSet,
+        .update_descriptor_buffer = updateDescriptorBuffer,
+        .update_descriptor_texture = updateDescriptorTexture,
+        .update_descriptor_sampler = updateDescriptorSampler,
+        .validate_descriptor_set = validateDescriptorSet,
+        .set_debug_name = setDebugName,
+        .begin_frame = beginFrame,
+        .begin_render_pass = beginRenderPass,
+        .begin_render_pass_target = beginRenderPassTarget,
+        .end_render_pass = endRenderPass,
+        .bind_pipeline = bindPipeline,
+        .bind_vertex_buffer = bindVertexBuffer,
+        .bind_index_buffer = bindIndexBuffer,
+        .bind_descriptor_set = bindDescriptorSet,
+        .draw_indexed = drawIndexed,
+        .end_frame = endFrame,
+        .load_gltf_model = loadGltfModel,
+        .destroy_gltf_model = destroyGltfModel,
+        .load_ibl_environment = loadIblEnvironment,
+        .destroy_ibl_environment = destroyIblEnvironment,
     };
 }  // namespace
 
 const KeraRendererApiV1* keraGetRendererApiV1(void)
 {
-    return &g_api;
+    return &kGApi;
 }
 
 void keraLog(KeraLogLevel level, KeraStringView message)

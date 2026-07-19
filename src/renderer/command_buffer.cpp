@@ -1,4 +1,4 @@
-// Copyright 2026 Tomas Mikalauskas
+﻿// Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/command_buffer.h"
@@ -14,10 +14,10 @@ namespace kera
 {
 
     CommandBuffer::CommandBuffer()
-        : device_(VK_NULL_HANDLE)
-        , command_pool_(VK_NULL_HANDLE)
-        , command_buffer_(VK_NULL_HANDLE)
-        , state_(State::Uninitialized)
+        : m_device(VK_NULL_HANDLE)
+        , m_command_pool(VK_NULL_HANDLE)
+        , m_command_buffer(VK_NULL_HANDLE)
+        , m_state(EState::UNINITIALIZED)
     {
     }
 
@@ -27,15 +27,15 @@ namespace kera
     }
 
     CommandBuffer::CommandBuffer(CommandBuffer&& other) noexcept
-        : device_(other.device_)
-        , command_pool_(other.command_pool_)
-        , command_buffer_(other.command_buffer_)
-        , state_(other.state_)
+        : m_device(other.m_device)
+        , m_command_pool(other.m_command_pool)
+        , m_command_buffer(other.m_command_buffer)
+        , m_state(other.m_state)
     {
-        other.device_ = VK_NULL_HANDLE;
-        other.command_pool_ = VK_NULL_HANDLE;
-        other.command_buffer_ = VK_NULL_HANDLE;
-        other.state_ = State::Uninitialized;
+        other.m_device = VK_NULL_HANDLE;
+        other.m_command_pool = VK_NULL_HANDLE;
+        other.m_command_buffer = VK_NULL_HANDLE;
+        other.m_state = EState::UNINITIALIZED;
     }
 
     CommandBuffer& CommandBuffer::operator=(CommandBuffer&& other) noexcept
@@ -43,153 +43,153 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            device_ = other.device_;
-            command_pool_ = other.command_pool_;
-            command_buffer_ = other.command_buffer_;
-            state_ = other.state_;
-            other.device_ = VK_NULL_HANDLE;
-            other.command_pool_ = VK_NULL_HANDLE;
-            other.command_buffer_ = VK_NULL_HANDLE;
-            other.state_ = State::Uninitialized;
+            m_device = other.m_device;
+            m_command_pool = other.m_command_pool;
+            m_command_buffer = other.m_command_buffer;
+            m_state = other.m_state;
+            other.m_device = VK_NULL_HANDLE;
+            other.m_command_pool = VK_NULL_HANDLE;
+            other.m_command_buffer = VK_NULL_HANDLE;
+            other.m_state = EState::UNINITIALIZED;
         }
         return *this;
     }
 
     bool CommandBuffer::initialize(const Device& device)
     {
-        if (command_buffer_)
+        if (m_command_buffer)
         {
             shutdown();
         }
 
-        device_ = device.getVulkanDevice();
-        command_pool_ = device.getCommandPool();
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = command_pool_;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
+        m_device = device.getVulkanDevice();
+        m_command_pool = device.getCommandPool();
+        VkCommandBufferAllocateInfo alloc_info{};
+        alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        alloc_info.commandPool = m_command_pool;
+        alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        alloc_info.commandBufferCount = 1;
 
-        VkResult result = vkAllocateCommandBuffers(device.getVulkanDevice(), &allocInfo, &command_buffer_);
+        VkResult result = vkAllocateCommandBuffers(device.getVulkanDevice(), &alloc_info, &m_command_buffer);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to allocate command buffer: " + std::to_string(result));
-            state_ = State::Uninitialized;
+            m_state = EState::UNINITIALIZED;
             return false;
         }
 
-        state_ = State::Ready;
+        m_state = EState::READY;
         return true;
     }
 
     void CommandBuffer::shutdown()
     {
-        if (command_buffer_)
+        if (m_command_buffer)
         {
-            vkFreeCommandBuffers(device_, command_pool_, 1, &command_buffer_);
-            command_buffer_ = VK_NULL_HANDLE;
+            vkFreeCommandBuffers(m_device, m_command_pool, 1, &m_command_buffer);
+            m_command_buffer = VK_NULL_HANDLE;
         }
-        command_pool_ = VK_NULL_HANDLE;
-        device_ = VK_NULL_HANDLE;
-        state_ = State::Uninitialized;
+        m_command_pool = VK_NULL_HANDLE;
+        m_device = VK_NULL_HANDLE;
+        m_state = EState::UNINITIALIZED;
     }
 
     bool CommandBuffer::begin()
     {
-        if (!command_buffer_)
+        if (!m_command_buffer)
         {
             Logger::getInstance().error("Cannot begin an uninitialized Vulkan command buffer.");
             return false;
         }
 
-        if (state_ != State::Ready)
+        if (m_state != EState::READY)
         {
             Logger::getInstance().error("Cannot begin a Vulkan command buffer that is not ready.");
             return false;
         }
 
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        VkCommandBufferBeginInfo begin_info{};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        VkResult result = vkBeginCommandBuffer(command_buffer_, &beginInfo);
+        VkResult result = vkBeginCommandBuffer(m_command_buffer, &begin_info);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to begin Vulkan command buffer: " + std::to_string(result));
             return false;
         }
 
-        state_ = State::Recording;
+        m_state = EState::RECORDING;
         return true;
     }
 
     bool CommandBuffer::end()
     {
-        if (!command_buffer_)
+        if (!m_command_buffer)
         {
             Logger::getInstance().error("Cannot end an uninitialized Vulkan command buffer.");
             return false;
         }
 
-        if (state_ != State::Recording)
+        if (m_state != EState::RECORDING)
         {
             Logger::getInstance().error("Cannot end a Vulkan command buffer that is not recording.");
             return false;
         }
 
-        VkResult result = vkEndCommandBuffer(command_buffer_);
+        VkResult result = vkEndCommandBuffer(m_command_buffer);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to end Vulkan command buffer: " + std::to_string(result));
             return false;
         }
 
-        state_ = State::Executable;
+        m_state = EState::EXECUTABLE;
         return true;
     }
 
     bool CommandBuffer::reset()
     {
-        if (!command_buffer_)
+        if (!m_command_buffer)
         {
             Logger::getInstance().error("Cannot reset an uninitialized Vulkan command buffer.");
             return false;
         }
 
-        if (state_ == State::Pending)
+        if (m_state == EState::PENDING)
         {
             Logger::getInstance().error("Cannot reset a pending Vulkan command buffer.");
             return false;
         }
 
-        VkResult result = vkResetCommandBuffer(command_buffer_, 0);
+        VkResult result = vkResetCommandBuffer(m_command_buffer, 0);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to reset Vulkan command buffer: " + std::to_string(result));
             return false;
         }
 
-        state_ = State::Ready;
+        m_state = EState::READY;
         return true;
     }
 
     bool CommandBuffer::markSubmitted()
     {
-        if (state_ != State::Executable)
+        if (m_state != EState::EXECUTABLE)
         {
             Logger::getInstance().error("Cannot mark a Vulkan command buffer submitted before it is executable.");
             return false;
         }
 
-        state_ = State::Pending;
+        m_state = EState::PENDING;
         return true;
     }
 
     void CommandBuffer::markCompleted()
     {
-        if (state_ == State::Pending)
+        if (m_state == EState::PENDING)
         {
-            state_ = State::Executable;
+            m_state = EState::EXECUTABLE;
         }
     }
 

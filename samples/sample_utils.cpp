@@ -39,14 +39,14 @@ namespace kera
         }
     }  // namespace
 
-    std::string resolveShaderPath(const std::string& shaderPath)
+    std::string resolveShaderPath(const std::string& shader_path)
     {
-        return resolveSampleFilePath(shaderPath);
+        return resolveSampleFilePath(shader_path);
     }
 
-    std::string resolveSampleAssetPath(const std::string& assetPath)
+    std::string resolveSampleAssetPath(const std::string& asset_path)
     {
-        return resolveSampleFilePath(assetPath);
+        return resolveSampleFilePath(asset_path);
     }
 
     KeraStringView sampleStringView(const std::string& text)
@@ -91,8 +91,8 @@ namespace kera
 
     const std::array<uint16_t, 3>& fullscreenTriangleIndices()
     {
-        static constexpr std::array<uint16_t, 3> indices = {0, 1, 2};
-        return indices;
+        static constexpr std::array<uint16_t, 3> kIndices = {0, 1, 2};
+        return kIndices;
     }
 
 }  // namespace kera

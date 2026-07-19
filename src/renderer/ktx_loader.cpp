@@ -15,28 +15,28 @@
 
 namespace kera
 {
-    constexpr uint8_t KtxIndetifier[12] = {0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
-    constexpr uint32_t KtxEndianLittle = 0x04030201;
-    constexpr uint32_t GlRgb10A2LikePackedFloat = 0x8C3A;
-    constexpr uint32_t KtxFaceCountCube = 6;
+    constexpr uint8_t kKtxIndetifier[12] = {0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
+    constexpr uint32_t kKtxEndianLittle = 0x04030201;
+    constexpr uint32_t kGlRgb10A2LikePackedFloat = 0x8C3A;
+    constexpr uint32_t kKtxFaceCountCube = 6;
 
 #pragma pack(push, 1)
     struct KtxHeader
     {
         uint8_t identifier[12];
         uint32_t endianness;
-        uint32_t glType;
-        uint32_t glTypeSize;
-        uint32_t glFormat;
-        uint32_t glInternalFormat;
-        uint32_t glBaseInternalFormat;
-        uint32_t pixelWidth;
-        uint32_t pixelHeight;
-        uint32_t pixelDepth;
-        uint32_t numberOfArrayElements;
-        uint32_t numberOfFaces;
-        uint32_t numberOfMipmapLevels;
-        uint32_t bytesOfKeyValueData;
+        uint32_t gl_type;
+        uint32_t gl_type_size;
+        uint32_t gl_format;
+        uint32_t gl_internal_format;
+        uint32_t gl_base_internal_format;
+        uint32_t pixel_width;
+        uint32_t pixel_height;
+        uint32_t pixel_depth;
+        uint32_t number_of_array_elements;
+        uint32_t number_of_faces;
+        uint32_t number_of_mipmap_levels;
+        uint32_t bytes_of_key_value_data;
     };
 #pragma pack(pop)
 
@@ -44,8 +44,8 @@ namespace kera
     {
         uint32_t width = 0;
         uint32_t height = 0;
-        uint32_t mipLevels = 1;
-        TextureFormat format = TextureFormat::B10G11R11Ufloat;
+        uint32_t mip_levels = 1;
+        ETextureFormat format = ETextureFormat::B10_G11_R11_UFLOAT;
 
         std::vector<uint8_t> bytes;
         std::vector<TextureSubresourceUpload> subresources;
@@ -91,44 +91,44 @@ namespace kera
         KtxHeader header{};
         std::memcpy(&header, bytes.data(), sizeof(KtxHeader));
 
-        if (std::memcmp(header.identifier, KtxIndetifier, sizeof(KtxIndetifier)) != 0)
+        if (std::memcmp(header.identifier, kKtxIndetifier, sizeof(kKtxIndetifier)) != 0)
         {
             error = "KTX file has invalid identifier: " + path.string();
             return false;
         }
 
-        if (header.endianness != KtxEndianLittle)
+        if (header.endianness != kKtxEndianLittle)
         {
             error = "KTX file has unsupported endianness: " + path.string();
             return false;
         }
 
-        if (header.numberOfFaces != KtxFaceCountCube)
+        if (header.number_of_faces != kKtxFaceCountCube)
         {
             error = "KTX file is not a cube map: " + path.string();
             return false;
         }
 
-        if (header.pixelDepth != 0 || header.numberOfArrayElements != 0)
+        if (header.pixel_depth != 0 || header.number_of_array_elements != 0)
         {
             error = "Only non-array 2D cubemaps are supported: " + path.string();
             return false;
         }
 
-        if (header.glInternalFormat != GlRgb10A2LikePackedFloat)
+        if (header.gl_internal_format != kGlRgb10A2LikePackedFloat)
         {
             error = "KTX file has unsupported internal format: " + path.string();
             return false;
         }
 
-        const uint32_t mipLevels = header.numberOfMipmapLevels == 0 ? 1u : header.numberOfMipmapLevels;
+        const uint32_t mip_levels = header.number_of_mipmap_levels == 0 ? 1u : header.number_of_mipmap_levels;
         size_t offset = sizeof(KtxHeader);
-        offset += header.bytesOfKeyValueData;
+        offset += header.bytes_of_key_value_data;
 
         std::vector<TextureSubresourceUpload> subresources;
-        subresources.reserve(static_cast<size_t>(mipLevels) * KtxFaceCountCube);
+        subresources.reserve(static_cast<size_t>(mip_levels) * kKtxFaceCountCube);
 
-        for (uint32_t mip = 0; mip < mipLevels; ++mip)
+        for (uint32_t mip = 0; mip < mip_levels; ++mip)
         {
             if (offset + sizeof(uint32_t) > bytes.size())
             {
@@ -136,39 +136,39 @@ namespace kera
                 return false;
             }
 
-            uint32_t imageSize = 0;
-            std::memcpy(&imageSize, bytes.data() + offset, sizeof(uint32_t));
+            uint32_t image_size = 0;
+            std::memcpy(&image_size, bytes.data() + offset, sizeof(uint32_t));
             offset += sizeof(uint32_t);
 
-            const uint32_t mipWidth = std::max(1u, header.pixelWidth >> mip);
-            const uint32_t mipHeight = std::max(1u, header.pixelHeight >> mip);
-            const size_t faceSize = imageSize;
+            const uint32_t mip_width = std::max(1u, header.pixel_width >> mip);
+            const uint32_t mip_height = std::max(1u, header.pixel_height >> mip);
+            const size_t face_size = image_size;
 
-            for (uint32_t face = 0; face < KtxFaceCountCube; ++face)
+            for (uint32_t face = 0; face < kKtxFaceCountCube; ++face)
             {
-                if (offset + faceSize > bytes.size())
+                if (offset + face_size > bytes.size())
                 {
                     error = "Unexpected end of KTX face payload: " + path.string();
                     return false;
                 }
 
-                TextureSubresourceUpload subresource{.mipLevel = mip,
-                                                     .arrayLayer = face,
-                                                     .width = mipWidth,
-                                                     .height = mipHeight,
+                TextureSubresourceUpload subresource{.mip_level = mip,
+                                                     .array_layer = face,
+                                                     .width = mip_width,
+                                                     .height = mip_height,
                                                      .offset = offset,
-                                                     .size = faceSize};
+                                                     .size = face_size};
 
                 subresources.emplace_back(std::move(subresource));
-                offset += faceSize;
+                offset += face_size;
                 offset = alignTo4(offset);
             }
         }
 
-        out.width = header.pixelWidth;
-        out.height = header.pixelHeight;
-        out.mipLevels = mipLevels;
-        out.format = TextureFormat::B10G11R11Ufloat;
+        out.width = header.pixel_width;
+        out.height = header.pixel_height;
+        out.mip_levels = mip_levels;
+        out.format = ETextureFormat::B10_G11_R11_UFLOAT;
         out.bytes = std::move(bytes);
         out.subresources = std::move(subresources);
         return true;
@@ -188,10 +188,10 @@ namespace kera
 
         while (std::getline(file, line))
         {
-            const std::size_t commenStart = line.find("//");
-            if (commenStart != std::string::npos)
+            const std::size_t commen_start = line.find("//");
+            if (commen_start != std::string::npos)
             {
-                line.resize(commenStart);
+                line.resize(commen_start);
             }
 
             for (char& c : line)
@@ -202,9 +202,9 @@ namespace kera
                 }
             }
 
-            std::stringstream toeknStream(line);
+            std::stringstream toekn_stream(line);
             float value = 0.0f;
-            while (toeknStream >> value)
+            while (toekn_stream >> value)
             {
                 values.push_back(value);
             }
@@ -228,84 +228,84 @@ namespace kera
     }
 
     RendererResult<TextureHandle> createAndUploadCube(IRenderer& renderer, const LoadedKtxCube& ktx,
-                                                      const std::string& debugName)
+                                                      const std::string& debug_name)
     {
         TextureDesc desc{};
         desc.width = ktx.width;
         desc.height = ktx.height;
-        desc.mipLevels = ktx.mipLevels;
+        desc.mip_levels = ktx.mip_levels;
         desc.format = ktx.format;
-        desc.dimension = TextureDimension::TextureCube;
-        desc.generateMipmaps = false;
+        desc.dimension = ETextureDimension::TEXTURE_CUBE;
+        desc.generate_mipmaps = false;
         desc.sampled = true;
-        desc.debugName = debugName;
+        desc.debug_name = debug_name;
         TextureHandle texture = renderer.createTexture(desc);
         if (!texture.isValid())
         {
-            return RendererResult<TextureHandle>::failure("Failed to create texture for KTX cube: " + debugName);
+            return RendererResult<TextureHandle>::failure("Failed to create texture for KTX cube: " + debug_name);
         }
 
         TexturePrepareUpload upload{};
         upload.data = ktx.bytes.data();
         upload.size = ktx.bytes.size();
         upload.subresources = ktx.subresources.data();
-        upload.subresourceCount = ktx.subresources.size();
+        upload.subresource_count = ktx.subresources.size();
 
         if (!renderer.uploadTextureSubresource(texture, upload))
         {
             renderer.destroyTexture(texture);
-            return RendererResult<TextureHandle>::failure("Failed to upload KTX cubemap: " + debugName);
+            return RendererResult<TextureHandle>::failure("Failed to upload KTX cubemap: " + debug_name);
         }
         return RendererResult<TextureHandle>::success(texture);
     }
 
     RendererResult<IblEnvironment> loadIblEnvironment(IRenderer& renderer, const IblEnvironmentLoadDesc& desc)
     {
-        LoadedKtxCube iblCube;
-        LoadedKtxCube SkyboxCube;
+        LoadedKtxCube ibl_cube;
+        LoadedKtxCube skybox_cube;
         std::string error;
 
-        if (!loadKtxCube(desc.iblKtxPath, iblCube, error))
+        if (!loadKtxCube(desc.ibl_ktx_path, ibl_cube, error))
         {
             return RendererResult<IblEnvironment>::failure(error);
         }
 
-        if (!loadKtxCube(desc.skyboxKtxPath, SkyboxCube, error))
+        if (!loadKtxCube(desc.skybox_ktx_path, skybox_cube, error))
         {
             return RendererResult<IblEnvironment>::failure(error);
         }
 
         IblEnvironment environment{};
-        environment.iblMiplevels = iblCube.mipLevels;
-        environment.skyboxMiplevels = SkyboxCube.mipLevels;
+        environment.ibl_miplevels = ibl_cube.mip_levels;
+        environment.skybox_miplevels = skybox_cube.mip_levels;
 
-        if (!loadSphericalHarmonics(desc.sphericalHarmonicsPath, environment.sphericalHarmonics, error))
+        if (!loadSphericalHarmonics(desc.spherical_harmonics_path, environment.spherical_harmonics, error))
         {
             return RendererResult<IblEnvironment>::failure(error);
         }
 
-        auto iblTexture = createAndUploadCube(renderer, iblCube, desc.debugName + " IBL");
-        if (!iblTexture.ok())
+        auto ibl_texture = createAndUploadCube(renderer, ibl_cube, desc.debug_name + " IBL");
+        if (!ibl_texture.ok())
         {
-            return RendererResult<IblEnvironment>::failure(iblTexture.errorMessage());
+            return RendererResult<IblEnvironment>::failure(ibl_texture.errorMessage());
         }
 
-        environment.iblTexture = iblTexture.value();
+        environment.ibl_texture = ibl_texture.value();
 
-        auto skyboxTexture = createAndUploadCube(renderer, SkyboxCube, desc.debugName + " Skybox");
-        if (!skyboxTexture.ok())
+        auto skybox_texture = createAndUploadCube(renderer, skybox_cube, desc.debug_name + " Skybox");
+        if (!skybox_texture.ok())
         {
-            renderer.destroyTexture(environment.iblTexture);
-            return RendererResult<IblEnvironment>::failure(skyboxTexture.errorMessage());
+            renderer.destroyTexture(environment.ibl_texture);
+            return RendererResult<IblEnvironment>::failure(skybox_texture.errorMessage());
         }
 
-        environment.skyboxTexture = skyboxTexture.value();
+        environment.skybox_texture = skybox_texture.value();
 
-        SamplerDesc samplerDesc{};
-        samplerDesc.maxLod = static_cast<float>(iblCube.mipLevels - 1);
-        samplerDesc.debugName = "IBL Cubemap Sampler";
+        SamplerDesc sampler_desc{};
+        sampler_desc.max_lod = static_cast<float>(ibl_cube.mip_levels - 1);
+        sampler_desc.debug_name = "IBL Cubemap Sampler";
 
-        auto sampler = renderer.createSampler(samplerDesc);
+        auto sampler = renderer.createSampler(sampler_desc);
         if (!sampler.isValid())
         {
             destroyIblEnvironment(renderer, environment);
@@ -324,16 +324,16 @@ namespace kera
             environment.sampler = {};
         }
 
-        if (environment.skyboxTexture.isValid())
+        if (environment.skybox_texture.isValid())
         {
-            renderer.destroyTexture(environment.skyboxTexture);
-            environment.skyboxTexture = {};
+            renderer.destroyTexture(environment.skybox_texture);
+            environment.skybox_texture = {};
         }
 
-        if (environment.iblTexture.isValid())
+        if (environment.ibl_texture.isValid())
         {
-            renderer.destroyTexture(environment.iblTexture);
-            environment.iblTexture = {};
+            renderer.destroyTexture(environment.ibl_texture);
+            environment.ibl_texture = {};
         }
 
         environment = {};

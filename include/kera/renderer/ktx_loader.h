@@ -19,20 +19,20 @@ namespace kera
 
     struct IblEnvironmentLoadDesc
     {
-        std::filesystem::path iblKtxPath;
-        std::filesystem::path skyboxKtxPath;
-        std::filesystem::path sphericalHarmonicsPath;
-        std::string debugName = "IBL Environment";
+        std::filesystem::path ibl_ktx_path;
+        std::filesystem::path skybox_ktx_path;
+        std::filesystem::path spherical_harmonics_path;
+        std::string debug_name = "IBL Environment";
     };
 
     struct IblEnvironment
     {
-        TextureHandle iblTexture;
-        TextureHandle skyboxTexture;
+        TextureHandle ibl_texture;
+        TextureHandle skybox_texture;
         SamplerHandle sampler;
-        IblSphericalHarmonics sphericalHarmonics{};
-        uint32_t iblMiplevels = 0;
-        uint32_t skyboxMiplevels = 0;
+        IblSphericalHarmonics spherical_harmonics{};
+        uint32_t ibl_miplevels = 0;
+        uint32_t skybox_miplevels = 0;
     };
 
     RendererResult<IblEnvironment> loadIblEnvironment(IRenderer& renderer, const IblEnvironmentLoadDesc& desc);

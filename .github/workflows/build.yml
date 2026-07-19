@@ -10,6 +10,10 @@ on:
   pull_request:
     branches:
       - main
+concurrency:
+  # Make sure every PR has its own concurrency group, so that multiple PRs can run in parallel.
+  group: ${{ github.workflow }}-${{ github.head_ref && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   style_windows:
@@ -17,10 +21,34 @@ jobs:
     runs-on: [self-hosted, Windows]
 
     steps:
+      - name: Enable long paths
+        shell: powershell
+        run: |
+          git config --global core.longpaths true
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
+          lfs: false
+
+      - name: Install Git LFS
+        run: git lfs install --local --force
+
+      - name: LFS Pull
+        run: |
+          # Github's extraHeader auth cred should only be sent on the fisrt lfs request
+          $serverUrl = '${{ github.server_url }}'
+          $repository = '${{ github.repository }}'
+          $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
+          $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
+          $authHeader = git config --local --get $checkOutAuthKey
+          if ([string]::IsNullOrEmpty($authHeader)) {
+            throw 'Checkout did not configure an HTTP authorization header for Git LFS'
+          }
+          git config --local --unset-all $checkOutAuthKey
+          git config --local $lfsBatchAuthKey "$authHeader"
+          git lfs pull
 
       - name: Add LLVM to PATH
         shell: powershell
@@ -51,7 +79,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
+          lfs: false
+
+      - name: Install Git LFS
+        run: git lfs install --local --force
+
+      - name: LFS Pull
+        run: |
+          # Github's extraHeader auth cred should only be sent on the fisrt lfs request
+          $serverUrl = '${{ github.server_url }}'
+          $repository = '${{ github.repository }}'
+          $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
+          $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
+          $authHeader = git config --local --get $checkOutAuthKey
+          if ([string]::IsNullOrEmpty($authHeader)) {
+            throw 'Checkout did not configure an HTTP authorization header for Git LFS'
+          }
+          git config --local --unset-all $checkOutAuthKey
+          git config --local $lfsBatchAuthKey "$authHeader"
+          git lfs pull
 
       - name: Configure CMake
         shell: powershell
@@ -77,7 +124,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
+          lfs: false
+
+      - name: Install Git LFS
+        run: git lfs install --local --force
+
+      - name: LFS Pull
+        run: |
+          # Github's extraHeader auth cred should only be sent on the fisrt lfs request
+          $serverUrl = '${{ github.server_url }}'
+          $repository = '${{ github.repository }}'
+          $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
+          $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
+          $authHeader = git config --local --get $checkOutAuthKey
+          if ([string]::IsNullOrEmpty($authHeader)) {
+            throw 'Checkout did not configure an HTTP authorization header for Git LFS'
+          }
+          git config --local --unset-all $checkOutAuthKey
+          git config --local $lfsBatchAuthKey "$authHeader"
+          git lfs pull
 
       - name: Configure CMake
         shell: powershell

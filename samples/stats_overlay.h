@@ -26,8 +26,8 @@ namespace kera
             return m_visible;
         }
 
-        void draw(const Renderer& renderer, int activeSampleIndex, const std::string& activeSampleName,
-                  float frameTimeMs);
+        void draw(const Renderer& renderer, int active_sample_index, const std::string& active_sample_name,
+                  float frame_time_ms);
 
     private:
         bool m_visible = true;

@@ -9,9 +9,9 @@
 namespace kera
 {
 
-    enum class Key
+    enum class EKey
     {
-        Unknown = 0,
+        UNKNOWN = 0,
         A,
         B,
         C,
@@ -38,25 +38,25 @@ namespace kera
         X,
         Y,
         Z,
-        Num0,
-        Num1,
-        Num2,
-        Num3,
-        Num4,
-        Num5,
-        Num6,
-        Num7,
-        Num8,
-        Num9,
-        Escape,
-        Space,
-        Enter,
-        Tab,
-        Backspace,
-        Left,
-        Right,
-        Up,
-        Down,
+        NUM0,
+        NUM1,
+        NUM2,
+        NUM3,
+        NUM4,
+        NUM5,
+        NUM6,
+        NUM7,
+        NUM8,
+        NUM9,
+        ESCAPE,
+        SPACE,
+        ENTER,
+        TAB,
+        BACKSPACE,
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN,
         F1,
         F2,
         F3,
@@ -69,21 +69,21 @@ namespace kera
         F10,
         F11,
         F12,
-        LeftShift,
-        RightShift,
-        LeftCtrl,
-        RightCtrl,
-        LeftAlt,
-        RightAlt,
-        Count
+        LEFT_SHIFT,
+        RIGHT_SHIFT,
+        LEFT_CTRL,
+        RIGHT_CTRL,
+        LEFT_ALT,
+        RIGHT_ALT,
+        COUNT
     };
 
-    enum class MouseButton
+    enum class EMouseButton
     {
-        Left = 0,
-        Middle,
-        Right,
-        Count
+        LEFT = 0,
+        MIDDLE,
+        RIGHT,
+        COUNT
     };
 
     struct MousePosition
@@ -101,49 +101,49 @@ namespace kera
         void update();
 
         // Keyboard
-        bool isKeyPressed(Key key) const;
-        bool isKeyDown(Key key) const;
-        bool isKeyReleased(Key key) const;
+        bool isKeyPressed(EKey key) const;
+        bool isKeyDown(EKey key) const;
+        bool isKeyReleased(EKey key) const;
 
         // Mouse
-        bool isMouseButtonPressed(MouseButton button) const;
-        bool isMouseButtonDown(MouseButton button) const;
-        bool isMouseButtonReleased(MouseButton button) const;
+        bool isMouseButtonPressed(EMouseButton button) const;
+        bool isMouseButtonDown(EMouseButton button) const;
+        bool isMouseButtonReleased(EMouseButton button) const;
 
         MousePosition getMousePosition() const;
         MousePosition getMouseDelta() const;
 
         // Input callbacks
-        using KeyCallback = std::function<void(Key, bool pressed)>;
-        using MouseButtonCallback = std::function<void(MouseButton, bool pressed)>;
-        using MouseMoveCallback = std::function<void(int x, int y, int deltaX, int deltaY)>;
+        using KeyCallback = std::function<void(EKey, bool pressed)>;
+        using MouseButtonCallback = std::function<void(EMouseButton, bool pressed)>;
+        using MouseMoveCallback = std::function<void(int x, int y, int delta_x, int delta_y)>;
 
         void setKeyCallback(KeyCallback callback)
         {
-            key_callback_ = callback;
+            m_key_callback = callback;
         }
         void setMouseButtonCallback(MouseButtonCallback callback)
         {
-            mouse_button_callback_ = callback;
+            m_mouse_button_callback = callback;
         }
         void setMouseMoveCallback(MouseMoveCallback callback)
         {
-            mouse_move_callback_ = callback;
+            m_mouse_move_callback = callback;
         }
 
     private:
-        std::array<bool, static_cast<size_t>(Key::Count)> current_keys_;
-        std::array<bool, static_cast<size_t>(Key::Count)> previous_keys_;
+        std::array<bool, static_cast<size_t>(EKey::COUNT)> m_current_keys;
+        std::array<bool, static_cast<size_t>(EKey::COUNT)> m_previous_keys;
 
-        std::array<bool, static_cast<size_t>(MouseButton::Count)> current_mouse_buttons_;
-        std::array<bool, static_cast<size_t>(MouseButton::Count)> previous_mouse_buttons_;
+        std::array<bool, static_cast<size_t>(EMouseButton::COUNT)> m_current_mouse_buttons;
+        std::array<bool, static_cast<size_t>(EMouseButton::COUNT)> m_previous_mouse_buttons;
 
-        MousePosition mouse_position_;
-        MousePosition previous_mouse_position_;
+        MousePosition m_mouse_position;
+        MousePosition m_previous_mouse_position;
 
-        KeyCallback key_callback_;
-        MouseButtonCallback mouse_button_callback_;
-        MouseMoveCallback mouse_move_callback_;
+        KeyCallback m_key_callback;
+        MouseButtonCallback m_mouse_button_callback;
+        MouseMoveCallback m_mouse_move_callback;
     };
 
 }  // namespace kera

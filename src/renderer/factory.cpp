@@ -9,11 +9,11 @@
 namespace kera
 {
 
-    std::unique_ptr<IRenderer> CreateRenderer(GraphicsBackend backend, Window& window)
+    std::unique_ptr<IRenderer> createRenderer(EGraphicsBackend backend, Window& window)
     {
         switch (backend)
         {
-            case GraphicsBackend::Vulkan:
+            case EGraphicsBackend::VULKAN:
             {
                 auto renderer = std::make_unique<VulkanRenderer>();
                 if (!renderer->initialize(window))

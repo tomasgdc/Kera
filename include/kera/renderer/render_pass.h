@@ -27,23 +27,23 @@ namespace kera
         RenderPass(RenderPass&& other) noexcept;
         RenderPass& operator=(RenderPass&& other) noexcept;
 
-        bool initialize(const Device& device, const SwapChain& swapChain);
-        bool initializeColorTarget(const Device& device, VkFormat colorFormat,
-                                   VkFormat depthFormat = VK_FORMAT_UNDEFINED);
+        bool initialize(const Device& device, const SwapChain& swap_chain);
+        bool initializeColorTarget(const Device& device, VkFormat color_format,
+                                   VkFormat depth_format = VK_FORMAT_UNDEFINED);
         void shutdown();
 
         VkRenderPass getVulkanRenderPass() const
         {
-            return render_pass_;
+            return m_render_pass;
         }
         bool isValid() const
         {
-            return render_pass_ != VK_NULL_HANDLE;
+            return m_render_pass != VK_NULL_HANDLE;
         }
 
     private:
-        VkDevice device_;
-        VkRenderPass render_pass_;
+        VkDevice m_device;
+        VkRenderPass m_render_pass;
     };
 
 }  // namespace kera

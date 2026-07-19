@@ -10,6 +10,6 @@
 namespace kera
 {
 
-    Key sdlKeyToKey(SDL_Keycode sdlKey);
+    EKey sdlKeyToKey(SDL_Keycode sdl_key);
 
 }  // namespace kera

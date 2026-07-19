@@ -15,49 +15,49 @@ namespace kera
     namespace
     {
 
-        MouseButton sdlButtonToMouseButton(int sdlButton)
+        EMouseButton sdlButtonToMouseButton(int sdl_button)
         {
-            switch (sdlButton)
+            switch (sdl_button)
             {
                 case SDL_BUTTON_LEFT:
-                    return MouseButton::Left;
+                    return EMouseButton::LEFT;
                 case SDL_BUTTON_MIDDLE:
-                    return MouseButton::Middle;
+                    return EMouseButton::MIDDLE;
                 case SDL_BUTTON_RIGHT:
-                    return MouseButton::Right;
+                    return EMouseButton::RIGHT;
                 default:
-                    return MouseButton::Left;
+                    return EMouseButton::LEFT;
             }
         }
 
     }  // anonymous namespace
 
     Input::Input()
-        : current_keys_()
-        , previous_keys_()
-        , current_mouse_buttons_()
-        , previous_mouse_buttons_()
-        , mouse_position_{0, 0}
-        , previous_mouse_position_{0, 0}
+        : m_current_keys()
+        , m_previous_keys()
+        , m_current_mouse_buttons()
+        , m_previous_mouse_buttons()
+        , m_mouse_position{0, 0}
+        , m_previous_mouse_position{0, 0}
     {
     }
 
     void Input::update()
     {
-        previous_keys_ = current_keys_;
-        previous_mouse_buttons_ = current_mouse_buttons_;
-        previous_mouse_position_ = mouse_position_;
+        m_previous_keys = m_current_keys;
+        m_previous_mouse_buttons = m_current_mouse_buttons;
+        m_previous_mouse_position = m_mouse_position;
 
-        const bool* sdlKeys = SDL_GetKeyboardState(nullptr);
-        for (size_t i = 0; i < current_keys_.size(); ++i)
+        const bool* sdl_keys = SDL_GetKeyboardState(nullptr);
+        for (size_t i = 0; i < m_current_keys.size(); ++i)
         {
-            current_keys_[i] = sdlKeys[i];
+            m_current_keys[i] = sdl_keys[i];
         }
 
-        Uint32 mouseState = SDL_GetMouseState(&mouse_position_.x, &mouse_position_.y);
-        current_mouse_buttons_[static_cast<size_t>(MouseButton::Left)] = mouseState & SDL_BUTTON_LMASK;
-        current_mouse_buttons_[static_cast<size_t>(MouseButton::Middle)] = mouseState & SDL_BUTTON_MMASK;
-        current_mouse_buttons_[static_cast<size_t>(MouseButton::Right)] = mouseState & SDL_BUTTON_RMASK;
+        Uint32 mouse_state = SDL_GetMouseState(&m_mouse_position.x, &m_mouse_position.y);
+        m_current_mouse_buttons[static_cast<size_t>(EMouseButton::LEFT)] = mouse_state & SDL_BUTTON_LMASK;
+        m_current_mouse_buttons[static_cast<size_t>(EMouseButton::MIDDLE)] = mouse_state & SDL_BUTTON_MMASK;
+        m_current_mouse_buttons[static_cast<size_t>(EMouseButton::RIGHT)] = mouse_state & SDL_BUTTON_RMASK;
 
         SDL_Event event;
         while (SDL_PollEvent(&event))
@@ -67,31 +67,31 @@ namespace kera
                 case SDL_EVENT_KEY_DOWN:
                 case SDL_EVENT_KEY_UP:
                 {
-                    Key key = sdlKeyToKey(event.key.key);
+                    EKey key = sdlKeyToKey(event.key.key);
                     bool pressed = event.key.down;
-                    if (key_callback_)
+                    if (m_key_callback)
                     {
-                        key_callback_(key, pressed);
+                        m_key_callback(key, pressed);
                     }
                     break;
                 }
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 case SDL_EVENT_MOUSE_BUTTON_UP:
                 {
-                    MouseButton button = sdlButtonToMouseButton(event.button.button);
+                    EMouseButton button = sdlButtonToMouseButton(event.button.button);
                     bool pressed = event.button.down;
-                    if (mouse_button_callback_)
+                    if (m_mouse_button_callback)
                     {
-                        mouse_button_callback_(button, pressed);
+                        m_mouse_button_callback(button, pressed);
                     }
                     break;
                 }
                 case SDL_EVENT_MOUSE_MOTION:
                 {
-                    if (mouse_move_callback_)
+                    if (m_mouse_move_callback)
                     {
-                        mouse_move_callback_(static_cast<int>(event.motion.x), static_cast<int>(event.motion.y),
-                                             static_cast<int>(event.motion.xrel), static_cast<int>(event.motion.yrel));
+                        m_mouse_move_callback(static_cast<int>(event.motion.x), static_cast<int>(event.motion.y),
+                                              static_cast<int>(event.motion.xrel), static_cast<int>(event.motion.yrel));
                     }
                     break;
                 }
@@ -101,52 +101,52 @@ namespace kera
         }
     }
 
-    bool Input::isKeyPressed(Key key) const
+    bool Input::isKeyPressed(EKey key) const
     {
         size_t index = static_cast<size_t>(key);
-        return index < current_keys_.size() && current_keys_[index] && !previous_keys_[index];
+        return index < m_current_keys.size() && m_current_keys[index] && !m_previous_keys[index];
     }
 
-    bool Input::isKeyDown(Key key) const
+    bool Input::isKeyDown(EKey key) const
     {
         size_t index = static_cast<size_t>(key);
-        return index < current_keys_.size() && current_keys_[index];
+        return index < m_current_keys.size() && m_current_keys[index];
     }
 
-    bool Input::isKeyReleased(Key key) const
+    bool Input::isKeyReleased(EKey key) const
     {
         size_t index = static_cast<size_t>(key);
-        return index < current_keys_.size() && !current_keys_[index] && previous_keys_[index];
+        return index < m_current_keys.size() && !m_current_keys[index] && m_previous_keys[index];
     }
 
-    bool Input::isMouseButtonPressed(MouseButton button) const
+    bool Input::isMouseButtonPressed(EMouseButton button) const
     {
         size_t index = static_cast<size_t>(button);
-        return index < current_mouse_buttons_.size() && current_mouse_buttons_[index] &&
-               !previous_mouse_buttons_[index];
+        return index < m_current_mouse_buttons.size() && m_current_mouse_buttons[index] &&
+               !m_previous_mouse_buttons[index];
     }
 
-    bool Input::isMouseButtonDown(MouseButton button) const
+    bool Input::isMouseButtonDown(EMouseButton button) const
     {
         size_t index = static_cast<size_t>(button);
-        return index < current_mouse_buttons_.size() && current_mouse_buttons_[index];
+        return index < m_current_mouse_buttons.size() && m_current_mouse_buttons[index];
     }
 
-    bool Input::isMouseButtonReleased(MouseButton button) const
+    bool Input::isMouseButtonReleased(EMouseButton button) const
     {
         size_t index = static_cast<size_t>(button);
-        return index < current_mouse_buttons_.size() && !current_mouse_buttons_[index] &&
-               previous_mouse_buttons_[index];
+        return index < m_current_mouse_buttons.size() && !m_current_mouse_buttons[index] &&
+               m_previous_mouse_buttons[index];
     }
 
     MousePosition Input::getMousePosition() const
     {
-        return mouse_position_;
+        return m_mouse_position;
     }
 
     MousePosition Input::getMouseDelta() const
     {
-        return {mouse_position_.x - previous_mouse_position_.x, mouse_position_.y - previous_mouse_position_.y};
+        return {m_mouse_position.x - m_previous_mouse_position.x, m_mouse_position.y - m_previous_mouse_position.y};
     }
 
 }  // namespace kera

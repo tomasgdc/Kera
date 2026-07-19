@@ -14,13 +14,6 @@ namespace kera
 {
     class IRenderer;
 
-    enum class GltfAlphaMode
-    {
-        Opaque,
-        Mask,
-        Blend
-    };
-
     struct GltfVertex
     {
         glm::vec3 position;
@@ -32,14 +25,14 @@ namespace kera
     struct GltfLoadDesc
     {
         std::string path;
-        std::string debugName;
-        bool requireMaterialTextures = true;
+        std::string debug_name;
+        bool require_material_textures = true;
     };
 
     struct GltfMaterialTextures
     {
-        TextureHandle baseColor;
-        TextureHandle metalRoughness;
+        TextureHandle base_color;
+        TextureHandle metal_roughness;
         TextureHandle emissive;
         TextureHandle occlusion;
         TextureHandle normal;
@@ -47,8 +40,8 @@ namespace kera
 
     struct GltfMaterialTextureNames
     {
-        std::string baseColor;
-        std::string metalRoughness;
+        std::string base_color;
+        std::string metal_roughness;
         std::string emissive;
         std::string occlusion;
         std::string normal;
@@ -56,28 +49,28 @@ namespace kera
 
     struct GltfMaterialFactors
     {
-        glm::vec4 baseColor{1.0f};
+        glm::vec4 base_color{1.0f};
         glm::vec3 emissive{0.0f};
         float metallic = 1.0f;
         float roughness = 1.0f;
-        float normalScale = 1.0f;
-        float occlusionStrength = 1.0f;
-        float alphaCutoff = 0.5f;
-        GltfAlphaMode alphaMode = GltfAlphaMode::Opaque;
-        bool doubleSided = false;
+        float normal_scale = 1.0f;
+        float occlusion_strength = 1.0f;
+        float alpha_cutoff = 0.5f;
+        EGltfAlphaMode alpha_mode = EGltfAlphaMode::ALPHA_OPAQUE;
+        bool double_sided = false;
     };
 
     struct GltfLoadedModel
     {
-        BufferHandle vertexBuffer;
-        BufferHandle indexBuffer;
-        GltfMaterialTextures materialTextures;
-        SamplerHandle materialSampler;
-        IndexFormat indexFormat = IndexFormat::UInt32;
-        uint32_t indexCount = 0;
+        BufferHandle vertex_buffer;
+        BufferHandle index_buffer;
+        GltfMaterialTextures material_textures;
+        SamplerHandle material_sampler;
+        EIndexFormat index_format = EIndexFormat::U_INT32;
+        uint32_t index_count = 0;
         glm::mat4 transform{1.0f};
-        GltfMaterialTextureNames textureNames;
-        GltfMaterialFactors materialFactors;
+        GltfMaterialTextureNames texture_names;
+        GltfMaterialFactors material_factors;
     };
 
     RendererResult<GltfLoadedModel> loadGltfModel(IRenderer& renderer, const GltfLoadDesc& desc);

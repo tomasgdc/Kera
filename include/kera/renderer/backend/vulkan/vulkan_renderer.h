@@ -34,7 +34,7 @@ namespace kera
     struct VulkanShaderModuleResource
     {
         Shader m_shader;
-        ShaderStage m_stage = ShaderStage::Vertex;
+        EShaderStage m_stage = EShaderStage::VERTEX;
     };
 
     struct VulkanShaderProgramResource
@@ -46,9 +46,9 @@ namespace kera
     struct VulkanBufferResource
     {
         Buffer m_buffer;
-        std::size_t m_ringSlotSize = 0;
-        std::size_t m_ringSlotStride = 0;
-        uint32_t m_ringSlotCount = 1;
+        std::size_t m_ring_slot_size = 0;
+        std::size_t m_ring_slot_stride = 0;
+        uint32_t m_ring_slot_count = 1;
     };
 
     struct VulkanTextureResource
@@ -56,20 +56,20 @@ namespace kera
         VkDevice m_device = VK_NULL_HANDLE;
         VkImage m_image = VK_NULL_HANDLE;
         VkDeviceMemory m_memory = VK_NULL_HANDLE;
-        VkImageView m_imageView = VK_NULL_HANDLE;
+        VkImageView m_image_view = VK_NULL_HANDLE;
         VkFormat m_format = VK_FORMAT_R8G8B8A8_UNORM;
-        TextureFormat m_textureFormat = TextureFormat::RGBA8;
+        ETextureFormat m_texture_format = ETextureFormat::RGBA8;
         VkExtent2D m_extent{};
-        uint32_t m_mipLevels = 1;
-        uint32_t m_arrayLayers = 1;
-        bool m_generateMipmaps = false;
-        VkImageAspectFlags m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        VkImageLayout m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        VkImageLayout m_renderTargetFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        uint32_t m_mip_levels = 1;
+        uint32_t m_array_layers = 1;
+        bool m_generate_mipmaps = false;
+        VkImageAspectFlags m_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+        VkImageLayout m_current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageLayout m_descriptor_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageLayout m_render_target_final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
         bool m_sampled = false;
-        bool m_renderTarget = false;
-        bool m_depthStencil = false;
+        bool m_render_target = false;
+        bool m_depth_stencil = false;
 
         VulkanTextureResource() = default;
         ~VulkanTextureResource()
@@ -84,20 +84,20 @@ namespace kera
             : m_device(std::exchange(other.m_device, VK_NULL_HANDLE))
             , m_image(std::exchange(other.m_image, VK_NULL_HANDLE))
             , m_memory(std::exchange(other.m_memory, VK_NULL_HANDLE))
-            , m_imageView(std::exchange(other.m_imageView, VK_NULL_HANDLE))
+            , m_image_view(std::exchange(other.m_image_view, VK_NULL_HANDLE))
             , m_format(other.m_format)
-            , m_textureFormat(other.m_textureFormat)
+            , m_texture_format(other.m_texture_format)
             , m_extent(other.m_extent)
-            , m_mipLevels(other.m_mipLevels)
-            , m_arrayLayers(other.m_arrayLayers)
-            , m_generateMipmaps(other.m_generateMipmaps)
-            , m_aspectMask(other.m_aspectMask)
-            , m_currentLayout(other.m_currentLayout)
-            , m_descriptorLayout(other.m_descriptorLayout)
-            , m_renderTargetFinalLayout(other.m_renderTargetFinalLayout)
+            , m_mip_levels(other.m_mip_levels)
+            , m_array_layers(other.m_array_layers)
+            , m_generate_mipmaps(other.m_generate_mipmaps)
+            , m_aspect_mask(other.m_aspect_mask)
+            , m_current_layout(other.m_current_layout)
+            , m_descriptor_layout(other.m_descriptor_layout)
+            , m_render_target_final_layout(other.m_render_target_final_layout)
             , m_sampled(other.m_sampled)
-            , m_renderTarget(other.m_renderTarget)
-            , m_depthStencil(other.m_depthStencil)
+            , m_render_target(other.m_render_target)
+            , m_depth_stencil(other.m_depth_stencil)
         {
         }
 
@@ -109,30 +109,30 @@ namespace kera
                 m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
                 m_image = std::exchange(other.m_image, VK_NULL_HANDLE);
                 m_memory = std::exchange(other.m_memory, VK_NULL_HANDLE);
-                m_imageView = std::exchange(other.m_imageView, VK_NULL_HANDLE);
+                m_image_view = std::exchange(other.m_image_view, VK_NULL_HANDLE);
                 m_format = other.m_format;
-                m_textureFormat = other.m_textureFormat;
+                m_texture_format = other.m_texture_format;
                 m_extent = other.m_extent;
-                m_mipLevels = other.m_mipLevels;
-                m_arrayLayers = other.m_arrayLayers;
-                m_generateMipmaps = other.m_generateMipmaps;
-                m_aspectMask = other.m_aspectMask;
-                m_currentLayout = other.m_currentLayout;
-                m_descriptorLayout = other.m_descriptorLayout;
-                m_renderTargetFinalLayout = other.m_renderTargetFinalLayout;
+                m_mip_levels = other.m_mip_levels;
+                m_array_layers = other.m_array_layers;
+                m_generate_mipmaps = other.m_generate_mipmaps;
+                m_aspect_mask = other.m_aspect_mask;
+                m_current_layout = other.m_current_layout;
+                m_descriptor_layout = other.m_descriptor_layout;
+                m_render_target_final_layout = other.m_render_target_final_layout;
                 m_sampled = other.m_sampled;
-                m_renderTarget = other.m_renderTarget;
-                m_depthStencil = other.m_depthStencil;
+                m_render_target = other.m_render_target;
+                m_depth_stencil = other.m_depth_stencil;
             }
             return *this;
         }
 
         void shutdown()
         {
-            if (m_imageView != VK_NULL_HANDLE)
+            if (m_image_view != VK_NULL_HANDLE)
             {
-                vkDestroyImageView(m_device, m_imageView, nullptr);
-                m_imageView = VK_NULL_HANDLE;
+                vkDestroyImageView(m_device, m_image_view, nullptr);
+                m_image_view = VK_NULL_HANDLE;
             }
             if (m_image != VK_NULL_HANDLE)
             {
@@ -145,18 +145,18 @@ namespace kera
                 m_memory = VK_NULL_HANDLE;
             }
             m_device = VK_NULL_HANDLE;
-            m_textureFormat = TextureFormat::RGBA8;
+            m_texture_format = ETextureFormat::RGBA8;
             m_extent = {};
-            m_mipLevels = 1;
-            m_arrayLayers = 1;
-            m_generateMipmaps = false;
-            m_aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            m_descriptorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            m_renderTargetFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_mip_levels = 1;
+            m_array_layers = 1;
+            m_generate_mipmaps = false;
+            m_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+            m_current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_descriptor_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_render_target_final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
             m_sampled = false;
-            m_renderTarget = false;
-            m_depthStencil = false;
+            m_render_target = false;
+            m_depth_stencil = false;
         }
     };
 
@@ -204,8 +204,8 @@ namespace kera
 
     struct VulkanRenderTargetResource
     {
-        TextureHandle m_colorTexture;
-        TextureHandle m_depthTexture;
+        TextureHandle m_color_texture;
+        TextureHandle m_depth_texture;
         VkExtent2D m_extent{};
     };
 
@@ -227,12 +227,12 @@ namespace kera
 
     struct VulkanDescriptorSetResource
     {
-        VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
-        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+        VkDescriptorSet m_descriptor_set = VK_NULL_HANDLE;
+        VkDescriptorPool m_descriptor_pool = VK_NULL_HANDLE;
         GraphicsPipelineHandle m_pipeline;
         uint32_t m_set = 0;
         DescriptorSetLayoutDesc m_layout;
-        std::string m_debugName;
+        std::string m_debug_name;
         std::vector<VulkanDescriptorBindingReference<BufferHandle>> m_buffers;
         std::vector<VulkanDescriptorBindingReference<TextureHandle>> m_textures;
         std::vector<VulkanDescriptorBindingReference<SamplerHandle>> m_samplers;
@@ -243,51 +243,61 @@ namespace kera
         std::vector<BufferHandle> m_buffers;
         std::vector<TextureHandle> m_textures;
         std::vector<SamplerHandle> m_samplers;
-        std::vector<DescriptorSetHandle> m_descriptorSets;
+        std::vector<DescriptorSetHandle> m_descriptor_sets;
     };
 
     struct VulkanFrameResource
     {
-        VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
-        VkImageView m_colorImageView = VK_NULL_HANDLE;
+        VkCommandBuffer m_command_buffer = VK_NULL_HANDLE;
+        VkImageView m_color_image_view = VK_NULL_HANDLE;
         VkExtent2D m_extent{};
-        uint32_t m_imageIndex = 0;
-        uint32_t m_syncIndex = 0;
-        bool m_renderPassActive = false;
-        TextureHandle m_activeRenderTargetTexture;
-        TextureHandle m_activeDepthTexture;
-        VkImageLayout m_renderPassFinalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        uint32_t m_image_index = 0;
+        uint32_t m_sync_index = 0;
+        bool m_render_pass_active = false;
+        TextureHandle m_active_render_target_texture;
+        TextureHandle m_active_depth_texture;
+        VkImageLayout m_render_pass_final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
 
     struct VulkanFrameSyncResource
     {
-        VkSemaphore m_imageAvailableSemaphore = VK_NULL_HANDLE;
-        VkSemaphore m_renderFinishedSemaphore = VK_NULL_HANDLE;
-        uint64_t m_timelineValue = 0;
-        VulkanFrameResourceUse m_resourceUse;
+        VkSemaphore m_image_available_semaphore = VK_NULL_HANDLE;
+        VkSemaphore m_render_finished_semaphore = VK_NULL_HANDLE;
+        uint64_t m_timeline_value = 0;
+        VulkanFrameResourceUse m_resource_use;
     };
 
     struct VulkanDeferredDeletion
     {
-        uint64_t m_timelineValue = 0;
+        uint64_t m_timeline_value = 0;
         std::vector<Buffer> m_buffers;
-        std::vector<VulkanBufferResource> m_bufferResources;
+        std::vector<VulkanBufferResource> m_buffer_resources;
         std::vector<VulkanTextureResource> m_textures;
         std::vector<VulkanSamplerResource> m_samplers;
-        std::vector<VulkanGraphicsPipelineResource> m_graphicsPipelines;
-        std::vector<VulkanDescriptorSetResource> m_descriptorSets;
-        std::vector<VkCommandBuffer> m_commandBuffers;
+        std::vector<VulkanGraphicsPipelineResource> m_graphics_pipelines;
+        std::vector<VulkanDescriptorSetResource> m_descriptor_sets;
+        std::vector<VkCommandBuffer> m_command_buffers;
+    };
+
+    struct PendingTextureUpload
+    {
+        TextureHandle texture;
+        Buffer staging_buffer;
+        std::vector<VkBufferImageCopy> regions;
+        bool generate_mipmaps = false;
     };
 
     struct VulkanUploadContext
     {
-        std::vector<Buffer> m_availableStagingBuffers;
+        std::vector<Buffer> available_staging_buffers;
+        std::vector<PendingTextureUpload> pending_texture_uploads;
+        bool batch_active = false;
     };
 
     struct VulkanDescriptorPoolResource
     {
         VkDescriptorPool m_pool = VK_NULL_HANDLE;
-        uint32_t m_allocatedSets = 0;
+        uint32_t m_allocated_sets = 0;
     };
 
     class VulkanRenderer : public IRenderer
@@ -303,13 +313,13 @@ namespace kera
         bool initialize(SDL_Window* window, uint32_t width, uint32_t height);
         void shutdown() override;
 
-        GraphicsBackend getBackend() const override
+        EGraphicsBackend getBackend() const override
         {
-            return GraphicsBackend::Vulkan;
+            return EGraphicsBackend::VULKAN;
         }
         Extent2D getDrawableExtent() const override;
         RendererStats getStats() const override;
-        bool resize(Extent2D newExtent) override;
+        bool resize(Extent2D new_extent) override;
         bool initializeUi() override;
         void shutdownUi() override;
         void handleUiEvent(const SDL_Event& event) override;
@@ -318,7 +328,7 @@ namespace kera
         void renderUi(FrameHandle frame) override;
         bool isUiAvailable() const override
         {
-            return m_uiInitialized;
+            return m_ui_initialized;
         }
 
         ShaderModuleHandle createShaderModule(const ShaderModuleDesc& desc) override;
@@ -331,15 +341,15 @@ namespace kera
         std::vector<SlangReflectionBinding> getShaderProgramDescriptorBindings(
             ShaderProgramHandle program) const override;
         std::vector<SlangReflectionInput> getShaderProgramVertexInputs(ShaderProgramHandle program,
-                                                                       const std::string& entryPoint) const override;
+                                                                       const std::string& entry_point) const override;
         bool destroyShaderProgram(ShaderProgramHandle program) override;
 
         BufferHandle createBuffer(const BufferDesc& desc) override;
         bool destroyBuffer(BufferHandle buffer) override;
-        bool mapBuffer(BufferHandle bufferHandle, void** data);
-        void unmapBuffer(BufferHandle bufferHandle);
+        bool mapBuffer(BufferHandle buffer_handle, void** data) override;
+        void unmapBuffer(BufferHandle buffer_handle) override;
         bool uploadBuffer(BufferHandle buffer, const void* data, std::size_t size, std::size_t offset = 0) override;
-        BufferHandle createUniformRingBuffer(std::size_t elementSize, uint32_t slotCount = 0) override;
+        BufferHandle createUniformRingBuffer(std::size_t element_size, uint32_t slot_count = 0) override;
         bool uploadUniformRingBuffer(BufferHandle buffer, FrameHandle frame, const void* data,
                                      std::size_t size) override;
         virtual UniformRingBufferInfo getUniformRingBufferInfo(BufferHandle buffer) const override;
@@ -347,13 +357,16 @@ namespace kera
         std::size_t getUniformRingBufferSlotOffset(BufferHandle buffer, uint32_t slot) const override;
 
         TextureHandle createTexture(const TextureDesc& desc) override;
+        bool beginUploadBatch() override;
+        bool endUploadBatch() override;
+        void cancelUploadBatch() override;
         bool uploadTexture(TextureHandle texture, const void* data, std::size_t size) override;
         bool uploadTextureSubresource(TextureHandle texture, const TexturePrepareUpload& upload) override;
         bool destroyTexture(TextureHandle texture) override;
         SamplerHandle createSampler(const SamplerDesc& desc) override;
         bool destroySampler(SamplerHandle sampler) override;
         RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) override;
-        bool destroyRenderTarget(RenderTargetHandle renderTarget) override;
+        bool destroyRenderTarget(RenderTargetHandle render_target) override;
 
         GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                       ShaderProgramHandle program) override;
@@ -383,7 +396,7 @@ namespace kera
         bool setDebugName(TextureHandle texture, const std::string& name) override;
         bool setDebugName(SamplerHandle sampler, const std::string& name) override;
         bool setDebugName(GraphicsPipelineHandle pipeline, const std::string& name) override;
-        bool setDebugName(DescriptorSetHandle descriptorSet, const std::string& name) override;
+        bool setDebugName(DescriptorSetHandle descriptor_set, const std::string& name) override;
 
         FrameHandle beginFrame() override;
         void beginRenderPass(FrameHandle frame, const RenderPassDesc& desc) override;
@@ -391,13 +404,13 @@ namespace kera
         void endRenderPass(FrameHandle frame) override;
         void bindPipeline(FrameHandle frame, GraphicsPipelineHandle pipeline) override;
         void bindVertexBuffer(FrameHandle frame, uint32_t slot, BufferHandle buffer, std::size_t offset = 0) override;
-        void bindIndexBuffer(FrameHandle frame, BufferHandle buffer, IndexFormat format,
+        void bindIndexBuffer(FrameHandle frame, BufferHandle buffer, EIndexFormat format,
                              std::size_t offset = 0) override;
         void bindDescriptorSet(FrameHandle frame, GraphicsPipelineHandle pipeline,
-                               DescriptorSetHandle descriptorSet) override;
+                               DescriptorSetHandle descriptor_set) override;
         void bindDescriptorSet(FrameHandle frame, GraphicsPipelineHandle pipeline, uint32_t set,
-                               DescriptorSetHandle descriptorSet) override;
-        void drawIndexed(FrameHandle frame, uint32_t indexCount, uint32_t instanceCount = 1) override;
+                               DescriptorSetHandle descriptor_set) override;
+        void drawIndexed(FrameHandle frame, uint32_t index_count, uint32_t instance_count = 1) override;
         bool endFrame(FrameHandle frame) override;
 
     private:
@@ -406,89 +419,90 @@ namespace kera
         bool recreateSwapchainFromWindow();
         bool refreshSwapchainSupport();
         bool hasActiveFrames() const;
-        void releaseFrame(FrameHandle frame, uint32_t syncIndex);
-        bool waitForTimelineValue(uint64_t timelineValue);
+        void releaseFrame(FrameHandle frame, uint32_t sync_index);
+        bool waitForTimelineValue(uint64_t timeline_value);
         uint64_t reserveTimelineValue();
         uint64_t getLastSubmittedTimelineValue() const;
-        bool submitImmediateCommandBuffer(VkCommandBuffer commandBuffer, uint64_t& timelineValue);
+        bool submitImmediateCommandBuffer(VkCommandBuffer command_buffer, uint64_t& timeline_value);
         Buffer acquireStagingBuffer(VkDeviceSize size);
         void releaseStagingBuffer(Buffer&& buffer);
         bool allocateDescriptorSet(const VulkanGraphicsPipelineResource& pipeline, uint32_t set,
-                                   VkDescriptorSet& descriptorSet, VkDescriptorPool& descriptorPool);
-        bool reallocateDescriptorSetsForPipeline(GraphicsPipelineHandle pipelineHandle,
+                                   VkDescriptorSet& descriptor_set, VkDescriptorPool& descriptor_pool);
+        bool reallocateDescriptorSetsForPipeline(GraphicsPipelineHandle pipeline_handle,
                                                  VulkanGraphicsPipelineResource& pipeline);
         void queueDeferredDeletion(VulkanDeferredDeletion deletion);
         void collectDeferredDeletions();
         void flushDeferredDeletions();
         bool createDescriptorPoolBlock();
-        void transitionTextureLayout(VkCommandBuffer commandBuffer, VulkanTextureResource& texture,
-                                     VkImageLayout newLayout);
-        bool copyBufferToTexture(Buffer& stagingBuffer, VulkanTextureResource& texture);
-        bool copyBufferToTextureSubresources(Buffer& stagingBuffer, VulkanTextureResource& texture,
-                                             const std::vector<VkBufferImageCopy>& regions);
-        bool generateTextureMipmaps(VkCommandBuffer commandBuffer, VulkanTextureResource& texture);
-        void clearCompletedFrameResourceUse(uint32_t syncIndex);
-        void recordDescriptorSetUse(uint32_t syncIndex, DescriptorSetHandle descriptorSetHandle,
-                                    const VulkanDescriptorSetResource& descriptorSet);
+        void transitionTextureLayout(VkCommandBuffer command_buffer, VulkanTextureResource& texture,
+                                     VkImageLayout new_layout);
+        bool recordTextureUpload(VkCommandBuffer command_buffer, PendingTextureUpload& pending_upload,
+                                 VulkanTextureResource& texture);
+        bool generateTextureMipmaps(VkCommandBuffer command_buffer, VulkanTextureResource& texture);
+        void clearCompletedFrameResourceUse(uint32_t sync_index);
+        void recordDescriptorSetUse(uint32_t sync_index, DescriptorSetHandle descriptor_set_handle,
+                                    const VulkanDescriptorSetResource& descriptor_set);
         bool frameResourceUses(BufferHandle buffer) const;
         bool frameResourceUses(TextureHandle texture) const;
         bool frameResourceUses(SamplerHandle sampler) const;
-        bool frameResourceUses(DescriptorSetHandle descriptorSet) const;
+        bool frameResourceUses(DescriptorSetHandle descriptor_set) const;
         bool descriptorSetsReference(BufferHandle buffer);
         bool descriptorSetsReference(TextureHandle texture);
         bool descriptorSetsReference(SamplerHandle sampler);
         bool renderTargetsReference(TextureHandle texture);
         const DescriptorSetLayoutDesc* resolveDescriptorSetLayout(const VulkanGraphicsPipelineResource& pipeline,
                                                                   uint32_t set) const;
-        bool validateDescriptorBinding(const VulkanDescriptorSetResource& descriptorSet, uint32_t binding,
-                                       DescriptorType type) const;
-        RendererValidationReport validateDescriptorSetResource(const VulkanDescriptorSetResource& descriptorSet) const;
-        bool resolvePipelineRenderingFormats(RenderTargetHandle renderTarget, VkFormat& colorFormat,
-                                             VkFormat& depthFormat) const;
-        void transitionSwapchainImageLayout(VkCommandBuffer commandBuffer, uint32_t imageIndex,
-                                            VkImageLayout newLayout);
+        bool validateDescriptorBinding(const VulkanDescriptorSetResource& descriptor_set, uint32_t binding,
+                                       EDescriptorType type) const;
+        RendererValidationReport validateDescriptorSetResource(const VulkanDescriptorSetResource& descriptor_set) const;
+        bool resolvePipelineRenderingFormats(RenderTargetHandle render_target, VkFormat& color_format,
+                                             VkFormat& depth_format) const;
+        void transitionSwapchainImageLayout(VkCommandBuffer command_buffer, uint32_t image_index,
+                                            VkImageLayout new_layout);
         void waitForDeviceIdle();
         void destroySyncObjects();
         bool createSyncObjects();
         bool createDescriptorPool();
         void destroyDescriptorPool();
+        bool flushUploads();
+        void discardPendingUploads();
 
         Window* m_window;
-        SDL_Window* m_sdlWindow = nullptr;
-        Extent2D m_windowExtent;
+        SDL_Window* m_sdl_window = nullptr;
+        Extent2D m_window_extent;
         std::shared_ptr<Instance> m_instance;
-        std::shared_ptr<PhysicalDevice> m_physicalDevice;
+        std::shared_ptr<PhysicalDevice> m_physical_device;
         std::shared_ptr<Device> m_device;
         std::shared_ptr<Surface> m_surface;
         std::shared_ptr<SwapChain> m_swapchain;
-        std::vector<std::unique_ptr<CommandBuffer>> m_commandBuffers;
+        std::vector<std::unique_ptr<CommandBuffer>> m_command_buffers;
 
-        std::vector<VulkanFrameSyncResource> m_frameSyncResources;
-        std::vector<uint64_t> m_imagesInFlight;
-        std::vector<VkImageLayout> m_swapchainImageLayouts;
-        std::vector<VulkanDeferredDeletion> m_deferredDeletions;
-        VulkanUploadContext m_uploadContext;
-        std::vector<FrameHandle> m_activeFrameHandles;
-        VkSemaphore m_frameTimelineSemaphore = VK_NULL_HANDLE;
-        uint64_t m_nextFrameTimelineValue = 1;
-        uint32_t m_currentFrameSyncIndex = 0;
-        VkPipelineCache m_pipelineCache = VK_NULL_HANDLE;
-        std::vector<VulkanDescriptorPoolResource> m_descriptorPools;
+        std::vector<VulkanFrameSyncResource> m_frame_sync_resources;
+        std::vector<uint64_t> m_images_in_flight;
+        std::vector<VkImageLayout> m_swapchain_image_layouts;
+        std::vector<VulkanDeferredDeletion> m_deferred_deletions;
+        VulkanUploadContext m_upload_context;
+        std::vector<FrameHandle> m_active_frame_handles;
+        VkSemaphore m_frame_timeline_semaphore = VK_NULL_HANDLE;
+        uint64_t m_next_frame_timeline_value = 1;
+        uint32_t m_current_frame_sync_index = 0;
+        VkPipelineCache m_pipeline_cache = VK_NULL_HANDLE;
+        std::vector<VulkanDescriptorPoolResource> m_descriptor_pools;
 
-        ResourceRegistry<VulkanShaderModuleResource, ShaderModuleHandle> m_shaderModules;
-        ResourceRegistry<VulkanShaderProgramResource, ShaderProgramHandle> m_shaderPrograms;
+        ResourceRegistry<VulkanShaderModuleResource, ShaderModuleHandle> m_shader_modules;
+        ResourceRegistry<VulkanShaderProgramResource, ShaderProgramHandle> m_shader_programs;
         ResourceRegistry<VulkanBufferResource, BufferHandle> m_buffers;
         ResourceRegistry<VulkanTextureResource, TextureHandle> m_textures;
         ResourceRegistry<VulkanSamplerResource, SamplerHandle> m_samplers;
-        ResourceRegistry<VulkanRenderTargetResource, RenderTargetHandle> m_renderTargets;
-        ResourceRegistry<VulkanGraphicsPipelineResource, GraphicsPipelineHandle> m_graphicsPipelines;
-        ResourceRegistry<VulkanDescriptorSetResource, DescriptorSetHandle> m_descriptorSets;
+        ResourceRegistry<VulkanRenderTargetResource, RenderTargetHandle> m_render_targets;
+        ResourceRegistry<VulkanGraphicsPipelineResource, GraphicsPipelineHandle> m_graphics_pipelines;
+        ResourceRegistry<VulkanDescriptorSetResource, DescriptorSetHandle> m_descriptor_sets;
         ResourceRegistry<VulkanFrameResource, FrameHandle> m_frames;
         mutable RendererStats m_stats;
-        Extent2D m_pendingResizeExtent{};
-        bool m_uiInitialized = false;
-        bool m_swapchainRecreateRequested = false;
-        bool m_resizePending = false;
+        Extent2D m_pending_resize_extent{};
+        bool m_ui_initialized = false;
+        bool m_swapchain_recreate_requested = false;
+        bool m_resize_pending = false;
     };
 
 }  // namespace kera

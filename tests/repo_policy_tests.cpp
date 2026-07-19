@@ -15,7 +15,7 @@ namespace
 #error "Kera tests must compile with C++ exceptions disabled."
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && defined(_HAS_EXCEPTIONS) && (_HAS_EXCEPTIONS == 0)
     static_assert(_HAS_EXCEPTIONS == 0, "Kera MSVC builds must compile the STL with exceptions disabled.");
 #endif
 
@@ -92,24 +92,24 @@ namespace
     std::filesystem::path normalized(const std::filesystem::path& path)
     {
         std::error_code error;
-        std::filesystem::path normalizedPath = std::filesystem::weakly_canonical(path, error);
+        std::filesystem::path normalized_path = std::filesystem::weakly_canonical(path, error);
         if (error)
         {
-            normalizedPath = path.lexically_normal();
+            normalized_path = path.lexically_normal();
         }
-        return normalizedPath;
+        return normalized_path;
     }
 }  // namespace
 
 TEST(KeraRepoPolicy, PublicAbiHeadersAreStlFree)
 {
     const std::filesystem::path root = sourceRoot();
-    const std::vector<std::filesystem::path> publicHeaders{
+    const std::vector<std::filesystem::path> public_headers{
         root / "include/kera/kera.h",
         root / "include/kera/renderer/api.h",
         root / "include/kera/renderer/abi.h",
     };
-    const std::vector<std::string_view> forbiddenPatterns{
+    const std::vector<std::string_view> forbidden_patterns{
         "std::",
         "#include <string>",
         "#include <vector>",
@@ -119,11 +119,11 @@ TEST(KeraRepoPolicy, PublicAbiHeadersAreStlFree)
         "#include <functional>",
     };
 
-    for (const std::filesystem::path& header : publicHeaders)
+    for (const std::filesystem::path& header : public_headers)
     {
         const std::string content = readTextFile(header);
         ASSERT_FALSE(content.empty()) << "Public ABI header should be readable: " << header.string();
-        for (std::string_view pattern : forbiddenPatterns)
+        for (std::string_view pattern : forbidden_patterns)
         {
             EXPECT_FALSE(contains(content, pattern))
                 << "Public ABI header " << header.string() << " contains forbidden STL pattern: " << pattern;
@@ -134,8 +134,8 @@ TEST(KeraRepoPolicy, PublicAbiHeadersAreStlFree)
 TEST(KeraRepoPolicy, SamplesUsePublicKeraApiOnly)
 {
     const std::filesystem::path root = sourceRoot();
-    const std::vector<std::filesystem::path> sampleFiles = collectFiles({root / "samples"}, {".h", ".cpp"});
-    const std::vector<std::string_view> forbiddenHeaders{
+    const std::vector<std::filesystem::path> sample_files = collectFiles({root / "samples"}, {".h", ".cpp"});
+    const std::vector<std::string_view> forbidden_headers{
         "kera/renderer/interfaces.h",
         "kera/renderer/factory.h",
         "kera/renderer/gltf_loader.h",
@@ -147,14 +147,14 @@ TEST(KeraRepoPolicy, SamplesUsePublicKeraApiOnly)
         "kera/core/",
     };
 
-    ASSERT_FALSE(sampleFiles.empty());
-    for (const std::filesystem::path& source : sampleFiles)
+    ASSERT_FALSE(sample_files.empty());
+    for (const std::filesystem::path& source : sample_files)
     {
         const std::string content = readTextFile(source);
         EXPECT_FALSE(contains(content, ".semantic("))
             << "Sample source " << source.string()
             << " must map vertex inputs by reflected field names, not shader semantic strings.";
-        for (std::string_view pattern : forbiddenHeaders)
+        for (std::string_view pattern : forbidden_headers)
         {
             EXPECT_FALSE(contains(content, pattern))
                 << "Sample source " << source.string()
@@ -166,14 +166,14 @@ TEST(KeraRepoPolicy, SamplesUsePublicKeraApiOnly)
 TEST(KeraRepoPolicy, LoggingRulesStayBehindLoggerFacade)
 {
     const std::filesystem::path root = sourceRoot();
-    const std::filesystem::path allowedConsoleFile = normalized(root / "samples/main.cpp");
-    const std::filesystem::path allowedSpdlogFile = normalized(root / "src/utilities/logger.cpp");
-    const std::vector<std::filesystem::path> publicLoggingHeaders{
+    const std::filesystem::path allowed_console_file = normalized(root / "samples/main.cpp");
+    const std::filesystem::path allowed_spdlog_file = normalized(root / "src/utilities/logger.cpp");
+    const std::vector<std::filesystem::path> public_logging_headers{
         root / "include/kera/kera.h",
         root / "include/kera/renderer/api.h",
         root / "include/kera/renderer/abi.h",
     };
-    const std::vector<std::filesystem::path> scannedFiles = collectFiles(
+    const std::vector<std::filesystem::path> scanned_files = collectFiles(
         {
             root / "include",
             root / "src",
@@ -181,19 +181,19 @@ TEST(KeraRepoPolicy, LoggingRulesStayBehindLoggerFacade)
         },
         {".h", ".cpp"});
 
-    ASSERT_FALSE(scannedFiles.empty());
-    for (const std::filesystem::path& file : scannedFiles)
+    ASSERT_FALSE(scanned_files.empty());
+    for (const std::filesystem::path& file : scanned_files)
     {
-        const std::filesystem::path normalizedFile = normalized(file);
+        const std::filesystem::path normalized_file = normalized(file);
         const std::string content = readTextFile(file);
 
-        if (normalizedFile != allowedConsoleFile)
+        if (normalized_file != allowed_console_file)
         {
             EXPECT_FALSE(hasDirectConsoleOutput(content)) << "Production logging must use kera::Logger, but "
                                                           << file.string() << " contains direct console output.";
         }
 
-        if (normalizedFile != allowedSpdlogFile)
+        if (normalized_file != allowed_spdlog_file)
         {
             EXPECT_FALSE(hasRawSpdlogUsage(content))
                 << "Raw spdlog usage is only allowed in src/utilities/logger.cpp, but found it in " << file.string()
@@ -201,7 +201,7 @@ TEST(KeraRepoPolicy, LoggingRulesStayBehindLoggerFacade)
         }
     }
 
-    for (const std::filesystem::path& header : publicLoggingHeaders)
+    for (const std::filesystem::path& header : public_logging_headers)
     {
         const std::string content = readTextFile(header);
         EXPECT_FALSE(hasRawSpdlogUsage(content))

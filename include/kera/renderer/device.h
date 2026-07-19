@@ -27,37 +27,37 @@ namespace kera
         Device(Device&& other) noexcept;
         Device& operator=(Device&& other) noexcept;
 
-        bool initialize(const PhysicalDevice& physicalDevice);
+        bool initialize(const PhysicalDevice& physical_device);
         void shutdown();
 
         VkDevice getVulkanDevice() const
         {
-            return device_;
+            return m_device;
         }
         VkPhysicalDevice getVulkanPhysicalDevice() const
         {
-            return physical_device_;
+            return m_physical_device;
         }
         VkQueue getGraphicsQueue() const
         {
-            return graphics_queue_;
+            return m_graphics_queue;
         }
         VkQueue getPresentQueue() const
         {
-            return present_queue_;
+            return m_present_queue;
         }
         VkCommandPool getCommandPool() const
         {
-            return command_pool_;
+            return m_command_pool;
         }
         uint32_t getGraphicsQueueFamilyIndex() const
         {
-            return graphics_queue_family_index_;
+            return m_graphics_queue_family_index;
         }
 
         bool isValid() const
         {
-            return device_ != VK_NULL_HANDLE;
+            return m_device != VK_NULL_HANDLE;
         }
 
         // Command buffer management
@@ -65,12 +65,12 @@ namespace kera
         void destroyCommandPool();
 
     private:
-        VkPhysicalDevice physical_device_;
-        VkDevice device_;
-        VkQueue graphics_queue_;
-        VkQueue present_queue_;
-        VkCommandPool command_pool_;
-        uint32_t graphics_queue_family_index_;
+        VkPhysicalDevice m_physical_device;
+        VkDevice m_device;
+        VkQueue m_graphics_queue;
+        VkQueue m_present_queue;
+        VkCommandPool m_command_pool;
+        uint32_t m_graphics_queue_family_index;
     };
 
 }  // namespace kera

@@ -10,34 +10,34 @@
 
 namespace kera
 {
-    enum class RendererErrorCode : uint32_t
+    enum class ERendererErrorCode : uint32_t
     {
-        None = 0,
-        InvalidHandle,
-        InvalidState,
-        Unsupported,
-        OutOfMemory,
-        DeviceLost,
-        SwapchainOutOfDate,
-        ReflectionMissing,
-        ValidationFailed,
-        ResourceInUse,
-        BackendFailure,
+        NONE = 0,
+        INVALID_HANDLE,
+        INVALID_STATE,
+        UNSUPPORTED,
+        OUT_OF_MEMORY,
+        DEVICE_LOST,
+        SWAPCHAIN_OUT_OF_DATE,
+        REFLECTION_MISSING,
+        VALIDATION_FAILED,
+        RESOURCE_IN_USE,
+        BACKEND_FAILURE,
     };
 
-    enum class RendererValidationCategory : uint32_t
+    enum class ERendererValidationCategory : uint32_t
     {
-        General = 0,
-        Descriptor,
+        GENERAL = 0,
+        DESCRIPTOR,
     };
 
-    inline const char* rendererValidationCategoryName(RendererValidationCategory category) noexcept
+    inline const char* rendererValidationCategoryName(ERendererValidationCategory category) noexcept
     {
         switch (category)
         {
-            case RendererValidationCategory::Descriptor:
+            case ERendererValidationCategory::DESCRIPTOR:
                 return "Descriptor";
-            case RendererValidationCategory::General:
+            case ERendererValidationCategory::GENERAL:
             default:
                 return "General";
         }
@@ -45,19 +45,19 @@ namespace kera
 
     struct RendererError
     {
-        RendererErrorCode code = RendererErrorCode::None;
+        ERendererErrorCode code = ERendererErrorCode::NONE;
         std::string message;
 
         explicit operator bool() const noexcept
         {
-            return code != RendererErrorCode::None || !message.empty();
+            return code != ERendererErrorCode::NONE || !message.empty();
         }
     };
 
     struct RendererValidationIssue
     {
-        RendererErrorCode code = RendererErrorCode::ValidationFailed;
-        RendererValidationCategory category = RendererValidationCategory::General;
+        ERendererErrorCode code = ERendererErrorCode::VALIDATION_FAILED;
+        ERendererValidationCategory category = ERendererValidationCategory::GENERAL;
         std::string message;
         std::string name;
         uint32_t set = 0;
@@ -80,29 +80,30 @@ namespace kera
 
         const std::string& errorMessage() const noexcept
         {
-            static const std::string emptyMessage;
-            return issues.empty() ? emptyMessage : issues.front().message;
+            static const std::string empty_message;
+            return issues.empty() ? empty_message : issues.front().message;
         }
 
         void addIssue(std::string message, uint32_t set = 0, uint32_t binding = 0, std::string name = {})
         {
-            addIssue(RendererErrorCode::ValidationFailed, RendererValidationCategory::General, std::move(message), set,
-                     binding, std::move(name));
+            addIssue(ERendererErrorCode::VALIDATION_FAILED, ERendererValidationCategory::GENERAL, std::move(message),
+                     set, binding, std::move(name));
         }
 
-        void addIssue(RendererErrorCode code, std::string message, uint32_t set = 0, uint32_t binding = 0,
+        void addIssue(ERendererErrorCode code, std::string message, uint32_t set = 0, uint32_t binding = 0,
                       std::string name = {})
         {
-            addIssue(code, RendererValidationCategory::General, std::move(message), set, binding, std::move(name));
+            addIssue(code, ERendererValidationCategory::GENERAL, std::move(message), set, binding, std::move(name));
         }
 
-        void addIssue(RendererValidationCategory category, std::string message, uint32_t set = 0, uint32_t binding = 0,
+        void addIssue(ERendererValidationCategory category, std::string message, uint32_t set = 0, uint32_t binding = 0,
                       std::string name = {})
         {
-            addIssue(RendererErrorCode::ValidationFailed, category, std::move(message), set, binding, std::move(name));
+            addIssue(ERendererErrorCode::VALIDATION_FAILED, category, std::move(message), set, binding,
+                     std::move(name));
         }
 
-        void addIssue(RendererErrorCode code, RendererValidationCategory category, std::string message,
+        void addIssue(ERendererErrorCode code, ERendererValidationCategory category, std::string message,
                       uint32_t set = 0, uint32_t binding = 0, std::string name = {})
         {
             issues.push_back({
@@ -130,10 +131,10 @@ namespace kera
 
         static RendererResult failure(std::string message)
         {
-            return failure(RendererErrorCode::BackendFailure, std::move(message));
+            return failure(ERendererErrorCode::BACKEND_FAILURE, std::move(message));
         }
 
-        static RendererResult failure(RendererErrorCode code, std::string message)
+        static RendererResult failure(ERendererErrorCode code, std::string message)
         {
             RendererResult result;
             result.m_error.code = code;
@@ -193,7 +194,7 @@ namespace kera
             return m_error.message;
         }
 
-        RendererErrorCode errorCode() const noexcept
+        ERendererErrorCode errorCode() const noexcept
         {
             return m_error.code;
         }
@@ -217,10 +218,10 @@ namespace kera
 
         static RendererResult failure(std::string message)
         {
-            return failure(RendererErrorCode::BackendFailure, std::move(message));
+            return failure(ERendererErrorCode::BACKEND_FAILURE, std::move(message));
         }
 
-        static RendererResult failure(RendererErrorCode code, std::string message)
+        static RendererResult failure(ERendererErrorCode code, std::string message)
         {
             RendererResult result;
             result.m_error.code = code;
@@ -255,7 +256,7 @@ namespace kera
             return m_error.message;
         }
 
-        RendererErrorCode errorCode() const noexcept
+        ERendererErrorCode errorCode() const noexcept
         {
             return m_error.code;
         }

@@ -11,7 +11,7 @@
 namespace kera
 {
 
-    Window::Window() : window_(nullptr), width_(0), height_(0), should_close_(false), was_resized_(false) {}
+    Window::Window() : m_window(nullptr), m_width(0), m_height(0), m_should_close(false), m_was_resized(false) {}
 
     Window::~Window()
     {
@@ -19,17 +19,17 @@ namespace kera
     }
 
     Window::Window(Window&& other) noexcept
-        : window_(other.window_)
-        , width_(other.width_)
-        , height_(other.height_)
-        , should_close_(other.should_close_)
-        , was_resized_(other.was_resized_)
+        : m_window(other.m_window)
+        , m_width(other.m_width)
+        , m_height(other.m_height)
+        , m_should_close(other.m_should_close)
+        , m_was_resized(other.m_was_resized)
     {
-        other.window_ = nullptr;
-        other.width_ = 0;
-        other.height_ = 0;
-        other.should_close_ = false;
-        other.was_resized_ = false;
+        other.m_window = nullptr;
+        other.m_width = 0;
+        other.m_height = 0;
+        other.m_should_close = false;
+        other.m_was_resized = false;
     }
 
     Window& Window::operator=(Window&& other) noexcept
@@ -37,41 +37,41 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            window_ = other.window_;
-            width_ = other.width_;
-            height_ = other.height_;
-            should_close_ = other.should_close_;
-            was_resized_ = other.was_resized_;
+            m_window = other.m_window;
+            m_width = other.m_width;
+            m_height = other.m_height;
+            m_should_close = other.m_should_close;
+            m_was_resized = other.m_was_resized;
 
-            other.window_ = nullptr;
-            other.width_ = 0;
-            other.height_ = 0;
-            other.should_close_ = false;
-            other.was_resized_ = false;
+            other.m_window = nullptr;
+            other.m_width = 0;
+            other.m_height = 0;
+            other.m_should_close = false;
+            other.m_was_resized = false;
         }
         return *this;
     }
 
     bool Window::initialize(const std::string& title, int width, int height)
     {
-        if (window_)
+        if (m_window)
         {
             shutdown();
         }
 
         // Create SDL window with Vulkan support
-        window_ = SDL_CreateWindow(title.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+        m_window = SDL_CreateWindow(title.c_str(), width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
-        if (!window_)
+        if (!m_window)
         {
             Logger::getInstance().error("Failed to create SDL window: " + std::string(SDL_GetError()));
             return false;
         }
 
-        width_ = width;
-        height_ = height;
-        should_close_ = false;
-        was_resized_ = false;
+        m_width = width;
+        m_height = height;
+        m_should_close = false;
+        m_was_resized = false;
 
         Logger::getInstance().info("Window initialized: " + title + " (" + std::to_string(width) + "x" +
                                    std::to_string(height) + ")");
@@ -80,21 +80,21 @@ namespace kera
 
     void Window::shutdown()
     {
-        if (window_)
+        if (m_window)
         {
-            SDL_DestroyWindow(window_);
-            window_ = nullptr;
-            width_ = 0;
-            height_ = 0;
-            should_close_ = false;
-            was_resized_ = false;
+            SDL_DestroyWindow(m_window);
+            m_window = nullptr;
+            m_width = 0;
+            m_height = 0;
+            m_should_close = false;
+            m_was_resized = false;
             Logger::getInstance().info("Window shutdown");
         }
     }
 
     bool Window::shouldClose() const
     {
-        return should_close_;
+        return m_should_close;
     }
 
     void Window::processEvents()
@@ -102,27 +102,27 @@ namespace kera
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
-            if (event_callback_)
+            if (m_event_callback)
             {
-                event_callback_(event);
+                m_event_callback(event);
             }
 
             switch (event.type)
             {
                 case SDL_EVENT_QUIT:
-                    should_close_ = true;
+                    m_should_close = true;
                     break;
                 case SDL_EVENT_WINDOW_RESIZED:
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-                    width_ = event.window.data1;
-                    height_ = event.window.data2;
-                    was_resized_ = true;
+                    m_width = event.window.data1;
+                    m_height = event.window.data2;
+                    m_was_resized = true;
                     break;
                 case SDL_EVENT_KEY_DOWN:
                 case SDL_EVENT_KEY_UP:
-                    if (key_callback_ && !event.key.repeat)
+                    if (m_key_callback && !event.key.repeat)
                     {
-                        key_callback_(sdlKeyToKey(event.key.key), event.key.down);
+                        m_key_callback(sdlKeyToKey(event.key.key), event.key.down);
                     }
                     break;
                 default:

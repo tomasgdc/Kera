@@ -8,13 +8,13 @@
 namespace kera
 {
 
-    enum class LogLevel
+    enum class ELogLevel
     {
-        Debug,
-        Info,
-        Warning,
-        Error,
-        Fatal
+        DEBUG,
+        INFO,
+        WARNING,
+        ERROR,
+        FATAL
     };
 
     class Logger
@@ -27,43 +27,43 @@ namespace kera
         void clearLogFile();
         void flush();
 
-        void setLogLevel(LogLevel level)
+        void setLogLevel(ELogLevel level)
         {
-            log_level_ = level;
+            m_log_level = level;
         }
-        LogLevel getLogLevel() const
+        ELogLevel getLogLevel() const
         {
-            return log_level_;
+            return m_log_level;
         }
         void setAbortOnFatal(bool enabled)
         {
-            abort_on_fatal_ = enabled;
+            m_abort_on_fatal = enabled;
         }
         bool getAbortOnFatal() const
         {
-            return abort_on_fatal_;
+            return m_abort_on_fatal;
         }
 
-        void log(LogLevel level, const std::string& message);
+        void log(ELogLevel level, const std::string& message);
         void debug(const std::string& message)
         {
-            log(LogLevel::Debug, message);
+            log(ELogLevel::DEBUG, message);
         }
         void info(const std::string& message)
         {
-            log(LogLevel::Info, message);
+            log(ELogLevel::INFO, message);
         }
         void warning(const std::string& message)
         {
-            log(LogLevel::Warning, message);
+            log(ELogLevel::WARNING, message);
         }
         void error(const std::string& message)
         {
-            log(LogLevel::Error, message);
+            log(ELogLevel::ERROR, message);
         }
         void fatal(const std::string& message)
         {
-            log(LogLevel::Fatal, message);
+            log(ELogLevel::FATAL, message);
         }
 
     private:
@@ -73,8 +73,8 @@ namespace kera
         Logger(const Logger&) = delete;
         Logger& operator=(const Logger&) = delete;
 
-        LogLevel log_level_ = LogLevel::Info;
-        bool abort_on_fatal_ = true;
+        ELogLevel m_log_level = ELogLevel::INFO;
+        bool m_abort_on_fatal = true;
     };
 
 }  // namespace kera

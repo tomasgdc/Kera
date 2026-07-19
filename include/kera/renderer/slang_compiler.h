@@ -14,20 +14,20 @@ namespace kera
 
     struct SlangCompileRequest
     {
-        std::string shaderPath;
-        std::string entryPoint;
-        ShaderType shaderType = ShaderType::Vertex;
-        std::vector<std::string> searchPaths;
+        std::string shader_path;
+        std::string entry_point;
+        EShaderType shader_type = EShaderType::VERTEX;
+        std::vector<std::string> search_paths;
     };
 
     class SlangCompiler
     {
     public:
-        static bool compileToSpirv(const SlangCompileRequest& request, std::vector<uint32_t>& outSpirv,
-                                   std::string* outDiagnostics = nullptr);
-        static bool compileToSpirvAndReflect(const SlangCompileRequest& request, std::vector<uint32_t>& outSpirv,
-                                             SlangReflectionMetadata& outReflection,
-                                             std::string* outDiagnostics = nullptr);
+        static bool compileToSpirv(const SlangCompileRequest& request, std::vector<uint32_t>& out_spirv,
+                                   std::string* out_diagnostics = nullptr);
+        static bool compileToSpirvAndReflect(const SlangCompileRequest& request, std::vector<uint32_t>& out_spirv,
+                                             SlangReflectionMetadata& out_reflection,
+                                             std::string* out_diagnostics = nullptr);
 
     private:
         SlangCompiler() = delete;

@@ -7,7 +7,7 @@ struct VertexInput {
 };
 
 struct InstanceInput {
-    float4x4 modelMatrix : TRANSFORM;
+    float4x4 model_matrix : TRANSFORM;
 };
 
 struct Uniforms {
@@ -25,7 +25,7 @@ struct VertexStageOutput {
 VertexStageOutput vertexMain(VertexInput vertex, InstanceInput instance) {
     VertexStageOutput output;
 
-    float4 worldPos = mul(float4(vertex.position, 1.0), instance.modelMatrix);
+    float4 worldPos = mul(float4(vertex.position, 1.0), instance.model_matrix);
     float4 viewPos  = mul(worldPos, globalParams.view);
     output.sv_position = mul(viewPos, globalParams.projection);
     

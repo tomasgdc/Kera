@@ -21,16 +21,16 @@ namespace kera
             glm::vec3 color;
         };
 
-        namespace BasicTriangleShader
+        namespace basic_triangle_shader
         {
-            constexpr const char* Path = "shaders/triangle.slang";
-            constexpr const char* VertexEntryPoint = "vertexMain";
-            constexpr const char* FragmentEntryPoint = "fragmentMain";
-        }  // namespace BasicTriangleShader
+            constexpr const char* kPath = "shaders/triangle.slang";
+            constexpr const char* kVertexEntryPoint = "vertexMain";
+            constexpr const char* kFragmentEntryPoint = "fragmentMain";
+        }  // namespace basic_triangle_shader
     }  // namespace
 
     BasicTriangleSample::BasicTriangleSample(Renderer& renderer)
-        : Sample("Basic Triangle"), m_renderer(renderer), m_indexCount(0), m_rotationAngle(0.0f)
+        : Sample("Basic Triangle"), m_renderer(renderer), m_index_count(0), m_rotation_angle(0.0f)
     {
     }
 
@@ -61,15 +61,15 @@ namespace kera
 
     bool BasicTriangleSample::createShaderProgram()
     {
-        const std::string shaderPath = resolveShaderPath(BasicTriangleShader::Path);
-        m_shaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = sampleStringView(shaderPath),
-            .vertexEntryPoint = stringView(BasicTriangleShader::VertexEntryPoint),
-            .fragmentEntryPoint = stringView(BasicTriangleShader::FragmentEntryPoint),
-            .source = KERA_SHADER_SOURCE_SLANG_FILE,
-            .debugName = {},
+        const std::string shader_path = resolveShaderPath(basic_triangle_shader::kPath);
+        m_shader_program = m_renderer.createGraphicsShaderProgram({
+            .path = sampleStringView(shader_path),
+            .vertex_entry_point = stringView(basic_triangle_shader::kVertexEntryPoint),
+            .fragment_entry_point = stringView(basic_triangle_shader::kFragmentEntryPoint),
+            .source = EShaderSourceKind::SLANG_FILE,
+            .debug_name = {},
         });
-        return static_cast<bool>(m_shaderProgram.isValid());
+        return static_cast<bool>(m_shader_program.isValid());
     }
 
     bool BasicTriangleSample::createGeometry()
@@ -81,66 +81,66 @@ namespace kera
         };
 
         std::vector<uint16_t> indices = {0, 1, 2};
-        m_indexCount = static_cast<uint32_t>(indices.size());
+        m_index_count = static_cast<uint32_t>(indices.size());
 
-        m_vertexBuffer = m_renderer.createBuffer({
+        m_vertex_buffer = m_renderer.createBuffer({
             .size = vertices.size() * sizeof(Vertex),
-            .usage = BufferUsageKind::Vertex,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::VERTEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_vertexBuffer.isValid())
+        if (!m_vertex_buffer.isValid())
         {
             return false;
         }
 
-        if (!m_renderer.uploadBuffer(m_vertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex)))
+        if (!m_renderer.uploadBuffer(m_vertex_buffer, vertices.data(), vertices.size() * sizeof(Vertex)))
         {
             return false;
         }
 
-        m_indexBuffer = m_renderer.createBuffer({
+        m_index_buffer = m_renderer.createBuffer({
             .size = indices.size() * sizeof(uint16_t),
-            .usage = BufferUsageKind::Index,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::INDEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_indexBuffer.isValid())
+        if (!m_index_buffer.isValid())
         {
             return false;
         }
 
-        return m_renderer.uploadBuffer(m_indexBuffer, indices.data(), indices.size() * sizeof(uint16_t));
+        return m_renderer.uploadBuffer(m_index_buffer, indices.data(), indices.size() * sizeof(uint16_t));
     }
 
     bool BasicTriangleSample::createPipeline()
     {
-        const VertexInputLayout vertexInput = VertexInputLayoutBuilder{}
-                                                  .vertexBinding<Vertex>(0)
-                                                  .field(KERA_VERTEX_FIELD(Vertex, position, 0, VertexFormat::Float3))
-                                                  .field(KERA_VERTEX_FIELD(Vertex, color, 0, VertexFormat::Float3))
-                                                  .layout();
+        const VertexInputLayout vertex_input = VertexInputLayoutBuilder{}
+                                                   .vertexBinding<Vertex>(0)
+                                                   .field(KERA_VERTEX_FIELD(Vertex, position, 0, EVertexFormat::FLOAT3))
+                                                   .field(KERA_VERTEX_FIELD(Vertex, color, 0, EVertexFormat::FLOAT3))
+                                                   .layout();
 
         m_pipeline = m_renderer.createGraphicsPipeline({
-            .shaderProgram = m_shaderProgram,
-            .vertexInput = vertexInput,
-            .topology = PrimitiveTopologyKind::TriangleList,
+            .shader_program = m_shader_program,
+            .vertex_input = vertex_input,
+            .topology = EPrimitiveTopologyKind::TRIANGLE_LIST,
         });
         return static_cast<bool>(m_pipeline.isValid());
     }
 
-    void BasicTriangleSample::update(float deltaTime)
+    void BasicTriangleSample::update(float delta_time)
     {
-        m_rotationAngle += deltaTime * 45.0f;
-        if (m_rotationAngle >= 360.0f)
+        m_rotation_angle += delta_time * 45.0f;
+        if (m_rotation_angle >= 360.0f)
         {
-            m_rotationAngle -= 360.0f;
+            m_rotation_angle -= 360.0f;
         }
     }
 
     void BasicTriangleSample::render(RenderContext& context)
     {
-        if (!m_pipeline.isValid() || !m_vertexBuffer.isValid() || !m_indexBuffer.isValid())
+        if (!m_pipeline.isValid() || !m_vertex_buffer.isValid() || !m_index_buffer.isValid())
         {
             sampleLogWarning("Render called before Basic Triangle resources were initialized");
             return;
@@ -150,9 +150,9 @@ namespace kera
                                    [this](FrameHandle frame)
                                    {
                                        m_renderer.bindPipeline(frame, m_pipeline);
-                                       m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
-                                       m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
-                                       m_renderer.drawIndexed(frame, m_indexCount);
+                                       m_renderer.bindVertexBuffer(frame, 0, m_vertex_buffer);
+                                       m_renderer.bindIndexBuffer(frame, m_index_buffer, EIndexFormat::U_INT16);
+                                       m_renderer.drawIndexed(frame, m_index_count);
                                    });
     }
 
@@ -165,22 +165,22 @@ namespace kera
             m_pipeline = {};
         }
 
-        if (m_indexBuffer.isValid())
+        if (m_index_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_indexBuffer);
-            m_indexBuffer = {};
+            m_renderer.destroyBuffer(m_index_buffer);
+            m_index_buffer = {};
         }
 
-        if (m_vertexBuffer.isValid())
+        if (m_vertex_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_vertexBuffer);
-            m_vertexBuffer = {};
+            m_renderer.destroyBuffer(m_vertex_buffer);
+            m_vertex_buffer = {};
         }
 
-        if (m_shaderProgram.isValid())
+        if (m_shader_program.isValid())
         {
-            m_renderer.destroyShaderProgram(m_shaderProgram);
-            m_shaderProgram = {};
+            m_renderer.destroyShaderProgram(m_shader_program);
+            m_shader_program = {};
         }
     }
 }  // namespace kera

@@ -22,7 +22,7 @@ namespace
 
     struct InstanceData
     {
-        float modelMatrix[16];
+        float model_matrix[16];
     };
 
     struct Uniforms
@@ -30,43 +30,43 @@ namespace
         float matrix[16];
     };
 
-    kera::SlangReflectionInput makeInput(const std::string& parameterName, const std::string& fieldName,
-                                         const std::string& semanticName, uint32_t location, kera::VertexFormat format,
-                                         uint32_t locationCount = 1)
+    kera::SlangReflectionInput makeInput(const std::string& parameter_name, const std::string& field_name,
+                                         const std::string& semantic_name, uint32_t location,
+                                         kera::EVertexFormat format, uint32_t location_count = 1)
     {
         return {
-            .name = fieldName,
-            .parameterName = parameterName,
-            .fieldName = fieldName,
-            .semanticName = semanticName,
+            .name = field_name,
+            .parameter_name = parameter_name,
+            .field_name = field_name,
+            .semantic_name = semantic_name,
             .location = location,
-            .locationCount = locationCount,
+            .location_count = location_count,
             .format = format,
-            .hasFormat = true,
+            .has_format = true,
         };
     }
 
     kera::SlangReflectionMetadata makeTriangleReflection()
     {
         kera::SlangReflectionMetadata reflection{};
-        reflection.entryPoints.push_back({
+        reflection.entry_points.push_back({
             .name = "vertexMain",
-            .stage = kera::ShaderType::Vertex,
+            .stage = kera::EShaderType::VERTEX,
             .inputs =
                 {
-                    makeInput("vertex", "position", "POSITION", 0, kera::VertexFormat::Float3),
-                    makeInput("vertex", "color", "COLOR", 1, kera::VertexFormat::Float3),
+                    makeInput("vertex", "position", "POSITION", 0, kera::EVertexFormat::FLOAT3),
+                    makeInput("vertex", "color", "COLOR", 1, kera::EVertexFormat::FLOAT3),
                 },
         });
         reflection.bindings.push_back({
             .name = "globalParams",
-            .kind = kera::SlangReflectionBindingKind::ConstantBuffer,
-            .stage = kera::ShaderType::Vertex,
+            .kind = kera::ESlangReflectionBindingKind::CONSTANT_BUFFER,
+            .stage = kera::EShaderType::VERTEX,
             .binding = 0,
             .space = 0,
             .count = 1,
-            .typeName = "Uniforms",
-            .uniformSize = sizeof(Uniforms),
+            .type_name = "Uniforms",
+            .uniform_size = sizeof(Uniforms),
         });
         return reflection;
     }
@@ -74,8 +74,8 @@ namespace
     kera::SlangReflectionMetadata makeInstancedReflection()
     {
         kera::SlangReflectionMetadata reflection = makeTriangleReflection();
-        reflection.entryPoints.front().inputs.push_back(
-            makeInput("instance", "modelMatrix", "TRANSFORM", 2, kera::VertexFormat::Float4, 4));
+        reflection.entry_points.front().inputs.push_back(
+            makeInput("instance", "model_matrix", "TRANSFORM", 2, kera::EVertexFormat::FLOAT4, 4));
         return reflection;
     }
 
@@ -84,8 +84,8 @@ namespace
         return kera::VertexInputLayoutBuilder{}
             .debugName("Vertex Input Test")
             .vertexBinding<Vertex>(0)
-            .field("position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-            .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3);
+            .field("position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+            .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3);
     }
 
     kera::VertexInputLayoutBuildResult build(kera::VertexInputLayoutBuilder builder,
@@ -97,9 +97,9 @@ namespace
     class FakeRenderer final : public kera::IRenderer
     {
     public:
-        kera::GraphicsBackend getBackend() const override
+        kera::EGraphicsBackend getBackend() const override
         {
-            return kera::GraphicsBackend::Vulkan;
+            return kera::EGraphicsBackend::VULKAN;
         }
         kera::Extent2D getDrawableExtent() const override
         {
@@ -194,6 +194,22 @@ namespace
         {
             return {};
         }
+        int32_t upload_batch_begin_count = 0;
+        int32_t upload_batch_end_count = 0;
+        int32_t upload_batch_cancel_count = 0;
+        bool upload_batch_begin_succeeds = true;
+        bool upload_batch_end_succeeds = true;
+        bool texture_uploads_suceed = true;
+
+        bool beginUploadBatch() override
+        {
+            return false;
+        }
+        bool endUploadBatch() override
+        {
+            return false;
+        }
+        void cancelUploadBatch() override {}
         bool uploadTexture(kera::TextureHandle, const void*, std::size_t) override
         {
             return false;
@@ -289,7 +305,7 @@ namespace
         void endRenderPass(kera::FrameHandle) override {}
         void bindPipeline(kera::FrameHandle, kera::GraphicsPipelineHandle) override {}
         void bindVertexBuffer(kera::FrameHandle, uint32_t, kera::BufferHandle, std::size_t) override {}
-        void bindIndexBuffer(kera::FrameHandle, kera::BufferHandle, kera::IndexFormat, std::size_t) override {}
+        void bindIndexBuffer(kera::FrameHandle, kera::BufferHandle, kera::EIndexFormat, std::size_t) override {}
         void bindDescriptorSet(kera::FrameHandle, kera::GraphicsPipelineHandle, kera::DescriptorSetHandle) override {}
         void bindDescriptorSet(kera::FrameHandle, kera::GraphicsPipelineHandle, uint32_t,
                                kera::DescriptorSetHandle) override
@@ -318,26 +334,26 @@ TEST(KeraReflectionContracts, BuildsValidatedVertexInputLayoutAndDescriptorUpdat
     EXPECT_EQ(result.layout().attributes[1].offset, offsetof(Vertex, color));
 
     FakeRenderer renderer;
-    const kera::DescriptorSetHandle descriptorSet{0, 1};
+    const kera::DescriptorSetHandle descriptor_set{0, 1};
     const kera::BufferHandle buffer{0, 1};
     const kera::TextureHandle texture{0, 1};
     const kera::SamplerHandle sampler{0, 1};
-    const kera::DescriptorSetUpdate update = renderer.updateDescriptors(descriptorSet)
+    const kera::DescriptorSetUpdate update = renderer.updateDescriptors(descriptor_set)
                                                  .uniform<Uniforms>("globalParams", buffer)
                                                  .sampledImage("sceneTexture", texture)
                                                  .sampler("sceneSampler", sampler);
     EXPECT_TRUE(update.ok());
 
-    const kera::DescriptorSetUpdate failedUpdate =
-        renderer.updateDescriptors(descriptorSet).sampledImage("globalParams", texture);
-    EXPECT_FALSE(failedUpdate.ok());
-    EXPECT_FALSE(failedUpdate.errorMessage().empty());
-    EXPECT_FALSE(failedUpdate.report().ok());
-    ASSERT_EQ(failedUpdate.report().issues.size(), 1u);
-    EXPECT_EQ(failedUpdate.report().issues.front().code, kera::RendererErrorCode::ValidationFailed);
-    EXPECT_EQ(failedUpdate.report().issues.front().category, kera::RendererValidationCategory::Descriptor);
-    EXPECT_FALSE(failedUpdate.result().ok());
-    EXPECT_EQ(failedUpdate.result().errorCode(), kera::RendererErrorCode::ValidationFailed);
+    const kera::DescriptorSetUpdate failed_update =
+        renderer.updateDescriptors(descriptor_set).sampledImage("globalParams", texture);
+    EXPECT_FALSE(failed_update.ok());
+    EXPECT_FALSE(failed_update.errorMessage().empty());
+    EXPECT_FALSE(failed_update.report().ok());
+    ASSERT_EQ(failed_update.report().issues.size(), 1u);
+    EXPECT_EQ(failed_update.report().issues.front().code, kera::ERendererErrorCode::VALIDATION_FAILED);
+    EXPECT_EQ(failed_update.report().issues.front().category, kera::ERendererValidationCategory::DESCRIPTOR);
+    EXPECT_FALSE(failed_update.result().ok());
+    EXPECT_EQ(failed_update.result().errorCode(), kera::ERendererErrorCode::VALIDATION_FAILED);
     EXPECT_FALSE(renderer.tryCreateGraphicsShaderProgram({}).ok());
     EXPECT_FALSE(renderer.tryCreateGraphicsPipeline({}).ok());
     EXPECT_FALSE(renderer.tryCreateDescriptorSet({0, 1}).ok());
@@ -350,66 +366,66 @@ TEST(KeraReflectionContracts, BuildRejectsInvalidVertexInputLayouts)
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}
                            .vertexBinding<Vertex>(0)
                            .vertexBinding<Vertex>(0)
-                           .field("position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                           .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3),
+                           .field("position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                           .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3),
                        reflection)
                      .ok());
 
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}
                            .vertexBinding(0, 0)
-                           .field("position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                           .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3),
+                           .field("position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                           .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3),
                        reflection)
                      .ok());
 
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}
                            .vertexBinding<Vertex>(0)
-                           .field("missingPosition", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                           .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3),
+                           .field("missingPosition", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                           .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3),
                        reflection)
                      .ok());
 
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}
                            .vertexBinding<Vertex>(0)
-                           .field("position", 1, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                           .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3),
+                           .field("position", 1, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                           .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3),
                        reflection)
                      .ok());
 
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}
                            .vertexBinding<Vertex>(0)
-                           .field("position", 0, offsetof(Vertex, position), kera::VertexFormat::Float2)
-                           .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3),
+                           .field("position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT2)
+                           .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3),
                        reflection)
                      .ok());
 
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}
                            .vertexBinding<Vertex>(0)
-                           .field("position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                           .field("position", 0, offsetof(Vertex, color), kera::VertexFormat::Float3),
+                           .field("position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                           .field("position", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3),
                        reflection)
                      .ok());
 
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}
                            .debugName("Unused Field Test")
                            .vertexBinding<Vertex>(0)
-                           .field("position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                           .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3)
-                           .field("uv", 0, 0, kera::VertexFormat::Float2),
+                           .field("position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                           .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3)
+                           .field("uv", 0, 0, kera::EVertexFormat::FLOAT2),
                        reflection)
                      .ok());
 }
 
 TEST(KeraReflectionContracts, BuildRejectsMissingOrAmbiguousVertexEntryReflection)
 {
-    kera::SlangReflectionMetadata missingVertexReflection = makeTriangleReflection();
-    missingVertexReflection.entryPoints.clear();
-    EXPECT_FALSE(build(makeValidBuilder(), missingVertexReflection).ok());
+    kera::SlangReflectionMetadata missing_vertex_reflection = makeTriangleReflection();
+    missing_vertex_reflection.entry_points.clear();
+    EXPECT_FALSE(build(makeValidBuilder(), missing_vertex_reflection).ok());
 
-    kera::SlangReflectionMetadata ambiguousVertexReflection = makeTriangleReflection();
-    ambiguousVertexReflection.entryPoints.push_back(ambiguousVertexReflection.entryPoints.front());
-    ambiguousVertexReflection.entryPoints.back().name = "otherVertexMain";
-    EXPECT_FALSE(build(makeValidBuilder(), ambiguousVertexReflection).ok());
+    kera::SlangReflectionMetadata ambiguous_vertex_reflection = makeTriangleReflection();
+    ambiguous_vertex_reflection.entry_points.push_back(ambiguous_vertex_reflection.entry_points.front());
+    ambiguous_vertex_reflection.entry_points.back().name = "otherVertexMain";
+    EXPECT_FALSE(build(makeValidBuilder(), ambiguous_vertex_reflection).ok());
 }
 
 TEST(KeraReflectionContracts, BuildExpandsMatrixInputs)
@@ -419,42 +435,42 @@ TEST(KeraReflectionContracts, BuildExpandsMatrixInputs)
     const kera::VertexInputLayoutBuildResult result =
         build(kera::VertexInputLayoutBuilder{}
                   .vertexBinding<Vertex>(0)
-                  .vertexBinding<InstanceData>(1, kera::VertexInputRate::Instance)
-                  .field("position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                  .field("color", 0, offsetof(Vertex, color), kera::VertexFormat::Float3)
-                  .field("modelMatrix", 1, offsetof(InstanceData, modelMatrix), kera::VertexFormat::Float4),
+                  .vertexBinding<InstanceData>(1, kera::EVertexInputRate::INSTANCE)
+                  .field("position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                  .field("color", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3)
+                  .field("model_matrix", 1, offsetof(InstanceData, model_matrix), kera::EVertexFormat::FLOAT4),
               reflection);
 
     ASSERT_TRUE(result.ok()) << result.errorMessage();
     ASSERT_EQ(result.layout().attributes.size(), 6u);
     EXPECT_EQ(result.layout().attributes[2].location, 2u);
-    EXPECT_EQ(result.layout().attributes[2].offset, offsetof(InstanceData, modelMatrix));
+    EXPECT_EQ(result.layout().attributes[2].offset, offsetof(InstanceData, model_matrix));
     EXPECT_EQ(result.layout().attributes[5].location, 5u);
-    EXPECT_EQ(result.layout().attributes[5].offset, offsetof(InstanceData, modelMatrix) + sizeof(float) * 12);
+    EXPECT_EQ(result.layout().attributes[5].offset, offsetof(InstanceData, model_matrix) + sizeof(float) * 12);
 }
 
 TEST(KeraReflectionContracts, AmbiguousFieldsRequireParameterName)
 {
     kera::SlangReflectionMetadata reflection{};
-    reflection.entryPoints.push_back({
+    reflection.entry_points.push_back({
         .name = "vertexMain",
-        .stage = kera::ShaderType::Vertex,
+        .stage = kera::EShaderType::VERTEX,
         .inputs =
             {
-                makeInput("vertex", "position", "POSITION", 0, kera::VertexFormat::Float3),
-                makeInput("instance", "position", "INSTANCE_POSITION", 1, kera::VertexFormat::Float3),
+                makeInput("vertex", "position", "POSITION", 0, kera::EVertexFormat::FLOAT3),
+                makeInput("instance", "position", "INSTANCE_POSITION", 1, kera::EVertexFormat::FLOAT3),
             },
     });
 
     EXPECT_FALSE(build(kera::VertexInputLayoutBuilder{}.vertexBinding<Vertex>(0).field(
-                           "position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3),
+                           "position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3),
                        reflection)
                      .ok());
 
     EXPECT_TRUE(build(kera::VertexInputLayoutBuilder{}
                           .vertexBinding<Vertex>(0)
-                          .fieldIn("vertex", "position", 0, offsetof(Vertex, position), kera::VertexFormat::Float3)
-                          .fieldIn("instance", "position", 0, offsetof(Vertex, color), kera::VertexFormat::Float3),
+                          .fieldIn("vertex", "position", 0, offsetof(Vertex, position), kera::EVertexFormat::FLOAT3)
+                          .fieldIn("instance", "position", 0, offsetof(Vertex, color), kera::EVertexFormat::FLOAT3),
                       reflection)
                     .ok());
 }

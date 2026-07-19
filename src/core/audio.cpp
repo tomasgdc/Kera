@@ -14,7 +14,7 @@ namespace kera
 {
 
     // AudioBuffer implementation
-    AudioBuffer::AudioBuffer() : frequency_(0), channels_(0) {}
+    AudioBuffer::AudioBuffer() : m_frequency(0), m_channels(0) {}
 
     AudioBuffer::~AudioBuffer()
     {
@@ -28,18 +28,18 @@ namespace kera
         Logger::getInstance().info("Loading audio from file: " + filename);
 
         // Generate a simple sine wave for testing
-        frequency_ = 44100;
-        channels_ = 1;
+        m_frequency = 44100;
+        m_channels = 1;
         const float duration = 1.0f;  // 1 second
-        const size_t sampleCount = static_cast<size_t>(frequency_ * duration);
+        const size_t sample_count = static_cast<size_t>(m_frequency * duration);
 
-        data_.resize(sampleCount);
+        m_data.resize(sample_count);
         const float frequency = 440.0f;  // A4 note
 
-        for (size_t i = 0; i < sampleCount; ++i)
+        for (size_t i = 0; i < sample_count; ++i)
         {
-            float t = static_cast<float>(i) / frequency_;
-            data_[i] = static_cast<float>(std::sin(2.0f * 3.14159f * frequency * t) * 0.1f);  // Low volume
+            float t = static_cast<float>(i) / m_frequency;
+            m_data[i] = static_cast<float>(std::sin(2.0f * 3.14159f * frequency * t) * 0.1f);  // Low volume
         }
 
         return true;
@@ -51,25 +51,31 @@ namespace kera
         Logger::getInstance().info("Loading audio from memory: " + std::to_string(size) + " bytes, " +
                                    std::to_string(frequency) + "Hz, " + std::to_string(channels) + " channels");
 
-        frequency_ = frequency;
-        channels_ = channels;
-        data_.assign(static_cast<const float*>(data), static_cast<const float*>(data) + size);
+        m_frequency = frequency;
+        m_channels = channels;
+        m_data.assign(static_cast<const float*>(data), static_cast<const float*>(data) + size);
 
         return true;
     }
 
     float AudioBuffer::getDuration() const
     {
-        if (frequency_ == 0 || channels_ == 0)
+        if (m_frequency == 0 || m_channels == 0)
         {
             return 0.0f;
         }
-        return static_cast<float>(data_.size()) / (frequency_ * channels_);
+        return static_cast<float>(m_data.size()) / (m_frequency * m_channels);
     }
 
     // AudioSource implementation
     AudioSource::AudioSource()
-        : buffer_(nullptr), playing_(false), paused_(false), loop_(false), volume_(1.0f), pitch_(1.0f), position_(0)
+        : m_buffer(nullptr)
+        , m_playing(false)
+        , m_paused(false)
+        , m_loop(false)
+        , m_volume(1.0f)
+        , m_pitch(1.0f)
+        , m_position(0)
     {
     }
 
@@ -80,69 +86,69 @@ namespace kera
 
     void AudioSource::setBuffer(const AudioBuffer* buffer)
     {
-        if (playing_)
+        if (m_playing)
         {
             stop();
         }
-        buffer_ = buffer;
-        position_ = 0;
+        m_buffer = buffer;
+        m_position = 0;
     }
 
     void AudioSource::play()
     {
-        if (buffer_ && !playing_)
+        if (m_buffer && !m_playing)
         {
-            playing_ = true;
-            paused_ = false;
+            m_playing = true;
+            m_paused = false;
             Logger::getInstance().info("Audio source started playing");
         }
     }
 
     void AudioSource::pause()
     {
-        if (playing_ && !paused_)
+        if (m_playing && !m_paused)
         {
-            paused_ = true;
+            m_paused = true;
             Logger::getInstance().info("Audio source paused");
         }
     }
 
     void AudioSource::stop()
     {
-        playing_ = false;
-        paused_ = false;
-        position_ = 0;
+        m_playing = false;
+        m_paused = false;
+        m_position = 0;
         Logger::getInstance().info("Audio source stopped");
     }
 
     void AudioSource::setLoop(bool loop)
     {
-        loop_ = loop;
+        m_loop = loop;
     }
 
     void AudioSource::setVolume(float volume)
     {
-        volume_ = std::clamp(volume, 0.0f, 1.0f);
+        m_volume = std::clamp(volume, 0.0f, 1.0f);
     }
 
     void AudioSource::setPitch(float pitch)
     {
-        pitch_ = std::max(pitch, 0.0f);
+        m_pitch = std::max(pitch, 0.0f);
     }
 
     bool AudioSource::isPlaying() const
     {
-        return playing_ && !paused_;
+        return m_playing && !m_paused;
     }
 
     bool AudioSource::isPaused() const
     {
-        return playing_ && paused_;
+        return m_playing && m_paused;
     }
 
     bool AudioSource::isStopped() const
     {
-        return !playing_;
+        return !m_playing;
     }
 
     // Audio implementation
@@ -154,7 +160,7 @@ namespace kera
 
     bool Audio::initialize()
     {
-        if (initialized_)
+        if (m_initialized)
         {
             return true;
         }
@@ -168,26 +174,26 @@ namespace kera
 
         // TODO: Set up audio device and mixer
 
-        initialized_ = true;
+        m_initialized = true;
         Logger::getInstance().info("Audio system initialized");
         return true;
     }
 
     void Audio::shutdown()
     {
-        if (!initialized_)
+        if (!m_initialized)
         {
             return;
         }
 
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
-        initialized_ = false;
+        m_initialized = false;
         Logger::getInstance().info("Audio system shutdown");
     }
 
     void Audio::update()
     {
-        if (!initialized_)
+        if (!m_initialized)
         {
             return;
         }

@@ -21,30 +21,30 @@ namespace kera
     struct ShaderStageContract
     {
         std::string path;
-        std::string entryPoint;
-        ShaderStage stage = ShaderStage::Vertex;
-        ShaderSourceKind source = ShaderSourceKind::SlangFile;
+        std::string entry_point;
+        EShaderStage stage = EShaderStage::VERTEX;
+        EShaderSourceKind source = EShaderSourceKind::SLANG_FILE;
     };
 
     struct ReflectedVertexBindingDesc
     {
         uint32_t binding = 0;
         uint32_t stride = 0;
-        VertexInputRate inputRate = VertexInputRate::Vertex;
+        EVertexInputRate input_rate = EVertexInputRate::VERTEX;
     };
 
     struct ReflectedVertexFieldDesc
     {
-        std::string parameterName;
-        std::string fieldName;
+        std::string parameter_name;
+        std::string field_name;
         uint32_t binding = 0;
         uint32_t offset = 0;
-        VertexFormat format = VertexFormat::Float3;
+        EVertexFormat format = EVertexFormat::FLOAT3;
     };
 
     struct VertexInputLayoutView
     {
-        std::string_view debugName;
+        std::string_view debug_name;
         std::span<const ReflectedVertexBindingDesc> bindings;
         std::span<const ReflectedVertexFieldDesc> fields;
     };
@@ -73,19 +73,19 @@ namespace kera
 
     struct GraphicsPipelineCreateDesc
     {
-        ShaderProgramHandle shaderProgram;
-        RenderTargetHandle renderTarget;
-        PrimitiveTopologyKind topology = PrimitiveTopologyKind::TriangleList;
-        CullModeKind cullMode = CullModeKind::Back;
-        FrontFaceKind frontFace = FrontFaceKind::Clockwise;
-        BlendModeKind blendMode = BlendModeKind::Opaque;
-        bool depthTest = false;
-        bool depthWrite = false;
-        std::vector<ReflectedVertexBindingDesc> vertexBindings;
-        std::vector<ReflectedVertexFieldDesc> vertexFields;
-        VertexLayoutDesc vertexLayout;
-        std::vector<DescriptorSetLayoutDesc> descriptorSets;
-        std::string debugName;
+        ShaderProgramHandle shader_program;
+        RenderTargetHandle render_target;
+        EPrimitiveTopologyKind topology = EPrimitiveTopologyKind::TRIANGLE_LIST;
+        ECullModeKind cull_mode = ECullModeKind::BACK;
+        EFrontFaceKind front_face = EFrontFaceKind::CLOCKWISE;
+        EBlendModeKind blend_mode = EBlendModeKind::OPAQUE;
+        bool depth_test = false;
+        bool depth_write = false;
+        std::vector<ReflectedVertexBindingDesc> vertex_bindings;
+        std::vector<ReflectedVertexFieldDesc> vertex_fields;
+        VertexLayoutDesc vertex_layout;
+        std::vector<DescriptorSetLayoutDesc> descriptor_sets;
+        std::string debug_name;
     };
 
     class VertexInputLayoutBuilder
@@ -93,28 +93,30 @@ namespace kera
     public:
         VertexInputLayoutBuilder& debugName(std::string name);
         VertexInputLayoutBuilder& vertexBinding(uint32_t binding, uint32_t stride,
-                                                VertexInputRate inputRate = VertexInputRate::Vertex);
+                                                EVertexInputRate input_rate = EVertexInputRate::VERTEX);
         template <typename VertexT>
-        VertexInputLayoutBuilder& vertexBinding(uint32_t binding, VertexInputRate inputRate = VertexInputRate::Vertex)
+        VertexInputLayoutBuilder& vertexBinding(uint32_t binding,
+                                                EVertexInputRate input_rate = EVertexInputRate::VERTEX)
         {
-            return vertexBinding(binding, static_cast<uint32_t>(sizeof(VertexT)), inputRate);
+            return vertexBinding(binding, static_cast<uint32_t>(sizeof(VertexT)), input_rate);
         }
-        VertexInputLayoutBuilder& field(std::string fieldName, uint32_t binding, uint32_t offset, VertexFormat format);
-        VertexInputLayoutBuilder& fieldIn(std::string parameterName, std::string fieldName, uint32_t binding,
-                                          uint32_t offset, VertexFormat format);
+        VertexInputLayoutBuilder& field(std::string field_name, uint32_t binding, uint32_t offset,
+                                        EVertexFormat format);
+        VertexInputLayoutBuilder& fieldIn(std::string parameter_name, std::string field_name, uint32_t binding,
+                                          uint32_t offset, EVertexFormat format);
         VertexInputLayoutBuildResult build(const SlangReflectionMetadata& reflection) &&;
 
     private:
-        std::string m_debugName;
-        std::vector<ReflectedVertexBindingDesc> m_vertexBindings;
-        std::vector<ReflectedVertexFieldDesc> m_vertexFields;
+        std::string m_debug_name;
+        std::vector<ReflectedVertexBindingDesc> m_vertex_bindings;
+        std::vector<ReflectedVertexFieldDesc> m_vertex_fields;
     };
 
     ShaderProgramDesc makeShaderProgramDesc(std::span<const ShaderStageContract> stages);
     const SlangReflectionBinding* requireReflectedDescriptorBinding(const SlangReflectionMetadata* reflection,
-                                                                    const std::string& name, DescriptorType type);
-    bool validateReflectedUniformSize(const SlangReflectionBinding& binding, std::size_t expectedSize);
+                                                                    const std::string& name, EDescriptorType type);
+    bool validateReflectedUniformSize(const SlangReflectionBinding& binding, std::size_t expected_size);
     VertexInputLayoutBuildResult buildValidatedVertexInputLayout(const SlangReflectionMetadata& reflection,
-                                                                 VertexInputLayoutView vertexInput);
+                                                                 VertexInputLayoutView vertex_input);
 
 }  // namespace kera

@@ -29,7 +29,7 @@ namespace kera
 
         struct InstanceData
         {
-            glm::mat4 modelMatrix;
+            glm::mat4 model_matrix;
         };
 
         struct GeometryUniforms
@@ -40,28 +40,28 @@ namespace kera
 
         struct LightData
         {
-            glm::vec4 positionRadius;
-            glm::vec4 colorIntensity;
+            glm::vec4 position_radius;
+            glm::vec4 color_intensity;
         };
 
         struct LightingUniforms
         {
-            glm::vec4 ambientTimeLightCount;
+            glm::vec4 ambient_time_light_count;
             std::array<LightData, 64> lights;
         };
 
-        namespace ManyLightsShader
+        namespace many_lights_shader
         {
-            constexpr const char* Path = "shaders/instanced_triangle_many_lights.slang";
-            constexpr const char* GeometryVertexEntryPoint = "geometryVertexMain";
-            constexpr const char* GeometryFragmentEntryPoint = "geometryFragmentMain";
-            constexpr const char* FullscreenVertexEntryPoint = "fullscreenVertexMain";
-            constexpr const char* LightingFragmentEntryPoint = "lightingFragmentMain";
+            constexpr const char* kPath = "shaders/instanced_triangle_many_lights.slang";
+            constexpr const char* kGeometryVertexEntryPoint = "geometryVertexMain";
+            constexpr const char* kGeometryFragmentEntryPoint = "geometryFragmentMain";
+            constexpr const char* kFullscreenVertexEntryPoint = "fullscreenVertexMain";
+            constexpr const char* kLightingFragmentEntryPoint = "lightingFragmentMain";
 
-            constexpr const char* GeometryParams = "geometryParams";
-            constexpr const char* LightingParams = "lightingParams";
-            constexpr const char* SceneTexture = "sceneTexture";
-            constexpr const char* SceneSampler = "sceneSampler";
+            constexpr const char* kGeometryParams = "geometryParams";
+            constexpr const char* kLightingParams = "lightingParams";
+            constexpr const char* kSceneTexture = "sceneTexture";
+            constexpr const char* kSceneSampler = "sceneSampler";
         }  // namespace ManyLightsShader
 
     }  // namespace
@@ -103,30 +103,30 @@ namespace kera
 
     bool InstancedTriangleManyLightsSample::createShaderPrograms()
     {
-        const std::string shaderPath = resolveShaderPath(ManyLightsShader::Path);
+        const std::string shader_path = resolveShaderPath(many_lights_shader::kPath);
 
-        m_geometryShaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = sampleStringView(shaderPath),
-            .vertexEntryPoint = stringView(ManyLightsShader::GeometryVertexEntryPoint),
-            .fragmentEntryPoint = stringView(ManyLightsShader::GeometryFragmentEntryPoint),
-            .source = KERA_SHADER_SOURCE_SLANG_FILE,
-            .debugName = {},
+        m_geometry_shader_program = m_renderer.createGraphicsShaderProgram({
+            .path = sampleStringView(shader_path),
+            .vertex_entry_point = stringView(many_lights_shader::kGeometryVertexEntryPoint),
+            .fragment_entry_point = stringView(many_lights_shader::kGeometryFragmentEntryPoint),
+            .source = EShaderSourceKind::SLANG_FILE,
+            .debug_name = {},
         });
 
-        if (!m_geometryShaderProgram.isValid())
+        if (!m_geometry_shader_program.isValid())
         {
             return false;
         }
 
-        m_lightingShaderProgram = m_renderer.createGraphicsShaderProgram({
-            .path = sampleStringView(shaderPath),
-            .vertexEntryPoint = stringView(ManyLightsShader::FullscreenVertexEntryPoint),
-            .fragmentEntryPoint = stringView(ManyLightsShader::LightingFragmentEntryPoint),
-            .source = KERA_SHADER_SOURCE_SLANG_FILE,
-            .debugName = {},
+        m_lighting_shader_program = m_renderer.createGraphicsShaderProgram({
+            .path = sampleStringView(shader_path),
+            .vertex_entry_point = stringView(many_lights_shader::kFullscreenVertexEntryPoint),
+            .fragment_entry_point = stringView(many_lights_shader::kLightingFragmentEntryPoint),
+            .source = EShaderSourceKind::SLANG_FILE,
+            .debug_name = {},
         });
 
-        return m_lightingShaderProgram.isValid();
+        return m_lighting_shader_program.isValid();
     }
 
     bool InstancedTriangleManyLightsSample::createGeometry()
@@ -137,87 +137,87 @@ namespace kera
             {{0.0f, 0.32f, 0.0f}, {0.15f, 0.3f, 1.0f}},
         };
         const std::vector<uint16_t> indices = {0, 1, 2};
-        m_indexCount = static_cast<uint32_t>(indices.size());
+        m_index_count = static_cast<uint32_t>(indices.size());
 
-        m_vertexBuffer = m_renderer.createBuffer({
+        m_vertex_buffer = m_renderer.createBuffer({
             .size = vertices.size() * sizeof(Vertex),
-            .usage = BufferUsageKind::Vertex,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::VERTEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
-        if (!m_vertexBuffer.isValid() ||
-            !m_renderer.uploadBuffer(m_vertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex)))
+        if (!m_vertex_buffer.isValid() ||
+            !m_renderer.uploadBuffer(m_vertex_buffer, vertices.data(), vertices.size() * sizeof(Vertex)))
         {
             return false;
         }
 
-        m_indexBuffer = m_renderer.createBuffer({
+        m_index_buffer = m_renderer.createBuffer({
             .size = indices.size() * sizeof(uint16_t),
-            .usage = BufferUsageKind::Index,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::INDEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_indexBuffer.isValid() ||
-            !m_renderer.uploadBuffer(m_indexBuffer, indices.data(), indices.size() * sizeof(uint16_t)))
+        if (!m_index_buffer.isValid() ||
+            !m_renderer.uploadBuffer(m_index_buffer, indices.data(), indices.size() * sizeof(uint16_t)))
         {
             return false;
         }
 
-        m_instanceCount = 120;
-        std::vector<InstanceData> instances(m_instanceCount);
-        m_instanceBuffer = m_renderer.createBuffer({
+        m_instance_count = 120;
+        std::vector<InstanceData> instances(m_instance_count);
+        m_instance_buffer = m_renderer.createBuffer({
             .size = instances.size() * sizeof(InstanceData),
-            .usage = BufferUsageKind::Vertex,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::VERTEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_instanceBuffer.isValid())
+        if (!m_instance_buffer.isValid())
         {
             return false;
         }
 
-        const auto& fullscreenVertices = fullscreenTriangleVertices();
-        const auto& fullscreenIndices = fullscreenTriangleIndices();
-        m_fullscreenIndexCount = static_cast<uint32_t>(fullscreenIndices.size());
+        const auto& fullscreen_vertices = fullscreenTriangleVertices();
+        const auto& fullscreen_indices = fullscreenTriangleIndices();
+        m_fullscreen_index_count = static_cast<uint32_t>(fullscreen_indices.size());
 
-        m_fullscreenVertexBuffer = m_renderer.createBuffer({
-            .size = fullscreenVertices.size() * sizeof(FullscreenTriangleVertex),
-            .usage = BufferUsageKind::Vertex,
-            .memoryAccess = MemoryAccess::CpuWrite,
+        m_fullscreen_vertex_buffer = m_renderer.createBuffer({
+            .size = fullscreen_vertices.size() * sizeof(FullscreenTriangleVertex),
+            .usage = EBufferUsageKind::VERTEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_fullscreenVertexBuffer.isValid() ||
-            !m_renderer.uploadBuffer(m_fullscreenVertexBuffer, fullscreenVertices.data(),
-                                     fullscreenVertices.size() * sizeof(FullscreenTriangleVertex)))
+        if (!m_fullscreen_vertex_buffer.isValid() ||
+            !m_renderer.uploadBuffer(m_fullscreen_vertex_buffer, fullscreen_vertices.data(),
+                                     fullscreen_vertices.size() * sizeof(FullscreenTriangleVertex)))
         {
             return false;
         }
 
-        m_fullscreenIndexBuffer = m_renderer.createBuffer({
-            .size = fullscreenIndices.size() * sizeof(uint16_t),
-            .usage = BufferUsageKind::Index,
-            .memoryAccess = MemoryAccess::CpuWrite,
+        m_fullscreen_index_buffer = m_renderer.createBuffer({
+            .size = fullscreen_indices.size() * sizeof(uint16_t),
+            .usage = EBufferUsageKind::INDEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        if (!m_fullscreenIndexBuffer.isValid() ||
-            !m_renderer.uploadBuffer(m_fullscreenIndexBuffer, fullscreenIndices.data(),
-                                     fullscreenIndices.size() * sizeof(uint16_t)))
+        if (!m_fullscreen_index_buffer.isValid() ||
+            !m_renderer.uploadBuffer(m_fullscreen_index_buffer, fullscreen_indices.data(),
+                                     fullscreen_indices.size() * sizeof(uint16_t)))
         {
             return false;
         }
 
-        m_geometryUniformBuffer = m_renderer.createBuffer({
+        m_geometry_uniform_buffer = m_renderer.createBuffer({
             .size = sizeof(GeometryUniforms),
-            .usage = BufferUsageKind::Uniform,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::UNIFORM,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        m_lightingUniformBuffer = m_renderer.createBuffer({
+        m_lighting_uniform_buffer = m_renderer.createBuffer({
             .size = sizeof(LightingUniforms),
-            .usage = BufferUsageKind::Uniform,
-            .memoryAccess = MemoryAccess::CpuWrite,
+            .usage = EBufferUsageKind::UNIFORM,
+            .memory_access = EMemoryAccess::CPU_WRITE,
         });
 
-        return m_geometryUniformBuffer.isValid() && m_lightingUniformBuffer.isValid();
+        return m_geometry_uniform_buffer.isValid() && m_lighting_uniform_buffer.isValid();
     }
 
     bool InstancedTriangleManyLightsSample::recreateRenderResources(Extent2D extent)
@@ -228,49 +228,49 @@ namespace kera
         }
 
         destroyRenderResources();
-        m_renderExtent = extent;
+        m_render_extent = extent;
 
-        m_sceneTexture = m_renderer.createTexture({
+        m_scene_texture = m_renderer.createTexture({
             .width = extent.width,
             .height = extent.height,
-            .format = TextureFormat::RGBA8,
-            .renderTarget = true,
+            .format = ETextureFormat::RGBA8,
+            .render_target = true,
             .sampled = true,
         });
 
-        if (!m_sceneTexture.isValid())
+        if (!m_scene_texture.isValid())
         {
             return false;
         }
 
-        m_sceneDepthTexture = m_renderer.createTexture({
+        m_scene_depth_texture = m_renderer.createTexture({
             .width = extent.width,
             .height = extent.height,
-            .format = TextureFormat::Depth32,
-            .renderTarget = true,
+            .format = ETextureFormat::DEPTH32,
+            .render_target = true,
             .sampled = false,
-            .depthStencil = true,
+            .depth_stencil = true,
         });
 
-        if (!m_sceneDepthTexture.isValid())
+        if (!m_scene_depth_texture.isValid())
         {
             return false;
         }
 
-        m_sceneRenderTarget = m_renderer.createRenderTarget({
-            .colorTexture = m_sceneTexture,
-            .depthTexture = m_sceneDepthTexture,
+        m_scene_render_target = m_renderer.createRenderTarget({
+            .color_texture = m_scene_texture,
+            .depth_texture = m_scene_depth_texture,
         });
 
-        if (!m_sceneRenderTarget.isValid())
+        if (!m_scene_render_target.isValid())
         {
             return false;
         }
 
-        if (!m_sceneSampler.isValid())
+        if (!m_scene_sampler.isValid())
         {
-            m_sceneSampler = m_renderer.createSampler({});
-            if (!m_sceneSampler.isValid())
+            m_scene_sampler = m_renderer.createSampler({});
+            if (!m_scene_sampler.isValid())
             {
                 return false;
             }
@@ -281,72 +281,72 @@ namespace kera
 
     bool InstancedTriangleManyLightsSample::createPipelinesAndDescriptors()
     {
-        const VertexInputLayout geometryVertexInput =
+        const VertexInputLayout geometry_vertex_input =
             VertexInputLayoutBuilder{}
                 .vertexBinding<Vertex>(0)
-                .vertexBinding<InstanceData>(1, VertexInputRate::Instance)
-                .field(KERA_VERTEX_FIELD(Vertex, position, 0, VertexFormat::Float3))
-                .field(KERA_VERTEX_FIELD(Vertex, color, 0, VertexFormat::Float3))
-                .field(KERA_VERTEX_FIELD(InstanceData, modelMatrix, 1, VertexFormat::Float4))
+                .vertexBinding<InstanceData>(1, static_cast<KeraVertexInputRate>(EVertexInputRate::INSTANCE))
+                .field(KERA_VERTEX_FIELD(Vertex, position, 0, EVertexFormat::FLOAT3))
+                .field(KERA_VERTEX_FIELD(Vertex, color, 0, EVertexFormat::FLOAT3))
+                .field(KERA_VERTEX_FIELD(InstanceData, model_matrix, 1, EVertexFormat::FLOAT4))
                 .layout();
 
-        m_geometryPipeline = m_renderer.createGraphicsPipeline({
-            .shaderProgram = m_geometryShaderProgram,
-            .vertexInput = geometryVertexInput,
-            .renderTarget = m_sceneRenderTarget,
-            .cullMode = CullModeKind::None,
-            .depthTest = true,
-            .depthWrite = true,
+        m_geometry_pipeline = m_renderer.createGraphicsPipeline({
+            .shader_program = m_geometry_shader_program,
+            .vertex_input = geometry_vertex_input,
+            .render_target = m_scene_render_target,
+            .cull_mode = ECullModeKind::NONE,
+            .depth_test = true,
+            .depth_write = true,
         });
 
-        if (!m_geometryPipeline.isValid())
+        if (!m_geometry_pipeline.isValid())
         {
             return false;
         }
 
-        m_geometryDescriptorSet = m_renderer.createDescriptorSet(m_geometryPipeline);
-        if (!m_geometryDescriptorSet.isValid() ||
-            !m_renderer.updateDescriptors(m_geometryDescriptorSet)
-                 .uniform<GeometryUniforms>(ManyLightsShader::GeometryParams, m_geometryUniformBuffer)
+        m_geometry_descriptor_set = m_renderer.createDescriptorSet(m_geometry_pipeline);
+        if (!m_geometry_descriptor_set.isValid() ||
+            !m_renderer.updateDescriptors(m_geometry_descriptor_set)
+                 .uniform<GeometryUniforms>(many_lights_shader::kGeometryParams, m_geometry_uniform_buffer)
                  .ok())
         {
             return false;
         }
 
-        const VertexInputLayout lightingVertexInput =
+        const VertexInputLayout lighting_vertex_input =
             VertexInputLayoutBuilder{}
                 .vertexBinding<FullscreenTriangleVertex>(0)
-                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, position, 0, VertexFormat::Float2))
-                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, uv, 0, VertexFormat::Float2))
+                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, position, 0, EVertexFormat::FLOAT2))
+                .field(KERA_VERTEX_FIELD(FullscreenTriangleVertex, uv, 0, EVertexFormat::FLOAT2))
                 .layout();
 
-        m_lightingPipeline = m_renderer.createGraphicsPipeline({
-            .shaderProgram = m_lightingShaderProgram,
-            .vertexInput = lightingVertexInput,
-            .cullMode = CullModeKind::None,
+        m_lighting_pipeline = m_renderer.createGraphicsPipeline({
+            .shader_program = m_lighting_shader_program,
+            .vertex_input = lighting_vertex_input,
+            .cull_mode = ECullModeKind::NONE,
         });
 
-        if (!m_lightingPipeline.isValid())
+        if (!m_lighting_pipeline.isValid())
         {
             return false;
         }
 
-        m_lightingDescriptorSet = m_renderer.createDescriptorSet(m_lightingPipeline);
-        if (!m_lightingDescriptorSet.isValid())
+        m_lighting_descriptor_set = m_renderer.createDescriptorSet(m_lighting_pipeline);
+        if (!m_lighting_descriptor_set.isValid())
         {
             return false;
         }
 
-        return m_renderer.updateDescriptors(m_lightingDescriptorSet)
-            .uniform<LightingUniforms>(ManyLightsShader::LightingParams, m_lightingUniformBuffer)
-            .sampledImage(ManyLightsShader::SceneTexture, m_sceneTexture)
-            .sampler(ManyLightsShader::SceneSampler, m_sceneSampler)
+        return m_renderer.updateDescriptors(m_lighting_descriptor_set)
+            .uniform<LightingUniforms>(many_lights_shader::kLightingParams, m_lighting_uniform_buffer)
+            .sampledImage(many_lights_shader::kSceneTexture, m_scene_texture)
+            .sampler(many_lights_shader::kSceneSampler, m_scene_sampler)
             .ok();
     }
 
     void InstancedTriangleManyLightsSample::resize(Extent2D extent)
     {
-        if (extent == m_renderExtent || extent.width == 0 || extent.height == 0)
+        if (extent == m_render_extent || extent.width == 0 || extent.height == 0)
         {
             return;
         }
@@ -358,99 +358,99 @@ namespace kera
         }
     }
 
-    void InstancedTriangleManyLightsSample::update(float deltaTime)
+    void InstancedTriangleManyLightsSample::update(float delta_time)
     {
         if (!m_initialized)
         {
             return;
         }
 
-        m_elapsedTime += deltaTime;
-        const float angleRadians = m_elapsedTime;
-        updateInstances(angleRadians);
+        m_elapsed_time += delta_time;
+        const float angle_radians = m_elapsed_time;
+        updateInstances(angle_radians);
         updateGeometryUniforms();
-        updateLightingUniforms(angleRadians);
+        updateLightingUniforms(angle_radians);
     }
 
-    void InstancedTriangleManyLightsSample::updateInstances(float angleRadians)
+    void InstancedTriangleManyLightsSample::updateInstances(float angle_radians)
     {
-        void* mappedData = nullptr;
-        if (!m_renderer.mapBuffer(m_instanceBuffer, &mappedData))
+        void* mapped_data = nullptr;
+        if (!m_renderer.mapBuffer(m_instance_buffer, &mapped_data))
         {
             sampleLogError("Failed to map many-lights instance buffer.");
             return;
         }
 
-        InstanceData* data = static_cast<InstanceData*>(mappedData);
-        for (uint32_t i = 0; i < m_instanceCount; ++i)
+        InstanceData* data = static_cast<InstanceData*>(mapped_data);
+        for (uint32_t i = 0; i < m_instance_count; ++i)
         {
             const float x = (static_cast<float>(i % 15) - 7.0f) * 0.62f;
             const float y = (static_cast<float>(i / 15) - 3.5f) * 0.62f;
             const float phase = static_cast<float>(i) * 0.37f;
-            const float bob = std::sin(angleRadians * 1.8f + phase) * 0.08f;
-            const float drift = std::cos(angleRadians * 1.1f + phase) * 0.05f;
-            const float spin = angleRadians * (0.55f + 0.02f * static_cast<float>(i % 7)) + phase;
-            const float scale = 0.58f + 0.08f * std::sin(angleRadians + phase);
+            const float bob = std::sin(angle_radians * 1.8f + phase) * 0.08f;
+            const float drift = std::cos(angle_radians * 1.1f + phase) * 0.05f;
+            const float spin = angle_radians * (0.55f + 0.02f * static_cast<float>(i % 7)) + phase;
+            const float scale = 0.58f + 0.08f * std::sin(angle_radians + phase);
 
             glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(x + drift, y + bob, 0.0f));
             model = glm::rotate(model, spin, glm::vec3(0.0f, 0.0f, 1.0f));
             model = glm::scale(model, glm::vec3(scale, scale, 1.0f));
-            data[i].modelMatrix = model;
+            data[i].model_matrix = model;
         }
 
-        m_renderer.unmapBuffer(m_instanceBuffer);
+        m_renderer.unmapBuffer(m_instance_buffer);
     }
 
     void InstancedTriangleManyLightsSample::updateGeometryUniforms()
     {
-        void* mappedData = nullptr;
-        if (!m_renderer.mapBuffer(m_geometryUniformBuffer, &mappedData))
+        void* mapped_data = nullptr;
+        if (!m_renderer.mapBuffer(m_geometry_uniform_buffer, &mapped_data))
         {
             sampleLogError("Failed to map many-lights geometry uniforms.");
             return;
         }
 
-        GeometryUniforms* uniforms = static_cast<GeometryUniforms*>(mappedData);
-        const float aspect = m_renderExtent.height == 0
-                                 ? 16.0f / 9.0f
-                                 : static_cast<float>(m_renderExtent.width) / static_cast<float>(m_renderExtent.height);
+        GeometryUniforms* uniforms = static_cast<GeometryUniforms*>(mapped_data);
+        const float aspect = m_render_extent.height == 0 ? 16.0f / 9.0f
+                                                         : static_cast<float>(m_render_extent.width) /
+                                                               static_cast<float>(m_render_extent.height);
         uniforms->view =
             glm::lookAt(glm::vec3(0.0f, 0.0f, -8.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         uniforms->projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
 
-        m_renderer.unmapBuffer(m_geometryUniformBuffer);
+        m_renderer.unmapBuffer(m_geometry_uniform_buffer);
     }
 
-    void InstancedTriangleManyLightsSample::updateLightingUniforms(float angleRadians)
+    void InstancedTriangleManyLightsSample::updateLightingUniforms(float angle_radians)
     {
-        void* mappedData = nullptr;
-        if (!m_renderer.mapBuffer(m_lightingUniformBuffer, &mappedData))
+        void* mapped_data = nullptr;
+        if (!m_renderer.mapBuffer(m_lighting_uniform_buffer, &mapped_data))
         {
             sampleLogError("Failed to map many-lights lighting uniforms.");
             return;
         }
 
-        LightingUniforms* uniforms = static_cast<LightingUniforms*>(mappedData);
-        uniforms->ambientTimeLightCount = glm::vec4(0.08f, angleRadians, static_cast<float>(kLightCount), 0.0f);
+        LightingUniforms* uniforms = static_cast<LightingUniforms*>(mapped_data);
+        uniforms->ambient_time_light_count = glm::vec4(0.08f, angle_radians, static_cast<float>(kLightCount), 0.0f);
 
         for (uint32_t i = 0; i < kLightCount; ++i)
         {
             const float ring = static_cast<float>(i % 8);
             const float row = static_cast<float>(i / 8);
             const float phase = static_cast<float>(i) * 0.41f;
-            const float radius = 0.13f + 0.035f * std::sin(angleRadians + phase);
-            const float centerX = 0.12f + ring * 0.11f;
-            const float centerY = 0.15f + row * 0.10f;
-            const float x = centerX + 0.055f * std::cos(angleRadians * 0.9f + phase);
-            const float y = centerY + 0.045f * std::sin(angleRadians * 1.2f + phase);
+            const float radius = 0.13f + 0.035f * std::sin(angle_radians + phase);
+            const float center_x = 0.12f + ring * 0.11f;
+            const float center_y = 0.15f + row * 0.10f;
+            const float x = center_x + 0.055f * std::cos(angle_radians * 0.9f + phase);
+            const float y = center_y + 0.045f * std::sin(angle_radians * 1.2f + phase);
 
             const glm::vec3 color(0.55f + 0.45f * std::sin(phase + 0.0f), 0.55f + 0.45f * std::sin(phase + 2.1f),
                                   0.55f + 0.45f * std::sin(phase + 4.2f));
-            uniforms->lights[i].positionRadius = glm::vec4(x, y, radius, 0.0f);
-            uniforms->lights[i].colorIntensity = glm::vec4(color, 0.75f + 0.2f * std::sin(angleRadians + phase));
+            uniforms->lights[i].position_radius = glm::vec4(x, y, radius, 0.0f);
+            uniforms->lights[i].color_intensity = glm::vec4(color, 0.75f + 0.2f * std::sin(angle_radians + phase));
         }
 
-        m_renderer.unmapBuffer(m_lightingUniformBuffer);
+        m_renderer.unmapBuffer(m_lighting_uniform_buffer);
     }
 
     void InstancedTriangleManyLightsSample::render(RenderContext& context)
@@ -460,77 +460,78 @@ namespace kera
             return;
         }
 
-        if (!m_geometryPipeline.isValid() || !m_lightingPipeline.isValid() || !m_sceneRenderTarget.isValid() ||
-            !m_geometryDescriptorSet.isValid() || !m_lightingDescriptorSet.isValid())
+        if (!m_geometry_pipeline.isValid() || !m_lighting_pipeline.isValid() || !m_scene_render_target.isValid() ||
+            !m_geometry_descriptor_set.isValid() || !m_lighting_descriptor_set.isValid())
         {
             sampleLogWarning("Render called before many-lights resources were initialized");
             return;
         }
 
-        context.renderToTexture(m_sceneRenderTarget, {0.0f, 0.0f, 0.0f, 1.0f},
+        context.renderToTexture(m_scene_render_target, {0.0f, 0.0f, 0.0f, 1.0f},
                                 [this](FrameHandle frame)
                                 {
-                                    m_renderer.bindPipeline(frame, m_geometryPipeline);
-                                    m_renderer.bindVertexBuffer(frame, 0, m_vertexBuffer);
-                                    m_renderer.bindVertexBuffer(frame, 1, m_instanceBuffer);
-                                    m_renderer.bindIndexBuffer(frame, m_indexBuffer, IndexFormat::UInt16);
-                                    m_renderer.bindDescriptorSet(frame, m_geometryPipeline, m_geometryDescriptorSet);
-                                    m_renderer.drawIndexed(frame, m_indexCount, m_instanceCount);
+                                    m_renderer.bindPipeline(frame, m_geometry_pipeline);
+                                    m_renderer.bindVertexBuffer(frame, 0, m_vertex_buffer);
+                                    m_renderer.bindVertexBuffer(frame, 1, m_instance_buffer);
+                                    m_renderer.bindIndexBuffer(frame, m_index_buffer, EIndexFormat::U_INT16);
+                                    m_renderer.bindDescriptorSet(frame, m_geometry_pipeline, m_geometry_descriptor_set);
+                                    m_renderer.drawIndexed(frame, m_index_count, m_instance_count);
                                 });
 
-        context.renderToBackbuffer(getClearColor(),
-                                   [this](FrameHandle frame)
-                                   {
-                                       m_renderer.bindPipeline(frame, m_lightingPipeline);
-                                       m_renderer.bindVertexBuffer(frame, 0, m_fullscreenVertexBuffer);
-                                       m_renderer.bindIndexBuffer(frame, m_fullscreenIndexBuffer, IndexFormat::UInt16);
-                                       m_renderer.bindDescriptorSet(frame, m_lightingPipeline, m_lightingDescriptorSet);
-                                       m_renderer.drawIndexed(frame, m_fullscreenIndexCount);
-                                   });
+        context.renderToBackbuffer(
+            getClearColor(),
+            [this](FrameHandle frame)
+            {
+                m_renderer.bindPipeline(frame, m_lighting_pipeline);
+                m_renderer.bindVertexBuffer(frame, 0, m_fullscreen_vertex_buffer);
+                m_renderer.bindIndexBuffer(frame, m_fullscreen_index_buffer, EIndexFormat::U_INT16);
+                m_renderer.bindDescriptorSet(frame, m_lighting_pipeline, m_lighting_descriptor_set);
+                m_renderer.drawIndexed(frame, m_fullscreen_index_count);
+            });
     }
 
     void InstancedTriangleManyLightsSample::destroyRenderResources()
     {
-        if (m_lightingDescriptorSet.isValid())
+        if (m_lighting_descriptor_set.isValid())
         {
-            m_renderer.destroyDescriptorSet(m_lightingDescriptorSet);
-            m_lightingDescriptorSet = {};
+            m_renderer.destroyDescriptorSet(m_lighting_descriptor_set);
+            m_lighting_descriptor_set = {};
         }
 
-        if (m_geometryDescriptorSet.isValid())
+        if (m_geometry_descriptor_set.isValid())
         {
-            m_renderer.destroyDescriptorSet(m_geometryDescriptorSet);
-            m_geometryDescriptorSet = {};
+            m_renderer.destroyDescriptorSet(m_geometry_descriptor_set);
+            m_geometry_descriptor_set = {};
         }
 
-        if (m_lightingPipeline.isValid())
+        if (m_lighting_pipeline.isValid())
         {
-            m_renderer.destroyGraphicsPipeline(m_lightingPipeline);
-            m_lightingPipeline = {};
+            m_renderer.destroyGraphicsPipeline(m_lighting_pipeline);
+            m_lighting_pipeline = {};
         }
 
-        if (m_geometryPipeline.isValid())
+        if (m_geometry_pipeline.isValid())
         {
-            m_renderer.destroyGraphicsPipeline(m_geometryPipeline);
-            m_geometryPipeline = {};
+            m_renderer.destroyGraphicsPipeline(m_geometry_pipeline);
+            m_geometry_pipeline = {};
         }
 
-        if (m_sceneRenderTarget.isValid())
+        if (m_scene_render_target.isValid())
         {
-            m_renderer.destroyRenderTarget(m_sceneRenderTarget);
-            m_sceneRenderTarget = {};
+            m_renderer.destroyRenderTarget(m_scene_render_target);
+            m_scene_render_target = {};
         }
 
-        if (m_sceneTexture.isValid())
+        if (m_scene_texture.isValid())
         {
-            m_renderer.destroyTexture(m_sceneTexture);
-            m_sceneTexture = {};
+            m_renderer.destroyTexture(m_scene_texture);
+            m_scene_texture = {};
         }
 
-        if (m_sceneDepthTexture.isValid())
+        if (m_scene_depth_texture.isValid())
         {
-            m_renderer.destroyTexture(m_sceneDepthTexture);
-            m_sceneDepthTexture = {};
+            m_renderer.destroyTexture(m_scene_depth_texture);
+            m_scene_depth_texture = {};
         }
     }
 
@@ -541,64 +542,64 @@ namespace kera
 
         destroyRenderResources();
 
-        if (m_sceneSampler.isValid())
+        if (m_scene_sampler.isValid())
         {
-            m_renderer.destroySampler(m_sceneSampler);
-            m_sceneSampler = {};
+            m_renderer.destroySampler(m_scene_sampler);
+            m_scene_sampler = {};
         }
 
-        if (m_lightingUniformBuffer.isValid())
+        if (m_lighting_uniform_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_lightingUniformBuffer);
-            m_lightingUniformBuffer = {};
+            m_renderer.destroyBuffer(m_lighting_uniform_buffer);
+            m_lighting_uniform_buffer = {};
         }
 
-        if (m_geometryUniformBuffer.isValid())
+        if (m_geometry_uniform_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_geometryUniformBuffer);
-            m_geometryUniformBuffer = {};
+            m_renderer.destroyBuffer(m_geometry_uniform_buffer);
+            m_geometry_uniform_buffer = {};
         }
 
-        if (m_fullscreenIndexBuffer.isValid())
+        if (m_fullscreen_index_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_fullscreenIndexBuffer);
-            m_fullscreenIndexBuffer = {};
+            m_renderer.destroyBuffer(m_fullscreen_index_buffer);
+            m_fullscreen_index_buffer = {};
         }
 
-        if (m_fullscreenVertexBuffer.isValid())
+        if (m_fullscreen_vertex_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_fullscreenVertexBuffer);
-            m_fullscreenVertexBuffer = {};
+            m_renderer.destroyBuffer(m_fullscreen_vertex_buffer);
+            m_fullscreen_vertex_buffer = {};
         }
 
-        if (m_instanceBuffer.isValid())
+        if (m_instance_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_instanceBuffer);
-            m_instanceBuffer = {};
+            m_renderer.destroyBuffer(m_instance_buffer);
+            m_instance_buffer = {};
         }
 
-        if (m_indexBuffer.isValid())
+        if (m_index_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_indexBuffer);
-            m_indexBuffer = {};
+            m_renderer.destroyBuffer(m_index_buffer);
+            m_index_buffer = {};
         }
 
-        if (m_vertexBuffer.isValid())
+        if (m_vertex_buffer.isValid())
         {
-            m_renderer.destroyBuffer(m_vertexBuffer);
-            m_vertexBuffer = {};
+            m_renderer.destroyBuffer(m_vertex_buffer);
+            m_vertex_buffer = {};
         }
 
-        if (m_lightingShaderProgram.isValid())
+        if (m_lighting_shader_program.isValid())
         {
-            m_renderer.destroyShaderProgram(m_lightingShaderProgram);
-            m_lightingShaderProgram = {};
+            m_renderer.destroyShaderProgram(m_lighting_shader_program);
+            m_lighting_shader_program = {};
         }
 
-        if (m_geometryShaderProgram.isValid())
+        if (m_geometry_shader_program.isValid())
         {
-            m_renderer.destroyShaderProgram(m_geometryShaderProgram);
-            m_geometryShaderProgram = {};
+            m_renderer.destroyShaderProgram(m_geometry_shader_program);
+            m_geometry_shader_program = {};
         }
     }
 

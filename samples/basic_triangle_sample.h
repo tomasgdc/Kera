@@ -15,7 +15,7 @@ namespace kera
         explicit BasicTriangleSample(Renderer& renderer);
 
         void initialize() override;
-        void update(float deltaTime) override;
+        void update(float delta_time) override;
         void render(RenderContext& context) override;
         void cleanup() override;
 
@@ -25,12 +25,12 @@ namespace kera
         bool createPipeline();
 
         Renderer& m_renderer;
-        ShaderProgramHandle m_shaderProgram;
-        BufferHandle m_vertexBuffer;
-        BufferHandle m_indexBuffer;
-        uint32_t m_indexCount;
+        ShaderProgramHandle m_shader_program;
+        BufferHandle m_vertex_buffer;
+        BufferHandle m_index_buffer;
+        uint32_t m_index_count;
         GraphicsPipelineHandle m_pipeline;
-        float m_rotationAngle;
+        float m_rotation_angle;
     };
 
 }  // namespace kera

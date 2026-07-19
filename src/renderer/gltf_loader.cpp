@@ -6,7 +6,11 @@
 #include "kera/renderer/interfaces.h"
 #include "kera/utilities/logger.h"
 
-#if defined(_MSC_VER)
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+#elif defined(_MSC_VER)
 #pragma warning(push, 0)
 #endif
 #define TINYGLTF_IMPLEMENTATION
@@ -19,7 +23,9 @@
 #define JSON_NOEXCEPTION
 #endif
 #include "tiny_gltf.h"
-#if defined(_MSC_VER)
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(_MSC_VER)
 #pragma warning(pop)
 #endif
 
@@ -36,27 +42,77 @@ namespace kera
 {
     namespace
     {
-        RendererResult<GltfLoadedModel> failLoad(IRenderer& renderer, GltfLoadedModel& model, RendererErrorCode code,
+        RendererResult<GltfLoadedModel> failLoad(IRenderer& renderer, GltfLoadedModel& model, ERendererErrorCode code,
                                                  std::string message)
         {
             destroyGltfModel(renderer, model);
             return RendererResult<GltfLoadedModel>::failure(code, std::move(message));
         }
 
+        class UploadBatchGuard
+        {
+        public:
+            explicit UploadBatchGuard(IRenderer& renderer) : m_renderer(renderer), m_active(renderer.beginUploadBatch())
+            {
+            }
+
+            ~UploadBatchGuard()
+            {
+                if (m_active)
+                {
+                    m_renderer.cancelUploadBatch();
+                }
+            }
+
+            bool started() const
+            {
+                return m_active;
+            }
+
+            bool finish()
+            {
+                if (!m_active)
+                {
+                    return false;
+                }
+
+                const bool finished = m_renderer.endUploadBatch();
+                if (!finished)
+                {
+                    m_renderer.cancelUploadBatch();
+                }
+                m_active = false;
+                return finished;
+            }
+
+            void cancel()
+            {
+                if (m_active)
+                {
+                    m_renderer.cancelUploadBatch();
+                    m_active = false;
+                }
+            }
+
+        private:
+            IRenderer& m_renderer;
+            bool m_active = false;
+        };
+
         std::string makeDebugName(const GltfLoadDesc& desc, const char* suffix)
         {
-            const std::string prefix = desc.debugName.empty() ? "glTF" : desc.debugName;
+            const std::string prefix = desc.debug_name.empty() ? "glTF" : desc.debug_name;
             return prefix + " " + suffix;
         }
 
         glm::vec3 normalizeOr(const glm::vec3& value, const glm::vec3& fallback)
         {
-            const float lengthSquared = glm::dot(value, value);
-            if (lengthSquared <= 0.000001f)
+            const float length_squared = glm::dot(value, value);
+            if (length_squared <= 0.000001f)
             {
                 return fallback;
             }
-            return value * (1.0f / std::sqrt(lengthSquared));
+            return value * (1.0f / std::sqrt(length_squared));
         }
 
         glm::vec3 fallbackTangentForNormal(const glm::vec3& normal)
@@ -80,29 +136,29 @@ namespace kera
         }
 
         const uint8_t* accessorData(const tinygltf::Model& model, const tinygltf::Accessor& accessor,
-                                    const tinygltf::BufferView*& bufferView, size_t& stride)
+                                    const tinygltf::BufferView*& buffer_view, size_t& stride)
         {
             if (accessor.bufferView < 0 || accessor.bufferView >= static_cast<int>(model.bufferViews.size()))
             {
                 return nullptr;
             }
 
-            bufferView = &model.bufferViews[static_cast<size_t>(accessor.bufferView)];
-            if (bufferView->buffer < 0 || bufferView->buffer >= static_cast<int>(model.buffers.size()))
+            buffer_view = &model.bufferViews[static_cast<size_t>(accessor.bufferView)];
+            if (buffer_view->buffer < 0 || buffer_view->buffer >= static_cast<int>(model.buffers.size()))
             {
                 return nullptr;
             }
 
-            const tinygltf::Buffer& buffer = model.buffers[static_cast<size_t>(bufferView->buffer)];
-            const size_t byteOffset = static_cast<size_t>(bufferView->byteOffset + accessor.byteOffset);
-            if (byteOffset >= buffer.data.size())
+            const tinygltf::Buffer& buffer = model.buffers[static_cast<size_t>(buffer_view->buffer)];
+            const size_t byte_offset = static_cast<size_t>(buffer_view->byteOffset + accessor.byteOffset);
+            if (byte_offset >= buffer.data.size())
             {
                 return nullptr;
             }
 
-            const int accessorStride = accessor.ByteStride(*bufferView);
-            stride = accessorStride > 0 ? static_cast<size_t>(accessorStride) : 0;
-            return buffer.data.data() + byteOffset;
+            const int accessor_stride = accessor.ByteStride(*buffer_view);
+            stride = accessor_stride > 0 ? static_cast<size_t>(accessor_stride) : 0;
+            return buffer.data.data() + byte_offset;
         }
 
         bool readFloatVec3Accessor(const tinygltf::Model& model, const tinygltf::Accessor& accessor,
@@ -113,9 +169,9 @@ namespace kera
                 return false;
             }
 
-            const tinygltf::BufferView* bufferView = nullptr;
+            const tinygltf::BufferView* buffer_view = nullptr;
             size_t stride = 0;
-            const uint8_t* data = accessorData(model, accessor, bufferView, stride);
+            const uint8_t* data = accessorData(model, accessor, buffer_view, stride);
             if (!data)
             {
                 return false;
@@ -139,9 +195,9 @@ namespace kera
                 return false;
             }
 
-            const tinygltf::BufferView* bufferView = nullptr;
+            const tinygltf::BufferView* buffer_view = nullptr;
             size_t stride = 0;
-            const uint8_t* data = accessorData(model, accessor, bufferView, stride);
+            const uint8_t* data = accessorData(model, accessor, buffer_view, stride);
             if (!data)
             {
                 return false;
@@ -165,9 +221,9 @@ namespace kera
                 return false;
             }
 
-            const tinygltf::BufferView* bufferView = nullptr;
+            const tinygltf::BufferView* buffer_view = nullptr;
             size_t stride = 0;
-            const uint8_t* data = accessorData(model, accessor, bufferView, stride);
+            const uint8_t* data = accessorData(model, accessor, buffer_view, stride);
             if (!data)
             {
                 return false;
@@ -198,31 +254,31 @@ namespace kera
                 return false;
             }
 
-            const tinygltf::BufferView* bufferView = nullptr;
+            const tinygltf::BufferView* buffer_view = nullptr;
             size_t stride = 0;
-            const uint8_t* data = accessorData(model, accessor, bufferView, stride);
+            const uint8_t* data = accessorData(model, accessor, buffer_view, stride);
             if (!data)
             {
                 return false;
             }
 
-            size_t componentSize = 0;
+            size_t component_size = 0;
             switch (accessor.componentType)
             {
                 case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
-                    componentSize = sizeof(uint8_t);
+                    component_size = sizeof(uint8_t);
                     break;
                 case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-                    componentSize = sizeof(uint16_t);
+                    component_size = sizeof(uint16_t);
                     break;
                 case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-                    componentSize = sizeof(uint32_t);
+                    component_size = sizeof(uint32_t);
                     break;
                 default:
                     return false;
             }
 
-            stride = stride == 0 ? componentSize : stride;
+            stride = stride == 0 ? component_size : stride;
             indices.resize(accessor.count);
             for (size_t i = 0; i < accessor.count; ++i)
             {
@@ -261,13 +317,13 @@ namespace kera
                 return glm::mat4(1.0f);
             }
 
-            const int nodeIndex = scene.nodes.front();
-            if (nodeIndex < 0 || nodeIndex >= static_cast<int>(model.nodes.size()))
+            const int node_index = scene.nodes.front();
+            if (node_index < 0 || node_index >= static_cast<int>(model.nodes.size()))
             {
                 return glm::mat4(1.0f);
             }
 
-            const tinygltf::Node& node = model.nodes[static_cast<size_t>(nodeIndex)];
+            const tinygltf::Node& node = model.nodes[static_cast<size_t>(node_index)];
             if (node.matrix.size() == 16)
             {
                 glm::mat4 matrix(1.0f);
@@ -315,46 +371,46 @@ namespace kera
                 return {};
             }
 
-            const size_t pixelCount = static_cast<size_t>(image.width) * static_cast<size_t>(image.height);
-            std::vector<uint8_t> rgba(pixelCount * 4);
-            const size_t componentCount = static_cast<size_t>(image.component);
-            for (size_t pixel = 0; pixel < pixelCount; ++pixel)
+            const size_t pixel_count = static_cast<size_t>(image.width) * static_cast<size_t>(image.height);
+            std::vector<uint8_t> rgba(pixel_count * 4);
+            const size_t component_count = static_cast<size_t>(image.component);
+            for (size_t pixel = 0; pixel < pixel_count; ++pixel)
             {
-                const uint8_t* src = image.image.data() + pixel * componentCount;
+                const uint8_t* src = image.image.data() + pixel * component_count;
                 uint8_t* dst = rgba.data() + pixel * 4;
                 dst[0] = src[0];
-                dst[1] = componentCount > 1 ? src[1] : src[0];
-                dst[2] = componentCount > 2 ? src[2] : src[0];
-                dst[3] = componentCount > 3 ? src[3] : 255;
+                dst[1] = component_count > 1 ? src[1] : src[0];
+                dst[2] = component_count > 2 ? src[2] : src[0];
+                dst[3] = component_count > 3 ? src[3] : 255;
             }
             return rgba;
         }
 
-        bool getTextureSourceImage(const tinygltf::Model& model, int textureIndex, const tinygltf::Image*& image,
-                                   std::string& imageName)
+        bool getTextureSourceImage(const tinygltf::Model& model, int texture_index, const tinygltf::Image*& image,
+                                   std::string& image_name)
         {
-            if (textureIndex < 0 || textureIndex >= static_cast<int>(model.textures.size()))
+            if (texture_index < 0 || texture_index >= static_cast<int>(model.textures.size()))
             {
                 return false;
             }
 
-            const tinygltf::Texture& texture = model.textures[static_cast<size_t>(textureIndex)];
+            const tinygltf::Texture& texture = model.textures[static_cast<size_t>(texture_index)];
             if (texture.source < 0 || texture.source >= static_cast<int>(model.images.size()))
             {
                 return false;
             }
 
             image = &model.images[static_cast<size_t>(texture.source)];
-            imageName = image->uri;
+            image_name = image->uri;
             return true;
         }
 
-        bool createMaterialTexture(IRenderer& renderer, const tinygltf::Model& tinyModel, int textureIndex,
-                                   TextureFormat format, const std::string& debugName, TextureHandle& textureHandle,
-                                   std::string& textureName, uint32_t& textureMipLevels)
+        bool createMaterialTexture(IRenderer& renderer, const tinygltf::Model& tiny_model, int texture_index,
+                                   ETextureFormat format, const std::string& debug_name, TextureHandle& texture_handle,
+                                   std::string& texture_name, uint32_t& texture_mip_levels)
         {
             const tinygltf::Image* image = nullptr;
-            if (!getTextureSourceImage(tinyModel, textureIndex, image, textureName))
+            if (!getTextureSourceImage(tiny_model, texture_index, image, texture_name))
             {
                 return false;
             }
@@ -365,52 +421,52 @@ namespace kera
                 return false;
             }
 
-            textureMipLevels =
+            texture_mip_levels =
                 textureFullMipLevelCount(static_cast<uint32_t>(image->width), static_cast<uint32_t>(image->height));
-            textureHandle = renderer.createTexture({
+            texture_handle = renderer.createTexture({
                 .width = static_cast<uint32_t>(image->width),
                 .height = static_cast<uint32_t>(image->height),
                 .format = format,
-                .mipLevels = textureMipLevels,
-                .generateMipmaps = textureMipLevels > 1,
+                .mip_levels = texture_mip_levels,
+                .generate_mipmaps = texture_mip_levels > 1,
                 .sampled = true,
-                .debugName = debugName,
+                .debug_name = debug_name,
             });
-            return textureHandle.isValid() && renderer.uploadTexture(textureHandle, rgba.data(), rgba.size());
+            return texture_handle.isValid() && renderer.uploadTexture(texture_handle, rgba.data(), rgba.size());
         }
 
-        SamplerFilter gltfMagFilterToSamplerFilter(int filter)
+        ESamplerFilter gltfMagFilterToESamplerFilter(int filter)
         {
-            return filter == TINYGLTF_TEXTURE_FILTER_NEAREST ? SamplerFilter::Nearest : SamplerFilter::Linear;
+            return filter == TINYGLTF_TEXTURE_FILTER_NEAREST ? ESamplerFilter::NEAREST : ESamplerFilter::LINEAR;
         }
 
-        SamplerFilter gltfMinFilterToSamplerFilter(int filter)
+        ESamplerFilter gltfMinFilterToESamplerFilter(int filter)
         {
             switch (filter)
             {
                 case TINYGLTF_TEXTURE_FILTER_NEAREST:
                 case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
                 case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
-                    return SamplerFilter::Nearest;
+                    return ESamplerFilter::NEAREST;
                 case TINYGLTF_TEXTURE_FILTER_LINEAR:
                 case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
                 case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
                 default:
-                    return SamplerFilter::Linear;
+                    return ESamplerFilter::LINEAR;
             }
         }
 
-        SamplerMipFilter gltfMinFilterToMipFilter(int filter)
+        ESamplerMipFilter gltfMinFilterToMipFilter(int filter)
         {
             switch (filter)
             {
                 case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
                 case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
-                    return SamplerMipFilter::Nearest;
+                    return ESamplerMipFilter::NEAREST;
                 case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
                 case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
                 default:
-                    return SamplerMipFilter::Linear;
+                    return ESamplerMipFilter::LINEAR;
             }
         }
 
@@ -422,54 +478,54 @@ namespace kera
                    filter == TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR;
         }
 
-        SamplerAddressMode gltfWrapToAddressMode(int wrap)
+        ESamplerAddressMode gltfWrapToAddressMode(int wrap)
         {
             switch (wrap)
             {
                 case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-                    return SamplerAddressMode::ClampToEdge;
+                    return ESamplerAddressMode::CLAMP_TO_EDGE;
                 case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-                    return SamplerAddressMode::MirroredRepeat;
+                    return ESamplerAddressMode::MIRRORED_REPEAT;
                 case TINYGLTF_TEXTURE_WRAP_REPEAT:
                 default:
-                    return SamplerAddressMode::Repeat;
+                    return ESamplerAddressMode::REPEAT;
             }
         }
 
-        SamplerDesc createMaterialSamplerDesc(const tinygltf::Model& model, int textureIndex, uint32_t maxMipLevels,
-                                              const std::string& debugName)
+        SamplerDesc createMaterialSamplerDesc(const tinygltf::Model& model, int texture_index, uint32_t max_mip_levels,
+                                              const std::string& debug_name)
         {
             SamplerDesc desc{
-                .addressModeU = SamplerAddressMode::Repeat,
-                .addressModeV = SamplerAddressMode::Repeat,
-                .debugName = debugName,
+                .address_mode_u = ESamplerAddressMode::REPEAT,
+                .address_mode_v = ESamplerAddressMode::REPEAT,
+                .debug_name = debug_name,
             };
-            const uint32_t maxLod = maxMipLevels > 0 ? maxMipLevels - 1 : 0;
+            const uint32_t max_lod = max_mip_levels > 0 ? max_mip_levels - 1 : 0;
 
-            if (textureIndex < 0 || textureIndex >= static_cast<int>(model.textures.size()))
+            if (texture_index < 0 || texture_index >= static_cast<int>(model.textures.size()))
             {
-                desc.maxLod = static_cast<float>(maxLod);
+                desc.max_lod = static_cast<float>(max_lod);
                 return desc;
             }
 
-            const tinygltf::Texture& texture = model.textures[static_cast<size_t>(textureIndex)];
+            const tinygltf::Texture& texture = model.textures[static_cast<size_t>(texture_index)];
             if (texture.sampler < 0 || texture.sampler >= static_cast<int>(model.samplers.size()))
             {
-                desc.maxLod = static_cast<float>(maxLod);
+                desc.max_lod = static_cast<float>(max_lod);
                 return desc;
             }
 
             const tinygltf::Sampler& sampler = model.samplers[static_cast<size_t>(texture.sampler)];
-            desc.magFilter = gltfMagFilterToSamplerFilter(sampler.magFilter);
-            desc.minFilter = gltfMinFilterToSamplerFilter(sampler.minFilter);
-            desc.mipFilter = gltfMinFilterToMipFilter(sampler.minFilter);
-            desc.addressModeU = gltfWrapToAddressMode(sampler.wrapS);
-            desc.addressModeV = gltfWrapToAddressMode(sampler.wrapT);
-            desc.maxLod = gltfMinFilterUsesMipmaps(sampler.minFilter) ? static_cast<float>(maxLod) : 0.0f;
+            desc.mag_filter = gltfMagFilterToESamplerFilter(sampler.magFilter);
+            desc.min_filter = gltfMinFilterToESamplerFilter(sampler.minFilter);
+            desc.mip_filter = gltfMinFilterToMipFilter(sampler.minFilter);
+            desc.address_mode_u = gltfWrapToAddressMode(sampler.wrapS);
+            desc.address_mode_v = gltfWrapToAddressMode(sampler.wrapT);
+            desc.max_lod = gltfMinFilterUsesMipmaps(sampler.minFilter) ? static_cast<float>(max_lod) : 0.0f;
             return desc;
         }
 
-        bool validateTriangleIndices(const std::vector<uint32_t>& indices, size_t vertexCount)
+        bool validateTriangleIndices(const std::vector<uint32_t>& indices, size_t vertex_count)
         {
             if (indices.size() % 3 != 0)
             {
@@ -478,7 +534,7 @@ namespace kera
 
             for (uint32_t index : indices)
             {
-                if (index >= vertexCount)
+                if (index >= vertex_count)
                 {
                     return false;
                 }
@@ -497,8 +553,8 @@ namespace kera
                               const std::vector<glm::vec2>& uvs, const std::vector<uint32_t>& indices,
                               std::vector<glm::vec4>& tangents)
         {
-            std::vector<glm::vec3> tangentSums(positions.size(), glm::vec3(0.0f));
-            std::vector<glm::vec3> bitangentSums(positions.size(), glm::vec3(0.0f));
+            std::vector<glm::vec3> tangent_sums(positions.size(), glm::vec3(0.0f));
+            std::vector<glm::vec3> bitangent_sums(positions.size(), glm::vec3(0.0f));
 
             for (size_t i = 0; i + 2 < indices.size(); i += 3)
             {
@@ -508,37 +564,37 @@ namespace kera
 
                 const glm::vec3 edge1 = positions[i1] - positions[i0];
                 const glm::vec3 edge2 = positions[i2] - positions[i0];
-                const glm::vec2 deltaUv1 = uvs[i1] - uvs[i0];
-                const glm::vec2 deltaUv2 = uvs[i2] - uvs[i0];
-                const float determinant = deltaUv1.x * deltaUv2.y - deltaUv1.y * deltaUv2.x;
+                const glm::vec2 delta_uv1 = uvs[i1] - uvs[i0];
+                const glm::vec2 delta_uv2 = uvs[i2] - uvs[i0];
+                const float determinant = delta_uv1.x * delta_uv2.y - delta_uv1.y * delta_uv2.x;
                 if (std::abs(determinant) <= 0.000001f)
                 {
                     continue;
                 }
 
                 const float reciprocal = 1.0f / determinant;
-                const glm::vec3 tangent = (edge1 * deltaUv2.y - edge2 * deltaUv1.y) * reciprocal;
-                const glm::vec3 bitangent = (edge2 * deltaUv1.x - edge1 * deltaUv2.x) * reciprocal;
+                const glm::vec3 tangent = (edge1 * delta_uv2.y - edge2 * delta_uv1.y) * reciprocal;
+                const glm::vec3 bitangent = (edge2 * delta_uv1.x - edge1 * delta_uv2.x) * reciprocal;
 
                 const float angle0 = cornerAngle(edge1, edge2);
                 const float angle1 = cornerAngle(-edge1, positions[i2] - positions[i1]);
                 const float angle2 = cornerAngle(-edge2, positions[i1] - positions[i2]);
 
-                tangentSums[i0] += tangent * angle0;
-                tangentSums[i1] += tangent * angle1;
-                tangentSums[i2] += tangent * angle2;
-                bitangentSums[i0] += bitangent * angle0;
-                bitangentSums[i1] += bitangent * angle1;
-                bitangentSums[i2] += bitangent * angle2;
+                tangent_sums[i0] += tangent * angle0;
+                tangent_sums[i1] += tangent * angle1;
+                tangent_sums[i2] += tangent * angle2;
+                bitangent_sums[i0] += bitangent * angle0;
+                bitangent_sums[i1] += bitangent * angle1;
+                bitangent_sums[i2] += bitangent * angle2;
             }
 
             tangents.resize(positions.size());
             for (size_t i = 0; i < positions.size(); ++i)
             {
                 const glm::vec3 normal = normalizeOr(normals[i], glm::vec3(0.0f, 1.0f, 0.0f));
-                glm::vec3 tangent = tangentSums[i] - normal * glm::dot(normal, tangentSums[i]);
+                glm::vec3 tangent = tangent_sums[i] - normal * glm::dot(normal, tangent_sums[i]);
                 tangent = normalizeOr(tangent, fallbackTangentForNormal(normal));
-                const float handedness = glm::dot(glm::cross(normal, tangent), bitangentSums[i]) < 0.0f ? -1.0f : 1.0f;
+                const float handedness = glm::dot(glm::cross(normal, tangent), bitangent_sums[i]) < 0.0f ? -1.0f : 1.0f;
                 tangents[i] = glm::vec4(tangent, handedness);
             }
         }
@@ -551,31 +607,31 @@ namespace kera
         GltfMaterialFactors readMaterialFactors(const tinygltf::Material& material)
         {
             GltfMaterialFactors factors;
-            factors.baseColor = glm::vec4(readFactor(material.pbrMetallicRoughness.baseColorFactor, 0, 1.0f),
-                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 1, 1.0f),
-                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 2, 1.0f),
-                                          readFactor(material.pbrMetallicRoughness.baseColorFactor, 3, 1.0f));
+            factors.base_color = glm::vec4(readFactor(material.pbrMetallicRoughness.baseColorFactor, 0, 1.0f),
+                                           readFactor(material.pbrMetallicRoughness.baseColorFactor, 1, 1.0f),
+                                           readFactor(material.pbrMetallicRoughness.baseColorFactor, 2, 1.0f),
+                                           readFactor(material.pbrMetallicRoughness.baseColorFactor, 3, 1.0f));
             factors.emissive =
                 glm::vec3(readFactor(material.emissiveFactor, 0, 0.0f), readFactor(material.emissiveFactor, 1, 0.0f),
                           readFactor(material.emissiveFactor, 2, 0.0f));
             factors.metallic = static_cast<float>(material.pbrMetallicRoughness.metallicFactor);
             factors.roughness = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor);
-            factors.normalScale = static_cast<float>(material.normalTexture.scale);
-            factors.occlusionStrength = static_cast<float>(material.occlusionTexture.strength);
-            factors.alphaCutoff = static_cast<float>(material.alphaCutoff);
+            factors.normal_scale = static_cast<float>(material.normalTexture.scale);
+            factors.occlusion_strength = static_cast<float>(material.occlusionTexture.strength);
+            factors.alpha_cutoff = static_cast<float>(material.alphaCutoff);
             if (material.alphaMode == "MASK")
             {
-                factors.alphaMode = GltfAlphaMode::Mask;
+                factors.alpha_mode = EGltfAlphaMode::ALPHA_MASK;
             }
             else if (material.alphaMode == "BLEND")
             {
-                factors.alphaMode = GltfAlphaMode::Blend;
+                factors.alpha_mode = EGltfAlphaMode::ALPHA_BLEND;
             }
             else
             {
-                factors.alphaMode = GltfAlphaMode::Opaque;
+                factors.alpha_mode = EGltfAlphaMode::ALPHA_OPAQUE;
             }
-            factors.doubleSided = material.doubleSided;
+            factors.double_sided = material.doubleSided;
             return factors;
         }
 
@@ -583,17 +639,18 @@ namespace kera
 
     RendererResult<GltfLoadedModel> loadGltfModel(IRenderer& renderer, const GltfLoadDesc& desc)
     {
-        GltfLoadedModel loadedModel;
+        GltfLoadedModel loaded_model;
         if (desc.path.empty())
         {
-            return RendererResult<GltfLoadedModel>::failure(RendererErrorCode::ValidationFailed, "glTF path is empty.");
+            return RendererResult<GltfLoadedModel>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                            "glTF path is empty.");
         }
 
         tinygltf::TinyGLTF loader;
-        tinygltf::Model tinyModel;
+        tinygltf::Model tiny_model;
         std::string error;
         std::string warning;
-        if (!loader.LoadASCIIFromFile(&tinyModel, &error, &warning, desc.path))
+        if (!loader.LoadASCIIFromFile(&tiny_model, &error, &warning, desc.path))
         {
             if (!warning.empty())
             {
@@ -601,33 +658,33 @@ namespace kera
             }
             const std::string message =
                 error.empty() ? "Failed to load glTF file: " + desc.path : "Failed to load glTF file: " + error;
-            return failLoad(renderer, loadedModel, RendererErrorCode::ValidationFailed, message);
+            return failLoad(renderer, loaded_model, ERendererErrorCode::VALIDATION_FAILED, message);
         }
         if (!warning.empty())
         {
             Logger::getInstance().warning("glTF loader warning: " + warning);
         }
 
-        if (tinyModel.meshes.empty() || tinyModel.meshes.front().primitives.empty())
+        if (tiny_model.meshes.empty() || tiny_model.meshes.front().primitives.empty())
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::UNSUPPORTED,
                             "glTF file does not contain a mesh primitive.");
         }
 
-        const tinygltf::Primitive& primitive = tinyModel.meshes.front().primitives.front();
+        const tinygltf::Primitive& primitive = tiny_model.meshes.front().primitives.front();
         if (primitive.mode != TINYGLTF_MODE_TRIANGLES)
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::UNSUPPORTED,
                             "glTF loader currently supports only triangle-list primitives.");
         }
 
-        const tinygltf::Accessor* positionAccessor = findAccessor(tinyModel, primitive, "POSITION");
-        const tinygltf::Accessor* normalAccessor = findAccessor(tinyModel, primitive, "NORMAL");
-        const tinygltf::Accessor* uvAccessor = findAccessor(tinyModel, primitive, "TEXCOORD_0");
-        const tinygltf::Accessor* tangentAccessor = findAccessor(tinyModel, primitive, "TANGENT");
-        if (!positionAccessor || !normalAccessor || !uvAccessor)
+        const tinygltf::Accessor* position_accessor = findAccessor(tiny_model, primitive, "POSITION");
+        const tinygltf::Accessor* normal_accessor = findAccessor(tiny_model, primitive, "NORMAL");
+        const tinygltf::Accessor* uv_accessor = findAccessor(tiny_model, primitive, "TEXCOORD_0");
+        const tinygltf::Accessor* tangent_accessor = findAccessor(tiny_model, primitive, "TANGENT");
+        if (!position_accessor || !normal_accessor || !uv_accessor)
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::UNSUPPORTED,
                             "glTF primitive is missing POSITION, NORMAL, or TEXCOORD_0.");
         }
 
@@ -635,25 +692,25 @@ namespace kera
         std::vector<glm::vec3> normals;
         std::vector<glm::vec2> uvs;
         std::vector<uint32_t> indices;
-        if (!readFloatVec3Accessor(tinyModel, *positionAccessor, positions) ||
-            !readFloatVec3Accessor(tinyModel, *normalAccessor, normals) ||
-            !readFloatVec2Accessor(tinyModel, *uvAccessor, uvs) || !readIndices(tinyModel, primitive, indices))
+        if (!readFloatVec3Accessor(tiny_model, *position_accessor, positions) ||
+            !readFloatVec3Accessor(tiny_model, *normal_accessor, normals) ||
+            !readFloatVec2Accessor(tiny_model, *uv_accessor, uvs) || !readIndices(tiny_model, primitive, indices))
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::UNSUPPORTED,
                             "glTF primitive contains an unsupported accessor format.");
         }
 
         if (positions.empty() || positions.size() != normals.size() || positions.size() != uvs.size() ||
             indices.empty() || !validateTriangleIndices(indices, positions.size()))
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::ValidationFailed,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::VALIDATION_FAILED,
                             "glTF mesh attribute counts or triangle indices are invalid.");
         }
 
         std::vector<glm::vec4> tangents;
-        if (tangentAccessor && !readFloatVec4Accessor(tinyModel, *tangentAccessor, tangents))
+        if (tangent_accessor && !readFloatVec4Accessor(tiny_model, *tangent_accessor, tangents))
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::UNSUPPORTED,
                             "glTF primitive contains an unsupported TANGENT accessor format.");
         }
         if (tangents.size() != positions.size())
@@ -667,129 +724,144 @@ namespace kera
             vertices[i] = {positions[i], normals[i], uvs[i], tangents[i]};
         }
 
-        loadedModel.vertexBuffer = renderer.createBuffer({
+        loaded_model.vertex_buffer = renderer.createBuffer({
             .size = vertices.size() * sizeof(GltfVertex),
-            .usage = BufferUsageKind::Vertex,
-            .memoryAccess = MemoryAccess::CpuWrite,
-            .debugName = makeDebugName(desc, "Vertex Buffer"),
+            .usage = EBufferUsageKind::VERTEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
+            .debug_name = makeDebugName(desc, "Vertex Buffer"),
         });
-        loadedModel.indexBuffer = renderer.createBuffer({
+        loaded_model.index_buffer = renderer.createBuffer({
             .size = indices.size() * sizeof(uint32_t),
-            .usage = BufferUsageKind::Index,
-            .memoryAccess = MemoryAccess::CpuWrite,
-            .debugName = makeDebugName(desc, "Index Buffer"),
+            .usage = EBufferUsageKind::INDEX,
+            .memory_access = EMemoryAccess::CPU_WRITE,
+            .debug_name = makeDebugName(desc, "Index Buffer"),
         });
-        if (!loadedModel.vertexBuffer.isValid() || !loadedModel.indexBuffer.isValid() ||
-            !renderer.uploadBuffer(loadedModel.vertexBuffer, vertices.data(), vertices.size() * sizeof(GltfVertex)) ||
-            !renderer.uploadBuffer(loadedModel.indexBuffer, indices.data(), indices.size() * sizeof(uint32_t)))
+        if (!loaded_model.vertex_buffer.isValid() || !loaded_model.index_buffer.isValid() ||
+            !renderer.uploadBuffer(loaded_model.vertex_buffer, vertices.data(), vertices.size() * sizeof(GltfVertex)) ||
+            !renderer.uploadBuffer(loaded_model.index_buffer, indices.data(), indices.size() * sizeof(uint32_t)))
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::BackendFailure,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::BACKEND_FAILURE,
                             "Failed to create or upload glTF mesh buffers.");
         }
 
-        loadedModel.indexFormat = IndexFormat::UInt32;
-        loadedModel.indexCount = static_cast<uint32_t>(indices.size());
-        loadedModel.transform = readFirstNodeTransform(tinyModel);
+        loaded_model.index_format = EIndexFormat::U_INT32;
+        loaded_model.index_count = static_cast<uint32_t>(indices.size());
+        loaded_model.transform = readFirstNodeTransform(tiny_model);
 
-        if (primitive.material < 0 || primitive.material >= static_cast<int>(tinyModel.materials.size()))
+        if (primitive.material < 0 || primitive.material >= static_cast<int>(tiny_model.materials.size()))
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::ValidationFailed,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::VALIDATION_FAILED,
                             "glTF primitive does not reference a valid material.");
         }
 
-        const tinygltf::Material& material = tinyModel.materials[static_cast<size_t>(primitive.material)];
-        loadedModel.materialFactors = readMaterialFactors(material);
-        uint32_t maxMaterialMipLevels = 1;
-        uint32_t baseColorMipLevels = 1;
-        uint32_t metalRoughnessMipLevels = 1;
-        uint32_t emissiveMipLevels = 1;
-        uint32_t occlusionMipLevels = 1;
-        uint32_t normalMipLevels = 1;
-        const bool loadedAllTextures =
-            createMaterialTexture(renderer, tinyModel, material.pbrMetallicRoughness.baseColorTexture.index,
-                                  TextureFormat::RGBA8Srgb, makeDebugName(desc, "Base Color"),
-                                  loadedModel.materialTextures.baseColor, loadedModel.textureNames.baseColor,
-                                  baseColorMipLevels) &&
-            createMaterialTexture(renderer, tinyModel, material.pbrMetallicRoughness.metallicRoughnessTexture.index,
-                                  TextureFormat::RGBA8, makeDebugName(desc, "Metal Roughness"),
-                                  loadedModel.materialTextures.metalRoughness, loadedModel.textureNames.metalRoughness,
-                                  metalRoughnessMipLevels) &&
-            createMaterialTexture(renderer, tinyModel, material.emissiveTexture.index, TextureFormat::RGBA8Srgb,
-                                  makeDebugName(desc, "Emissive"), loadedModel.materialTextures.emissive,
-                                  loadedModel.textureNames.emissive, emissiveMipLevels) &&
-            createMaterialTexture(renderer, tinyModel, material.occlusionTexture.index, TextureFormat::RGBA8,
-                                  makeDebugName(desc, "Occlusion"), loadedModel.materialTextures.occlusion,
-                                  loadedModel.textureNames.occlusion, occlusionMipLevels) &&
-            createMaterialTexture(renderer, tinyModel, material.normalTexture.index, TextureFormat::RGBA8,
-                                  makeDebugName(desc, "Normal"), loadedModel.materialTextures.normal,
-                                  loadedModel.textureNames.normal, normalMipLevels);
-        if (!loadedAllTextures && desc.requireMaterialTextures)
+        const tinygltf::Material& material = tiny_model.materials[static_cast<size_t>(primitive.material)];
+        loaded_model.material_factors = readMaterialFactors(material);
+        uint32_t max_material_mip_levels = 1;
+        uint32_t base_color_mip_levels = 1;
+        uint32_t metal_roughness_mip_levels = 1;
+        uint32_t emissive_mip_levels = 1;
+        uint32_t occlusion_mip_levels = 1;
+        uint32_t normal_mip_levels = 1;
+        UploadBatchGuard upload_batch(renderer);
+        if (!upload_batch.started())
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::Unsupported,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::BACKEND_FAILURE,
+                            "Failed to upload glTF material textures upload batch");
+        }
+
+        const bool loaded_all_textures =
+            createMaterialTexture(renderer, tiny_model, material.pbrMetallicRoughness.baseColorTexture.index,
+                                  ETextureFormat::RGB_A8_SRGB, makeDebugName(desc, "Base Color"),
+                                  loaded_model.material_textures.base_color, loaded_model.texture_names.base_color,
+                                  base_color_mip_levels) &&
+            createMaterialTexture(renderer, tiny_model, material.pbrMetallicRoughness.metallicRoughnessTexture.index,
+                                  ETextureFormat::RGBA8, makeDebugName(desc, "Metal Roughness"),
+                                  loaded_model.material_textures.metal_roughness,
+                                  loaded_model.texture_names.metal_roughness, metal_roughness_mip_levels) &&
+            createMaterialTexture(renderer, tiny_model, material.emissiveTexture.index, ETextureFormat::RGB_A8_SRGB,
+                                  makeDebugName(desc, "Emissive"), loaded_model.material_textures.emissive,
+                                  loaded_model.texture_names.emissive, emissive_mip_levels) &&
+            createMaterialTexture(renderer, tiny_model, material.occlusionTexture.index, ETextureFormat::RGBA8,
+                                  makeDebugName(desc, "Occlusion"), loaded_model.material_textures.occlusion,
+                                  loaded_model.texture_names.occlusion, occlusion_mip_levels) &&
+            createMaterialTexture(renderer, tiny_model, material.normalTexture.index, ETextureFormat::RGBA8,
+                                  makeDebugName(desc, "Normal"), loaded_model.material_textures.normal,
+                                  loaded_model.texture_names.normal, normal_mip_levels);
+        if (!loaded_all_textures && desc.require_material_textures)
+        {
+            upload_batch.cancel();
+            return failLoad(renderer, loaded_model, ERendererErrorCode::UNSUPPORTED,
                             "glTF material is missing a required PBR texture or uses an unsupported image format.");
         }
-        maxMaterialMipLevels = std::max(
-            {baseColorMipLevels, metalRoughnessMipLevels, emissiveMipLevels, occlusionMipLevels, normalMipLevels});
 
-        loadedModel.materialSampler = renderer.createSampler(
-            createMaterialSamplerDesc(tinyModel, material.pbrMetallicRoughness.baseColorTexture.index,
-                                      maxMaterialMipLevels, makeDebugName(desc, "Material Sampler")));
-        if (!loadedModel.materialSampler.isValid())
+        if (!upload_batch.finish())
         {
-            return failLoad(renderer, loadedModel, RendererErrorCode::BackendFailure,
+            return failLoad(renderer, loaded_model, ERendererErrorCode::BACKEND_FAILURE,
+                            "Failed to submit glTF material textures upload batch.");
+        }
+
+        max_material_mip_levels = std::max({base_color_mip_levels, metal_roughness_mip_levels, emissive_mip_levels,
+                                            occlusion_mip_levels, normal_mip_levels});
+
+        loaded_model.material_sampler = renderer.createSampler(
+            createMaterialSamplerDesc(tiny_model, material.pbrMetallicRoughness.baseColorTexture.index,
+                                      max_material_mip_levels, makeDebugName(desc, "Material Sampler")));
+        if (!loaded_model.material_sampler.isValid())
+        {
+            return failLoad(renderer, loaded_model, ERendererErrorCode::BACKEND_FAILURE,
                             "Failed to create glTF material sampler.");
         }
 
-        return RendererResult<GltfLoadedModel>::success(std::move(loadedModel));
+        return RendererResult<GltfLoadedModel>::success(std::move(loaded_model));
     }
 
     void destroyGltfModel(IRenderer& renderer, GltfLoadedModel& model)
     {
-        if (model.materialTextures.normal.isValid())
+        if (model.material_textures.normal.isValid())
         {
-            renderer.destroyTexture(model.materialTextures.normal);
-            model.materialTextures.normal = {};
+            renderer.destroyTexture(model.material_textures.normal);
+            model.material_textures.normal = {};
         }
-        if (model.materialTextures.occlusion.isValid())
+        if (model.material_textures.occlusion.isValid())
         {
-            renderer.destroyTexture(model.materialTextures.occlusion);
-            model.materialTextures.occlusion = {};
+            renderer.destroyTexture(model.material_textures.occlusion);
+            model.material_textures.occlusion = {};
         }
-        if (model.materialTextures.emissive.isValid())
+        if (model.material_textures.emissive.isValid())
         {
-            renderer.destroyTexture(model.materialTextures.emissive);
-            model.materialTextures.emissive = {};
+            renderer.destroyTexture(model.material_textures.emissive);
+            model.material_textures.emissive = {};
         }
-        if (model.materialTextures.metalRoughness.isValid())
+        if (model.material_textures.metal_roughness.isValid())
         {
-            renderer.destroyTexture(model.materialTextures.metalRoughness);
-            model.materialTextures.metalRoughness = {};
+            renderer.destroyTexture(model.material_textures.metal_roughness);
+            model.material_textures.metal_roughness = {};
         }
-        if (model.materialTextures.baseColor.isValid())
+        if (model.material_textures.base_color.isValid())
         {
-            renderer.destroyTexture(model.materialTextures.baseColor);
-            model.materialTextures.baseColor = {};
+            renderer.destroyTexture(model.material_textures.base_color);
+            model.material_textures.base_color = {};
         }
-        if (model.materialSampler.isValid())
+        if (model.material_sampler.isValid())
         {
-            renderer.destroySampler(model.materialSampler);
-            model.materialSampler = {};
+            renderer.destroySampler(model.material_sampler);
+            model.material_sampler = {};
         }
-        if (model.indexBuffer.isValid())
+        if (model.index_buffer.isValid())
         {
-            renderer.destroyBuffer(model.indexBuffer);
-            model.indexBuffer = {};
+            renderer.destroyBuffer(model.index_buffer);
+            model.index_buffer = {};
         }
-        if (model.vertexBuffer.isValid())
+        if (model.vertex_buffer.isValid())
         {
-            renderer.destroyBuffer(model.vertexBuffer);
-            model.vertexBuffer = {};
+            renderer.destroyBuffer(model.vertex_buffer);
+            model.vertex_buffer = {};
         }
 
-        model.indexCount = 0;
+        model.index_count = 0;
         model.transform = glm::mat4(1.0f);
-        model.textureNames = {};
-        model.materialFactors = {};
+        model.texture_names = {};
+        model.material_factors = {};
     }
 
 }  // namespace kera

@@ -1,4 +1,4 @@
-// Copyright 2026 Tomas Mikalauskas
+﻿// Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/framebuffer.h"
@@ -13,7 +13,7 @@
 namespace kera
 {
 
-    Framebuffer::Framebuffer() : device_(VK_NULL_HANDLE) {}
+    Framebuffer::Framebuffer() : m_device(VK_NULL_HANDLE) {}
 
     Framebuffer::~Framebuffer()
     {
@@ -21,9 +21,9 @@ namespace kera
     }
 
     Framebuffer::Framebuffer(Framebuffer&& other) noexcept
-        : device_(other.device_), framebuffers_(std::move(other.framebuffers_))
+        : m_device(other.m_device), m_framebuffers(std::move(other.m_framebuffers))
     {
-        other.device_ = VK_NULL_HANDLE;
+        other.m_device = VK_NULL_HANDLE;
     }
 
     Framebuffer& Framebuffer::operator=(Framebuffer&& other) noexcept
@@ -31,38 +31,38 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            device_ = other.device_;
-            framebuffers_ = std::move(other.framebuffers_);
-            other.device_ = VK_NULL_HANDLE;
+            m_device = other.m_device;
+            m_framebuffers = std::move(other.m_framebuffers);
+            other.m_device = VK_NULL_HANDLE;
         }
         return *this;
     }
 
-    bool Framebuffer::initialize(const Device& device, const RenderPass& renderPass, const SwapChain& swapChain)
+    bool Framebuffer::initialize(const Device& device, const RenderPass& render_pass, const SwapChain& swap_chain)
     {
         shutdown();
 
-        VkDevice vkDevice = device.getVulkanDevice();
-        device_ = vkDevice;
-        const auto& imageViews = swapChain.getImageViews();
-        VkExtent2D extent = swapChain.getExtent();
+        VkDevice vk_device = device.getVulkanDevice();
+        m_device = vk_device;
+        const auto& image_views = swap_chain.getImageViews();
+        VkExtent2D extent = swap_chain.getExtent();
 
-        framebuffers_.resize(imageViews.size());
+        m_framebuffers.resize(image_views.size());
 
-        for (size_t i = 0; i < imageViews.size(); i++)
+        for (size_t i = 0; i < image_views.size(); i++)
         {
-            VkImageView attachments[] = {imageViews[i]};
+            VkImageView attachments[] = {image_views[i]};
 
-            VkFramebufferCreateInfo framebufferInfo{};
-            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = renderPass.getVulkanRenderPass();
-            framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = attachments;
-            framebufferInfo.width = extent.width;
-            framebufferInfo.height = extent.height;
-            framebufferInfo.layers = 1;
+            VkFramebufferCreateInfo framebuffer_info{};
+            framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebuffer_info.renderPass = render_pass.getVulkanRenderPass();
+            framebuffer_info.attachmentCount = 1;
+            framebuffer_info.pAttachments = attachments;
+            framebuffer_info.width = extent.width;
+            framebuffer_info.height = extent.height;
+            framebuffer_info.layers = 1;
 
-            VkResult result = vkCreateFramebuffer(vkDevice, &framebufferInfo, nullptr, &framebuffers_[i]);
+            VkResult result = vkCreateFramebuffer(vk_device, &framebuffer_info, nullptr, &m_framebuffers[i]);
             if (result != VK_SUCCESS)
             {
                 Logger::getInstance().error("Failed to create framebuffer " + std::to_string(i) + ": " +
@@ -72,68 +72,68 @@ namespace kera
             }
         }
 
-        Logger::getInstance().debug("Framebuffers created successfully (" + std::to_string(framebuffers_.size()) +
+        Logger::getInstance().debug("Framebuffers created successfully (" + std::to_string(m_framebuffers.size()) +
                                     " framebuffers)");
         return true;
     }
 
-    bool Framebuffer::initializeSingleColorTarget(const Device& device, const RenderPass& renderPass,
-                                                  VkImageView colorImageView, VkExtent2D extent,
-                                                  VkImageView depthImageView)
+    bool Framebuffer::initializeSingleColorTarget(const Device& device, const RenderPass& render_pass,
+                                                  VkImageView color_image_view, VkExtent2D extent,
+                                                  VkImageView depth_image_view)
     {
         shutdown();
 
-        if (colorImageView == VK_NULL_HANDLE || extent.width == 0 || extent.height == 0)
+        if (color_image_view == VK_NULL_HANDLE || extent.width == 0 || extent.height == 0)
         {
             return false;
         }
 
-        VkDevice vkDevice = device.getVulkanDevice();
-        device_ = vkDevice;
+        VkDevice vk_device = device.getVulkanDevice();
+        m_device = vk_device;
 
-        VkImageView attachments[] = {colorImageView, depthImageView};
-        const uint32_t attachmentCount = depthImageView == VK_NULL_HANDLE ? 1u : 2u;
+        VkImageView attachments[] = {color_image_view, depth_image_view};
+        const uint32_t attachment_count = depth_image_view == VK_NULL_HANDLE ? 1u : 2u;
 
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass.getVulkanRenderPass();
-        framebufferInfo.attachmentCount = attachmentCount;
-        framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = extent.width;
-        framebufferInfo.height = extent.height;
-        framebufferInfo.layers = 1;
+        VkFramebufferCreateInfo framebuffer_info{};
+        framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_info.renderPass = render_pass.getVulkanRenderPass();
+        framebuffer_info.attachmentCount = attachment_count;
+        framebuffer_info.pAttachments = attachments;
+        framebuffer_info.width = extent.width;
+        framebuffer_info.height = extent.height;
+        framebuffer_info.layers = 1;
 
         VkFramebuffer framebuffer = VK_NULL_HANDLE;
-        VkResult result = vkCreateFramebuffer(vkDevice, &framebufferInfo, nullptr, &framebuffer);
+        VkResult result = vkCreateFramebuffer(vk_device, &framebuffer_info, nullptr, &framebuffer);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create color target framebuffer: " + std::to_string(result));
             return false;
         }
 
-        framebuffers_.push_back(framebuffer);
+        m_framebuffers.push_back(framebuffer);
         Logger::getInstance().debug("Color target framebuffer created successfully");
         return true;
     }
 
     void Framebuffer::shutdown()
     {
-        for (auto framebuffer : framebuffers_)
+        for (auto framebuffer : m_framebuffers)
         {
             if (framebuffer)
             {
-                vkDestroyFramebuffer(device_, framebuffer, nullptr);
+                vkDestroyFramebuffer(m_device, framebuffer, nullptr);
             }
         }
-        framebuffers_.clear();
-        device_ = VK_NULL_HANDLE;
+        m_framebuffers.clear();
+        m_device = VK_NULL_HANDLE;
     }
 
     VkFramebuffer Framebuffer::getFramebuffer(uint32_t index) const
     {
-        if (index < framebuffers_.size())
+        if (index < m_framebuffers.size())
         {
-            return framebuffers_[index];
+            return m_framebuffers[index];
         }
         return VK_NULL_HANDLE;
     }

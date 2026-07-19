@@ -16,7 +16,7 @@ namespace kera
             std::function<void(const std::string& condition, const std::string& message, const char* file, int line)>;
 
         static void setAssertHandler(AssertHandler handler);
-        static void assertCondition(bool condition, const std::string& conditionStr, const std::string& message = "",
+        static void assertCondition(bool condition, const std::string& condition_str, const std::string& message = "",
                                     const char* file = "", int line = 0);
 
 // Validation macros (defined in cpp file)
@@ -25,7 +25,7 @@ namespace kera
     kera::Validation::assertCondition(condition, #condition, message, __FILE__, __LINE__)
 
     private:
-        static AssertHandler assert_handler_;
+        static AssertHandler g_assertHandler;
     };
 
 }  // namespace kera

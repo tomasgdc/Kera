@@ -25,17 +25,17 @@ namespace kera
         }
         bool hasRenderedBackbuffer() const
         {
-            return m_renderedBackbuffer;
+            return m_rendered_backbuffer;
         }
 
-        void renderToBackbuffer(const ClearColorValue& clearColor, const std::function<void(FrameHandle)>& draw);
-        void renderToTexture(RenderTargetHandle target, const ClearColorValue& clearColor,
+        void renderToBackbuffer(const ClearColorValue& clear_color, const std::function<void(FrameHandle)>& draw);
+        void renderToTexture(RenderTargetHandle target, const ClearColorValue& clear_color,
                              const std::function<void(FrameHandle)>& draw);
 
     private:
         Renderer& m_renderer;
         FrameHandle m_frame;
-        bool m_renderedBackbuffer = false;
+        bool m_rendered_backbuffer = false;
     };
 
 }  // namespace kera

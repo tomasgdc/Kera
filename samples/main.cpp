@@ -16,9 +16,9 @@ int main(int argc, char* argv[])
         const std::string arg = argv[index];
         if (arg == "--smoke-test")
         {
-            if (options.maxFrames == 0)
+            if (options.max_frames == 0)
             {
-                options.maxFrames = 1;
+                options.max_frames = 1;
             }
         }
         else if (arg == "--smoke-frames")
@@ -28,19 +28,19 @@ int main(int argc, char* argv[])
                 kera::sampleLogError("--smoke-frames requires a frame count");
                 return EXIT_FAILURE;
             }
-            options.maxFrames = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
+            options.max_frames = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
         }
         else if (arg == "--resize-smoke")
         {
-            options.resizeSmoke = true;
+            options.resize_smoke = true;
         }
         else if (arg == "--zero-resize-smoke")
         {
-            options.zeroResizeSmoke = true;
+            options.zero_resize_smoke = true;
         }
         else if (arg == "--hide-stats-overlay")
         {
-            options.showStatsOverlay = false;
+            options.show_stats_overlay = false;
         }
         else if (arg == "--damaged-helmet-debug-view")
         {
@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
                 kera::sampleLogError("--damaged-helmet-debug-view requires a mode index");
                 return EXIT_FAILURE;
             }
-            options.damagedHelmetDebugView = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
+            options.damaged_helmet_debug_view = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
         }
         else if (arg == "--damaged-helmet-fixed-yaw-degrees")
         {
@@ -58,8 +58,8 @@ int main(int argc, char* argv[])
                 kera::sampleLogError("--damaged-helmet-fixed-yaw-degrees requires a degree value");
                 return EXIT_FAILURE;
             }
-            options.damagedHelmetFixedYaw = true;
-            options.damagedHelmetYawRadians = std::strtof(argv[++index], nullptr) * 0.017453292519943295f;
+            options.damaged_helmet_fixed_yaw = true;
+            options.damaged_helmet_yaw_radians = std::strtof(argv[++index], nullptr) * 0.017453292519943295f;
         }
         else if (arg == "--sample-index")
         {
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
                 kera::sampleLogError("--sample-index requires a sample index");
                 return EXIT_FAILURE;
             }
-            options.initialSampleIndex = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
+            options.initial_sample_index = static_cast<uint32_t>(std::strtoul(argv[++index], nullptr, 10));
         }
         else if (arg == "--help")
         {

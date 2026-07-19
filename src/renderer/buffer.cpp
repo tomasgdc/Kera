@@ -1,4 +1,4 @@
-// Copyright 2026 Tomas Mikalauskas
+﻿// Copyright 2026 Tomas Mikalauskas
 // SPDX-License-Identifier: Apache-2.0
 
 #include "kera/renderer/buffer.h"
@@ -16,17 +16,18 @@ namespace kera
     namespace
     {
 
-        bool findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties,
-                            uint32_t& outMemoryType)
+        bool findMemoryType(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties,
+                            uint32_t& out_memory_type)
         {
-            VkPhysicalDeviceMemoryProperties memProperties;
-            vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+            VkPhysicalDeviceMemoryProperties mem_properties;
+            vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
 
-            for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+            for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
             {
-                if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+                if ((type_filter & (1 << i)) &&
+                    (mem_properties.memoryTypes[i].propertyFlags & properties) == properties)
                 {
-                    outMemoryType = i;
+                    out_memory_type = i;
                     return true;
                 }
             }
@@ -37,13 +38,13 @@ namespace kera
     }  // anonymous namespace
 
     Buffer::Buffer()
-        : device_(VK_NULL_HANDLE)
-        , buffer_(VK_NULL_HANDLE)
-        , memory_(VK_NULL_HANDLE)
-        , size_(0)
-        , non_coherent_atom_size_(1)
-        , memory_properties_(0)
-        , mapped_data_(nullptr)
+        : m_device(VK_NULL_HANDLE)
+        , m_buffer(VK_NULL_HANDLE)
+        , m_memory(VK_NULL_HANDLE)
+        , m_size(0)
+        , m_non_coherent_atom_size(1)
+        , m_memory_properties(0)
+        , m_mapped_data(nullptr)
     {
     }
 
@@ -53,21 +54,21 @@ namespace kera
     }
 
     Buffer::Buffer(Buffer&& other) noexcept
-        : device_(other.device_)
-        , buffer_(other.buffer_)
-        , memory_(other.memory_)
-        , size_(other.size_)
-        , non_coherent_atom_size_(other.non_coherent_atom_size_)
-        , memory_properties_(other.memory_properties_)
-        , mapped_data_(other.mapped_data_)
+        : m_device(other.m_device)
+        , m_buffer(other.m_buffer)
+        , m_memory(other.m_memory)
+        , m_size(other.m_size)
+        , m_non_coherent_atom_size(other.m_non_coherent_atom_size)
+        , m_memory_properties(other.m_memory_properties)
+        , m_mapped_data(other.m_mapped_data)
     {
-        other.device_ = VK_NULL_HANDLE;
-        other.buffer_ = VK_NULL_HANDLE;
-        other.memory_ = VK_NULL_HANDLE;
-        other.size_ = 0;
-        other.non_coherent_atom_size_ = 1;
-        other.memory_properties_ = 0;
-        other.mapped_data_ = nullptr;
+        other.m_device = VK_NULL_HANDLE;
+        other.m_buffer = VK_NULL_HANDLE;
+        other.m_memory = VK_NULL_HANDLE;
+        other.m_size = 0;
+        other.m_non_coherent_atom_size = 1;
+        other.m_memory_properties = 0;
+        other.m_mapped_data = nullptr;
     }
 
     Buffer& Buffer::operator=(Buffer&& other) noexcept
@@ -75,102 +76,103 @@ namespace kera
         if (this != &other)
         {
             shutdown();
-            device_ = other.device_;
-            buffer_ = other.buffer_;
-            memory_ = other.memory_;
-            size_ = other.size_;
-            non_coherent_atom_size_ = other.non_coherent_atom_size_;
-            memory_properties_ = other.memory_properties_;
-            mapped_data_ = other.mapped_data_;
+            m_device = other.m_device;
+            m_buffer = other.m_buffer;
+            m_memory = other.m_memory;
+            m_size = other.m_size;
+            m_non_coherent_atom_size = other.m_non_coherent_atom_size;
+            m_memory_properties = other.m_memory_properties;
+            m_mapped_data = other.m_mapped_data;
 
-            other.device_ = VK_NULL_HANDLE;
-            other.buffer_ = VK_NULL_HANDLE;
-            other.memory_ = VK_NULL_HANDLE;
-            other.size_ = 0;
-            other.non_coherent_atom_size_ = 1;
-            other.memory_properties_ = 0;
-            other.mapped_data_ = nullptr;
+            other.m_device = VK_NULL_HANDLE;
+            other.m_buffer = VK_NULL_HANDLE;
+            other.m_memory = VK_NULL_HANDLE;
+            other.m_size = 0;
+            other.m_non_coherent_atom_size = 1;
+            other.m_memory_properties = 0;
+            other.m_mapped_data = nullptr;
         }
         return *this;
     }
 
-    bool Buffer::initialize(const Device& device, VkDeviceSize size, BufferUsage usage,
+    bool Buffer::initialize(const Device& device, VkDeviceSize size, EBufferUsage usage,
                             VkMemoryPropertyFlags properties)
     {
-        if (buffer_)
+        if (m_buffer)
         {
             shutdown();
         }
 
-        VkDevice vkDevice = device.getVulkanDevice();
-        VkPhysicalDevice vkPhysicalDevice = device.getVulkanPhysicalDevice();
-        device_ = vkDevice;
-        size_ = size;
-        memory_properties_ = properties;
+        VkDevice vk_device = device.getVulkanDevice();
+        VkPhysicalDevice vk_physical_device = device.getVulkanPhysicalDevice();
+        m_device = vk_device;
+        m_size = size;
+        m_memory_properties = properties;
 
-        VkPhysicalDeviceProperties physicalDeviceProperties{};
-        vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
-        non_coherent_atom_size_ = physicalDeviceProperties.limits.nonCoherentAtomSize;
+        VkPhysicalDeviceProperties physical_device_properties{};
+        vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device_properties);
+        m_non_coherent_atom_size = physical_device_properties.limits.nonCoherentAtomSize;
 
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = size;
+        VkBufferCreateInfo buffer_info{};
+        buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        buffer_info.size = size;
 
         switch (usage)
         {
-            case BufferUsage::Vertex:
-                bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            case EBufferUsage::VERTEX:
+                buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
                 break;
-            case BufferUsage::Index:
-                bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            case EBufferUsage::INDEX:
+                buffer_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
                 break;
-            case BufferUsage::Uniform:
-                bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+            case EBufferUsage::UNIFORM:
+                buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
                 break;
-            case BufferUsage::Storage:
-                bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            case EBufferUsage::STORAGE:
+                buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
                 break;
-            case BufferUsage::TransferSrc:
-                bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            case EBufferUsage::TRANSFER_SRC:
+                buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
                 break;
-            case BufferUsage::TransferDst:
-                bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            case EBufferUsage::TRANSFER_DST:
+                buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
                 break;
         }
 
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VkResult result = vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer_);
+        VkResult result = vkCreateBuffer(vk_device, &buffer_info, nullptr, &m_buffer);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to create buffer: " + std::to_string(result));
             return false;
         }
 
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(vkDevice, buffer_, &memRequirements);
+        VkMemoryRequirements mem_requirements;
+        vkGetBufferMemoryRequirements(vk_device, m_buffer, &mem_requirements);
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        if (!findMemoryType(vkPhysicalDevice, memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex))
+        VkMemoryAllocateInfo alloc_info{};
+        alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        alloc_info.allocationSize = mem_requirements.size;
+        if (!findMemoryType(vk_physical_device, mem_requirements.memoryTypeBits, properties,
+                            alloc_info.memoryTypeIndex))
         {
             Logger::getInstance().error("Failed to find suitable buffer memory type");
-            vkDestroyBuffer(vkDevice, buffer_, nullptr);
-            buffer_ = VK_NULL_HANDLE;
+            vkDestroyBuffer(vk_device, m_buffer, nullptr);
+            m_buffer = VK_NULL_HANDLE;
             return false;
         }
 
-        result = vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory_);
+        result = vkAllocateMemory(vk_device, &alloc_info, nullptr, &m_memory);
         if (result != VK_SUCCESS)
         {
             Logger::getInstance().error("Failed to allocate buffer memory: " + std::to_string(result));
-            vkDestroyBuffer(vkDevice, buffer_, nullptr);
-            buffer_ = VK_NULL_HANDLE;
+            vkDestroyBuffer(vk_device, m_buffer, nullptr);
+            m_buffer = VK_NULL_HANDLE;
             return false;
         }
 
-        vkBindBufferMemory(vkDevice, buffer_, memory_, 0);
+        vkBindBufferMemory(vk_device, m_buffer, m_memory, 0);
 
         Logger::getInstance().debug("Buffer created successfully (size: " + std::to_string(size) + " bytes)");
         return true;
@@ -178,81 +180,81 @@ namespace kera
 
     void Buffer::shutdown()
     {
-        if (mapped_data_)
+        if (m_mapped_data)
         {
             unmap();
         }
 
-        if (buffer_)
+        if (m_buffer)
         {
-            vkDestroyBuffer(device_, buffer_, nullptr);
-            buffer_ = VK_NULL_HANDLE;
+            vkDestroyBuffer(m_device, m_buffer, nullptr);
+            m_buffer = VK_NULL_HANDLE;
         }
 
-        if (memory_)
+        if (m_memory)
         {
-            vkFreeMemory(device_, memory_, nullptr);
-            memory_ = VK_NULL_HANDLE;
+            vkFreeMemory(m_device, m_memory, nullptr);
+            m_memory = VK_NULL_HANDLE;
         }
 
-        device_ = VK_NULL_HANDLE;
-        size_ = 0;
-        non_coherent_atom_size_ = 1;
-        memory_properties_ = 0;
+        m_device = VK_NULL_HANDLE;
+        m_size = 0;
+        m_non_coherent_atom_size = 1;
+        m_memory_properties = 0;
     }
 
     bool Buffer::map(void** data)
     {
-        if (!memory_ || mapped_data_)
+        if (!m_memory || m_mapped_data)
         {
             return false;
         }
 
-        VkResult result = vkMapMemory(device_, memory_, 0, size_, 0, &mapped_data_);
+        VkResult result = vkMapMemory(m_device, m_memory, 0, m_size, 0, &m_mapped_data);
         if (result != VK_SUCCESS)
         {
             return false;
         }
 
-        *data = mapped_data_;
+        *data = m_mapped_data;
         return true;
     }
 
     void Buffer::unmap()
     {
-        if (mapped_data_ && memory_)
+        if (m_mapped_data && m_memory)
         {
-            vkUnmapMemory(device_, memory_);
-            mapped_data_ = nullptr;
+            vkUnmapMemory(m_device, m_memory);
+            m_mapped_data = nullptr;
         }
     }
 
     bool Buffer::copyFrom(const void* data, VkDeviceSize size, VkDeviceSize offset)
     {
-        if (!data || offset + size > size_)
+        if (!data || offset + size > m_size)
         {
             return false;
         }
 
-        void* mappedData = nullptr;
-        if (!map(&mappedData))
+        void* mapped_data = nullptr;
+        if (!map(&mapped_data))
         {
             return false;
         }
 
-        memcpy(static_cast<char*>(mappedData) + offset, data, size);
-        if ((memory_properties_ & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
+        memcpy(static_cast<char*>(mapped_data) + offset, data, size);
+        if ((m_memory_properties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
         {
-            const VkDeviceSize atomSize = non_coherent_atom_size_ == 0 ? 1 : non_coherent_atom_size_;
-            const VkDeviceSize alignedOffset = (offset / atomSize) * atomSize;
+            const VkDeviceSize atom_size = m_non_coherent_atom_size == 0 ? 1 : m_non_coherent_atom_size;
+            const VkDeviceSize aligned_offset = (offset / atom_size) * atom_size;
             const VkDeviceSize end = offset + size;
-            const VkDeviceSize alignedEnd = ((end + atomSize - 1) / atomSize) * atomSize;
+            const VkDeviceSize aligned_end = ((end + atom_size - 1) / atom_size) * atom_size;
             VkMappedMemoryRange range{};
             range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-            range.memory = memory_;
-            range.offset = alignedOffset;
-            range.size = alignedEnd > size_ ? VK_WHOLE_SIZE : alignedEnd - alignedOffset;
-            vkFlushMappedMemoryRanges(device_, 1, &range);
+            range.memory = m_memory;
+            range.offset = aligned_offset;
+            range.size = aligned_end > m_size ? VK_WHOLE_SIZE : aligned_end - aligned_offset;
+            vkFlushMappedMemoryRanges(m_device, 1, &range);
         }
         unmap();
 
