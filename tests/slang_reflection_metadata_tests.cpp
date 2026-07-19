@@ -84,7 +84,7 @@ TEST(KeraSlangReflectionMetadata, GeneratedJsonContracts)
     EXPECT_EQ(vertex_main->inputs[1].format, kera::EVertexFormat::FLOAT3);
     EXPECT_TRUE(vertex_main->inputs[1].has_format);
     EXPECT_EQ(vertex_main->inputs[2].parameter_name, "instance");
-    EXPECT_EQ(vertex_main->inputs[2].field_name, "modelMatrix");
+    EXPECT_EQ(vertex_main->inputs[2].field_name, "model_matrix");
     EXPECT_EQ(vertex_main->inputs[2].semantic_name, "TRANSFORM");
     EXPECT_EQ(vertex_main->inputs[2].location, 2u);
     EXPECT_EQ(vertex_main->inputs[2].location_count, 4u);
