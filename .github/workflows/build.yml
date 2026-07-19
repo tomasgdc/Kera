@@ -32,10 +32,8 @@ jobs:
           submodules: recursive
           lfs: false
 
-      - name: Clean and Install Git LFS
-        run: |
-          if (Test-Path .git/hooks/pre-push) { Remove-Item .git/hooks/pre-push -Force }
-          git lfs install --local
+      - name: Install Git LFS
+        run: git lfs install --local --force
 
       - name: LFS Pull
         run: |
@@ -77,10 +75,8 @@ jobs:
           submodules: recursive
           lfs: false
 
-      - name: Clean and Install Git LFS
-        run: |
-          if (Test-Path .git/hooks/pre-push) { Remove-Item .git/hooks/pre-push -Force }
-          git lfs install --local
+      - name: Install Git LFS
+        run: git lfs install --local --force
 
       - name: LFS Pull
         run: |
@@ -117,10 +113,8 @@ jobs:
           submodules: recursive
           lfs: false
 
-      - name: Clean and Install Git LFS
-        run: |
-          if (Test-Path .git/hooks/pre-push) { Remove-Item .git/hooks/pre-push -Force }
-          git lfs install --local
+      - name: Install Git LFS
+        run: git lfs install --local --force
 
       - name: LFS Pull
         run: |
