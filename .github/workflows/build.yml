@@ -42,11 +42,11 @@ jobs:
           $repository = '${{ github.repository }}'
           $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
           $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
-          $authHeader = & git config --local $checkOutAuthKey
+          $authHeader = git config --local --get $checkOutAuthKey
           if ([string]::IsNullOrEmpty($authHeader)) {
-            throw Checkout did not configure an HTTP authorization header for Git LFS'
+            throw 'Checkout did not configure an HTTP authorization header for Git LFS'
           }
-          git config --local --unset $checkOutAuthKey
+          git config --local --unset-all $checkOutAuthKey
           git config --local $lfsBatchAuthKey "$authHeader"
           git lfs pull
 
@@ -92,11 +92,11 @@ jobs:
           $repository = '${{ github.repository }}'
           $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
           $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
-          $authHeader = & git config --local $checkOutAuthKey
+          $authHeader = git config --local --get $checkOutAuthKey
           if ([string]::IsNullOrEmpty($authHeader)) {
-            throw Checkout did not configure an HTTP authorization header for Git LFS'
+            throw 'Checkout did not configure an HTTP authorization header for Git LFS'
           }
-          git config --local --unset $checkOutAuthKey
+          git config --local --unset-all $checkOutAuthKey
           git config --local $lfsBatchAuthKey "$authHeader"
           git lfs pull
 
@@ -137,11 +137,11 @@ jobs:
           $repository = '${{ github.repository }}'
           $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
           $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
-          $authHeader = & git config --local $checkOutAuthKey
+          $authHeader = git config --local --get $checkOutAuthKey
           if ([string]::IsNullOrEmpty($authHeader)) {
-            throw Checkout did not configure an HTTP authorization header for Git LFS'
+            throw 'Checkout did not configure an HTTP authorization header for Git LFS'
           }
-          git config --local --unset $checkOutAuthKey
+          git config --local --unset-all $checkOutAuthKey
           git config --local $lfsBatchAuthKey "$authHeader"
           git lfs pull
 
