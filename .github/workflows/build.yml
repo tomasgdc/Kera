@@ -38,9 +38,9 @@ jobs:
       - name: LFS Pull
         run: |
           # Github's extraHeader auth cred should only be sent on the fisrt lfs request
-          $AUTH_HEADER = & git config --local http.&{{ github.server_url }}.extraheader}
-          git config --local --unset http.&{{ github.server_url }}.extraheader
-          git config --local http.&{{ github.server_url }}.git/info/lfs/objects/batch.extraheader $AUTH_HEADER
+          $AUTH_HEADER = & git config --local http.${{ github.server_url }}/.extraheader}
+          git config --local --unset http.${{ github.server_url }}/.extraheader
+          git config --local http.${{ github.server_url }}.git/info/lfs/objects/batch.extraheader "$AUTH_HEADER"
           git lfs pull
 
       - name: Add LLVM to PATH
@@ -81,9 +81,9 @@ jobs:
       - name: LFS Pull
         run: |
           # Github's extraHeader auth cred should only be sent on the fisrt lfs request
-          $AUTH_HEADER = & git config --local http.&{{ github.server_url }}.extraheader}
-          git config --local --unset http.&{{ github.server_url }}.extraheader
-          gint config --local http.&{{ github.server_url }}.git/info/lfs/objects/batch.extraheader $AUTH_HEADER
+          $AUTH_HEADER = & git config --local http.${{ github.server_url }}/.extraheader}
+          git config --local --unset http.${{ github.server_url }}/.extraheader
+          git config --local http.${{ github.server_url }}.git/info/lfs/objects/batch.extraheader "$AUTH_HEADER"
           git lfs pull
 
       - name: Configure CMake
@@ -119,9 +119,9 @@ jobs:
       - name: LFS Pull
         run: |
           # Github's extraHeader auth cred should only be sent on the fisrt lfs request
-          $AUTH_HEADER = & git config --local http.&{{ github.server_url }}.extraheader}
-          git config --local --unset http.&{{ github.server_url }}.extraheader
-          gint config --local http.&{{ github.server_url }}.git/info/lfs/objects/batch.extraheader $AUTH_HEADER
+          $AUTH_HEADER = & git config --local http.${{ github.server_url }}/.extraheader}
+          git config --local --unset http.${{ github.server_url }}/.extraheader
+          git config --local http.${{ github.server_url }}.git/info/lfs/objects/batch.extraheader "$AUTH_HEADER"
           git lfs pull
 
       - name: Configure CMake
