@@ -12,7 +12,7 @@ on:
       - main
 concurrency:
   # Make sure every PR has its own concurrency group, so that multiple PRs can run in parallel.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.head_ref && github.ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
