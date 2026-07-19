@@ -38,9 +38,16 @@ jobs:
       - name: LFS Pull
         run: |
           # Github's extraHeader auth cred should only be sent on the fisrt lfs request
-          $AUTH_HEADER = & git config --local http.${{ github.server_url }}/.extraheader}
-          git config --local --unset http.${{ github.server_url }}/.extraheader
-          git config --local http.${{ github.server_url }}.git/info/lfs/objects/batch.extraheader "$AUTH_HEADER"
+          $serverUrl = '${{ github.server_url }}'
+          $repository = '${{ github.repository }}'
+          $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
+          $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
+          $authHeader = & git config --local $checkOutAuthKey
+          if ([string]::IsNullOrEmpty($authHeader)) {
+            throw Checkout did not configure an HTTP authorization header for Git LFS'
+          }
+          git config --local --unset $checkOutAuthKey
+          git config --local $lfsBatchAuthKey "$authHeader"
           git lfs pull
 
       - name: Add LLVM to PATH
@@ -81,9 +88,16 @@ jobs:
       - name: LFS Pull
         run: |
           # Github's extraHeader auth cred should only be sent on the fisrt lfs request
-          $AUTH_HEADER = & git config --local http.${{ github.server_url }}/.extraheader}
-          git config --local --unset http.${{ github.server_url }}/.extraheader
-          git config --local http.${{ github.server_url }}.git/info/lfs/objects/batch.extraheader "$AUTH_HEADER"
+          $serverUrl = '${{ github.server_url }}'
+          $repository = '${{ github.repository }}'
+          $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
+          $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
+          $authHeader = & git config --local $checkOutAuthKey
+          if ([string]::IsNullOrEmpty($authHeader)) {
+            throw Checkout did not configure an HTTP authorization header for Git LFS'
+          }
+          git config --local --unset $checkOutAuthKey
+          git config --local $lfsBatchAuthKey "$authHeader"
           git lfs pull
 
       - name: Configure CMake
@@ -119,9 +133,16 @@ jobs:
       - name: LFS Pull
         run: |
           # Github's extraHeader auth cred should only be sent on the fisrt lfs request
-          $AUTH_HEADER = & git config --local http.${{ github.server_url }}/.extraheader}
-          git config --local --unset http.${{ github.server_url }}/.extraheader
-          git config --local http.${{ github.server_url }}.git/info/lfs/objects/batch.extraheader "$AUTH_HEADER"
+          $serverUrl = '${{ github.server_url }}'
+          $repository = '${{ github.repository }}'
+          $checkOutAuthKey = 'http.' + $serverUrl + '/.extraheader'
+          $lfsBatchAuthKey = 'http.' + $serverUrl + '/' + $repository + '.git/info/lfs/objects/batch.extraheader'
+          $authHeader = & git config --local $checkOutAuthKey
+          if ([string]::IsNullOrEmpty($authHeader)) {
+            throw Checkout did not configure an HTTP authorization header for Git LFS'
+          }
+          git config --local --unset $checkOutAuthKey
+          git config --local $lfsBatchAuthKey "$authHeader"
           git lfs pull
 
       - name: Configure CMake
