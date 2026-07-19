@@ -18,7 +18,7 @@ foreach ($f in $files) {
         exit 1
     }
 
-    if((Get-Conntent -Raw -LiteralPath $f) -cne $contentBeforeFormatting) {
+    if((Get-Content -Raw -LiteralPath $f) -cne $contentBeforeFormatting) {
         $formattedFiles += $f
     }
 }
