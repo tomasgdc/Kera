@@ -32,15 +32,17 @@ jobs:
           submodules: recursive
           lfs: false
 
-      - name: Install LFS
-        run: git lfs install --local
+      - name: Clean and Install Git LFS
+        run: |
+          if (Test-Path .git/hooks/pre-push) { Remove-Item .git/hooks/pre-push -Force }
+          git lfs install --local
 
       - name: LFS Pull
         run: |
           # Github's extraHeader auth cred should only be sent on the fisrt lfs request
           $AUTH_HEADER = & git config --local http.&{{ github.server_url }}.extraheader}
           git config --local --unset http.&{{ github.server_url }}.extraheader
-          gint config --local http.&{{ github.server_url }}.git/info/lfs/objects/batch.extraheader $AUTH_HEADER
+          git config --local http.&{{ github.server_url }}.git/info/lfs/objects/batch.extraheader $AUTH_HEADER
           git lfs pull
 
       - name: Add LLVM to PATH
@@ -75,8 +77,10 @@ jobs:
           submodules: recursive
           lfs: false
 
-      - name: Install LFS
-        run: git lfs install --local
+      - name: Clean and Install Git LFS
+        run: |
+          if (Test-Path .git/hooks/pre-push) { Remove-Item .git/hooks/pre-push -Force }
+          git lfs install --local
 
       - name: LFS Pull
         run: |
@@ -113,8 +117,10 @@ jobs:
           submodules: recursive
           lfs: false
 
-      - name: Install LFS
-        run: git lfs install --local
+      - name: Clean and Install Git LFS
+        run: |
+          if (Test-Path .git/hooks/pre-push) { Remove-Item .git/hooks/pre-push -Force }
+          git lfs install --local
 
       - name: LFS Pull
         run: |
