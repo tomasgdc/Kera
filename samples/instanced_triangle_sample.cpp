@@ -34,13 +34,13 @@ namespace kera
             glm::mat4 model_matrix;
         };
 
-        namespace instanced_triangle_shader
+        namespace instancedTriangleShader
         {
             constexpr const char* kPath = "shaders/instanced_triangle.slang";
             constexpr const char* kVertexEntryPoint = "vertexMain";
             constexpr const char* kFragmentEntryPoint = "fragmentMain";
             constexpr const char* kGlobalParams = "globalParams";
-        }  // namespace InstancedTriangleShader
+        }  // namespace instancedTriangleShader
 
         constexpr uint32_t kUniformRingSlots = 3;
     }  // namespace
@@ -81,11 +81,11 @@ namespace kera
 
     bool InstancedTriangleSample::createShaderProgram()
     {
-        const std::string shader_path = resolveShaderPath(instanced_triangle_shader::kPath);
+        const std::string shader_path = resolveShaderPath(instancedTriangleShader::kPath);
         m_shader_program = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shader_path),
-            .vertex_entry_point = stringView(instanced_triangle_shader::kVertexEntryPoint),
-            .fragment_entry_point = stringView(instanced_triangle_shader::kFragmentEntryPoint),
+            .vertex_entry_point = stringView(instancedTriangleShader::kVertexEntryPoint),
+            .fragment_entry_point = stringView(instancedTriangleShader::kFragmentEntryPoint),
             .source = EShaderSourceKind::SLANG_FILE,
             .debug_name = {},
         });
@@ -192,7 +192,7 @@ namespace kera
 
             const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
             if (!m_renderer.updateDescriptors(descriptor_set)
-                     .uniform<Uniforms>(instanced_triangle_shader::kGlobalParams, m_uniform_buffer, uniform_offset)
+                     .uniform<Uniforms>(instancedTriangleShader::kGlobalParams, m_uniform_buffer, uniform_offset)
                      .ok())
             {
                 return false;
@@ -273,7 +273,7 @@ namespace kera
 
                 DescriptorSetHandle uniform_descriptor_set = m_uniform_descriptor_sets[uniform_buffer_slot];
                 if (!m_renderer.updateDescriptors(uniform_descriptor_set)
-                         .uniform<Uniforms>(instanced_triangle_shader::kGlobalParams, m_uniform_buffer, uniform_offset)
+                         .uniform<Uniforms>(instancedTriangleShader::kGlobalParams, m_uniform_buffer, uniform_offset)
                          .ok())
                 {
                     sampleLogError("Failed to update instanced triangle uniform descriptor.");
