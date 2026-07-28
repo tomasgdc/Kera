@@ -24,6 +24,6 @@ foreach ($f in $files) {
 }
 
 if ($formattedFiles.count -gt 0) {
-    Write-Error "clang-format updated the following files. Commit the formatting chages: " + ($formattedFiles -join ", ")
+    Write-Error ("clang-format updated the following files. Commit the formatting chages: " + ($formattedFiles -join ", "))
     exit 1
 }

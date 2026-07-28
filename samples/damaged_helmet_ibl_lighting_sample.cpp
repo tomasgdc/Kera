@@ -340,8 +340,7 @@ namespace kera
 
             const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
             if (!m_renderer.updateDescriptors(descriptor_set)
-                     .uniform<HelmetUniforms>(damagedHelmetIblShader::kHelmetParams, m_uniform_buffer,
-                                              uniform_offset)
+                     .uniform<HelmetUniforms>(damagedHelmetIblShader::kHelmetParams, m_uniform_buffer, uniform_offset)
                      .sampledImage(damagedHelmetIblShader::kBaseColorTexture, m_model.material_textures.base_color)
                      .sampledImage(damagedHelmetIblShader::kMetalRoughnessTexture,
                                    m_model.material_textures.metal_roughness)
@@ -416,8 +415,7 @@ namespace kera
 
             const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
             if (!m_renderer.updateDescriptors(descriptor_set)
-                     .uniform<HelmetUniforms>(damagedHelmetIblShader::kHelmetParams, m_uniform_buffer,
-                                              uniform_offset)
+                     .uniform<HelmetUniforms>(damagedHelmetIblShader::kHelmetParams, m_uniform_buffer, uniform_offset)
                      .sampledImage(damagedHelmetIblShader::kSkyboxTexture, m_ibl_environment.skybox_texture)
                      .sampler(damagedHelmetIblShader::kSkyboxSampler, m_ibl_environment.sampler)
                      .ok())
