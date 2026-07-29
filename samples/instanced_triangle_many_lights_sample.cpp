@@ -50,7 +50,7 @@ namespace kera
             std::array<LightData, 64> lights;
         };
 
-        namespace many_lights_shader
+        namespace manyLightsShader
         {
             constexpr const char* kPath = "shaders/instanced_triangle_many_lights.slang";
             constexpr const char* kGeometryVertexEntryPoint = "geometryVertexMain";
@@ -62,7 +62,7 @@ namespace kera
             constexpr const char* kLightingParams = "lightingParams";
             constexpr const char* kSceneTexture = "sceneTexture";
             constexpr const char* kSceneSampler = "sceneSampler";
-        }  // namespace ManyLightsShader
+        }  // namespace manyLightsShader
 
     }  // namespace
 
@@ -103,12 +103,12 @@ namespace kera
 
     bool InstancedTriangleManyLightsSample::createShaderPrograms()
     {
-        const std::string shader_path = resolveShaderPath(many_lights_shader::kPath);
+        const std::string shader_path = resolveShaderPath(manyLightsShader::kPath);
 
         m_geometry_shader_program = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shader_path),
-            .vertex_entry_point = stringView(many_lights_shader::kGeometryVertexEntryPoint),
-            .fragment_entry_point = stringView(many_lights_shader::kGeometryFragmentEntryPoint),
+            .vertex_entry_point = stringView(manyLightsShader::kGeometryVertexEntryPoint),
+            .fragment_entry_point = stringView(manyLightsShader::kGeometryFragmentEntryPoint),
             .source = EShaderSourceKind::SLANG_FILE,
             .debug_name = {},
         });
@@ -120,8 +120,8 @@ namespace kera
 
         m_lighting_shader_program = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shader_path),
-            .vertex_entry_point = stringView(many_lights_shader::kFullscreenVertexEntryPoint),
-            .fragment_entry_point = stringView(many_lights_shader::kLightingFragmentEntryPoint),
+            .vertex_entry_point = stringView(manyLightsShader::kFullscreenVertexEntryPoint),
+            .fragment_entry_point = stringView(manyLightsShader::kLightingFragmentEntryPoint),
             .source = EShaderSourceKind::SLANG_FILE,
             .debug_name = {},
         });
@@ -307,7 +307,7 @@ namespace kera
         m_geometry_descriptor_set = m_renderer.createDescriptorSet(m_geometry_pipeline);
         if (!m_geometry_descriptor_set.isValid() ||
             !m_renderer.updateDescriptors(m_geometry_descriptor_set)
-                 .uniform<GeometryUniforms>(many_lights_shader::kGeometryParams, m_geometry_uniform_buffer)
+                 .uniform<GeometryUniforms>(manyLightsShader::kGeometryParams, m_geometry_uniform_buffer)
                  .ok())
         {
             return false;
@@ -338,9 +338,9 @@ namespace kera
         }
 
         return m_renderer.updateDescriptors(m_lighting_descriptor_set)
-            .uniform<LightingUniforms>(many_lights_shader::kLightingParams, m_lighting_uniform_buffer)
-            .sampledImage(many_lights_shader::kSceneTexture, m_scene_texture)
-            .sampler(many_lights_shader::kSceneSampler, m_scene_sampler)
+            .uniform<LightingUniforms>(manyLightsShader::kLightingParams, m_lighting_uniform_buffer)
+            .sampledImage(manyLightsShader::kSceneTexture, m_scene_texture)
+            .sampler(manyLightsShader::kSceneSampler, m_scene_sampler)
             .ok();
     }
 

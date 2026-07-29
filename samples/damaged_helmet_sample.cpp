@@ -31,7 +31,7 @@ namespace kera
             glm::vec4 padding2;
         };
 
-        namespace damaged_helmet_shader
+        namespace damagedHelmetShader
         {
             constexpr const char* kPath = "shaders/damaged_helmet.slang";
             constexpr const char* kMeshVertexEntryPoint = "helmetVertexMain";
@@ -46,7 +46,7 @@ namespace kera
             constexpr const char* kNormalTexture = "normalTexture";
             constexpr const char* kSceneTexture = "sceneTexture";
             constexpr const char* kMaterialSampler = "materialSampler";
-        }  // namespace damaged_helmet_shader
+        }  // namespace damagedHelmetShader
 
         constexpr uint32_t kUniformRingSlots = 3;
         constexpr uint32_t kMaxDamagedHelmetDebugView = 11;
@@ -126,11 +126,11 @@ namespace kera
 
     bool DamagedHelmetSample::createShaderPrograms()
     {
-        const std::string shader_path = resolveShaderPath(damaged_helmet_shader::kPath);
+        const std::string shader_path = resolveShaderPath(damagedHelmetShader::kPath);
         m_mesh_shader_program = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shader_path),
-            .vertex_entry_point = stringView(damaged_helmet_shader::kMeshVertexEntryPoint),
-            .fragment_entry_point = stringView(damaged_helmet_shader::kMeshFragmentEntryPoint),
+            .vertex_entry_point = stringView(damagedHelmetShader::kMeshVertexEntryPoint),
+            .fragment_entry_point = stringView(damagedHelmetShader::kMeshFragmentEntryPoint),
             .source = EShaderSourceKind::SLANG_FILE,
             .debug_name = {},
         });
@@ -142,8 +142,8 @@ namespace kera
 
         m_display_shader_program = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shader_path),
-            .vertex_entry_point = stringView(damaged_helmet_shader::kFullscreenVertexEntryPoint),
-            .fragment_entry_point = stringView(damaged_helmet_shader::kFullscreenFragmentEntryPoint),
+            .vertex_entry_point = stringView(damagedHelmetShader::kFullscreenVertexEntryPoint),
+            .fragment_entry_point = stringView(damagedHelmetShader::kFullscreenFragmentEntryPoint),
             .source = EShaderSourceKind::SLANG_FILE,
             .debug_name = {},
         });
@@ -283,14 +283,14 @@ namespace kera
 
             const std::size_t uniform_offset = m_renderer.getUniformRingBufferSlotOffset(m_uniform_buffer, slot);
             if (!m_renderer.updateDescriptors(descriptor_set)
-                     .uniform<HelmetUniforms>(damaged_helmet_shader::kHelmetParams, m_uniform_buffer, uniform_offset)
-                     .sampledImage(damaged_helmet_shader::kBaseColorTexture, m_model.material_textures.base_color)
-                     .sampledImage(damaged_helmet_shader::kMetalRoughnessTexture,
+                     .uniform<HelmetUniforms>(damagedHelmetShader::kHelmetParams, m_uniform_buffer, uniform_offset)
+                     .sampledImage(damagedHelmetShader::kBaseColorTexture, m_model.material_textures.base_color)
+                     .sampledImage(damagedHelmetShader::kMetalRoughnessTexture,
                                    m_model.material_textures.metal_roughness)
-                     .sampledImage(damaged_helmet_shader::kEmissiveTexture, m_model.material_textures.emissive)
-                     .sampledImage(damaged_helmet_shader::kOcclusionTexture, m_model.material_textures.occlusion)
-                     .sampledImage(damaged_helmet_shader::kNormalTexture, m_model.material_textures.normal)
-                     .sampler(damaged_helmet_shader::kMaterialSampler, m_model.material_sampler)
+                     .sampledImage(damagedHelmetShader::kEmissiveTexture, m_model.material_textures.emissive)
+                     .sampledImage(damagedHelmetShader::kOcclusionTexture, m_model.material_textures.occlusion)
+                     .sampledImage(damagedHelmetShader::kNormalTexture, m_model.material_textures.normal)
+                     .sampler(damagedHelmetShader::kMaterialSampler, m_model.material_sampler)
                      .ok())
             {
                 return false;
@@ -320,8 +320,8 @@ namespace kera
         m_display_descriptor_set = m_renderer.createDescriptorSet(m_display_pipeline);
         return m_display_descriptor_set.isValid() &&
                m_renderer.updateDescriptors(m_display_descriptor_set)
-                   .sampledImage(damaged_helmet_shader::kSceneTexture, m_scene_texture)
-                   .sampler(damaged_helmet_shader::kMaterialSampler, m_model.material_sampler)
+                   .sampledImage(damagedHelmetShader::kSceneTexture, m_scene_texture)
+                   .sampler(damagedHelmetShader::kMaterialSampler, m_model.material_sampler)
                    .ok();
     }
 

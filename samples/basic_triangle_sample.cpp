@@ -21,12 +21,12 @@ namespace kera
             glm::vec3 color;
         };
 
-        namespace basic_triangle_shader
+        namespace basicTriangleShader
         {
             constexpr const char* kPath = "shaders/triangle.slang";
             constexpr const char* kVertexEntryPoint = "vertexMain";
             constexpr const char* kFragmentEntryPoint = "fragmentMain";
-        }  // namespace basic_triangle_shader
+        }  // namespace basicTriangleShader
     }  // namespace
 
     BasicTriangleSample::BasicTriangleSample(Renderer& renderer)
@@ -61,11 +61,11 @@ namespace kera
 
     bool BasicTriangleSample::createShaderProgram()
     {
-        const std::string shader_path = resolveShaderPath(basic_triangle_shader::kPath);
+        const std::string shader_path = resolveShaderPath(basicTriangleShader::kPath);
         m_shader_program = m_renderer.createGraphicsShaderProgram({
             .path = sampleStringView(shader_path),
-            .vertex_entry_point = stringView(basic_triangle_shader::kVertexEntryPoint),
-            .fragment_entry_point = stringView(basic_triangle_shader::kFragmentEntryPoint),
+            .vertex_entry_point = stringView(basicTriangleShader::kVertexEntryPoint),
+            .fragment_entry_point = stringView(basicTriangleShader::kFragmentEntryPoint),
             .source = EShaderSourceKind::SLANG_FILE,
             .debug_name = {},
         });

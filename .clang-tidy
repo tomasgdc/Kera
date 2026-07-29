@@ -103,4 +103,4 @@ CheckOptions:
     value: CamelCase
 
   - key: readability-identifier-naming.NamespaceCase
-    value: lower_case
+    value: camelCase
