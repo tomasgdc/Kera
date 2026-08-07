@@ -31,8 +31,9 @@ namespace kera
         Pipeline(Pipeline&& other) noexcept;
         Pipeline& operator=(Pipeline&& other) noexcept;
 
-        bool initialize(const Device& device, VkPipelineCache pipeline_cache, VkFormat color_format,
-                        VkFormat depth_format, std::span<const Shader* const> shaders,
+        bool initialize(const Device& device, VkPipelineCache pipeline_cache,
+                        std::span<const VkFormat> color_format, VkFormat depth_format,
+                        VkSampleCountFlagBits sample_count, std::span<const Shader* const> shaders,
                         const GraphicsPipelineDesc& desc = {});
         void shutdown();
 

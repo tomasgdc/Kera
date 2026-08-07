@@ -128,6 +128,8 @@ namespace kera
         virtual bool destroySampler(SamplerHandle sampler) = 0;
         virtual RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) = 0;
         virtual bool destroyRenderTarget(RenderTargetHandle render_target) = 0;
+        virtual uint32_t getAttachementSupportedSampleCounts() const = 0;
+        virtual RendererResult<TextureHandle> createAttachementTexture(const AttachementTextureDesc& desc) = 0;
 
         virtual GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                               ShaderProgramHandle program) = 0;
@@ -135,6 +137,8 @@ namespace kera
         virtual std::vector<DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
             GraphicsPipelineHandle pipeline) const = 0;
         virtual VertexLayoutDesc getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipeline) const;
+        virtual RendererResult<GraphicsPipelineHandle> createAttachementGraphicsPipeline(
+            const AttachementGraphicsPipelineCreateDesc& desc) = 0;
         virtual bool destroyGraphicsPipeline(GraphicsPipelineHandle pipeline) = 0;
         virtual DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline) = 0;
         virtual DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline, uint32_t set) = 0;
@@ -163,6 +167,14 @@ namespace kera
         virtual void beginRenderPass(FrameHandle frame, const RenderPassDesc& desc) = 0;
         virtual void beginRenderPass(FrameHandle frame, RenderTargetHandle target, const RenderPassDesc& desc) = 0;
         virtual void endRenderPass(FrameHandle frame) = 0;
+        virtual RendererResult<void> validateAttachementRendering(const AttachementRenderingDesc& desc) = 0;
+        virtual RendererResult<void> beginAttachementRendering(FrameHandle frame,
+                                                               const AttachementRenderingDesc& desc) = 0;
+        virtual RendererResult<void> endAttachementRendering(FrameHandle frame) = 0;
+        virtual RendererResult<void> resolveAttachementTexture(FrameHandle frame, TextureHandle src_texture,
+                                                               TextureHandle dst_texture) = 0;
+        virtual RendererResult<void> requestAttachementCapture(FrameHandle frame, TextureHandle texture,
+                                                               std::string& name) = 0;
         virtual void bindPipeline(FrameHandle frame, GraphicsPipelineHandle pipeline) = 0;
         virtual void bindVertexBuffer(FrameHandle frame, uint32_t slot, BufferHandle buffer,
                                       std::size_t offset = 0) = 0;

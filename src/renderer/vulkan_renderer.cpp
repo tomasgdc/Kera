@@ -100,6 +100,68 @@ namespace kera
             }
         }
 
+        VkSampleCountFlagBits toVkSampleCount(uint32_t sample_count)
+        {
+            switch (sample_count)
+            {
+                case 1:
+                    return VK_SAMPLE_COUNT_1_BIT;
+                case 2:
+                    return VK_SAMPLE_COUNT_2_BIT;
+                case 4:
+                    return VK_SAMPLE_COUNT_4_BIT;
+                case 8:
+                    return VK_SAMPLE_COUNT_8_BIT;
+                case 16:
+                    return VK_SAMPLE_COUNT_16_BIT;
+                case 32:
+                    return VK_SAMPLE_COUNT_32_BIT;
+                case 64:
+                    return VK_SAMPLE_COUNT_64_BIT;
+                default:
+                    return static_cast<VkSampleCountFlagBits>(0);
+            }
+        }
+
+        uint32_t toAttachementSampleCountMask(VkSampleCountFlags sample_counts)
+        {
+            uint32_t result = 0;
+            for (const uint32_t sample_count : {1u, 2u, 4u, 8u})
+            {
+                if ((sample_counts & toVkSampleCount(sample_count)) != 0)
+                {
+                    result |= sample_count;
+                }
+            }
+            return result;
+        }
+         
+        VkAttachmentLoadOp toVkAttachementLoadOp(EAttachementLoadOp load_op)
+        {
+            switch (load_op)
+            {
+                case EAttachementLoadOp::LOAD:
+                    return VK_ATTACHMENT_LOAD_OP_LOAD;
+                case EAttachementLoadOp::CLEAR:
+                    return VK_ATTACHMENT_LOAD_OP_CLEAR;
+                case EAttachementLoadOp::DONT_CARE:
+                default:
+                    return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            }
+        }
+        
+        VkAttachmentStoreOp toVkAttachementStoreOp(EAttachementStoreOp store_op)
+        {
+            switch (store_op)
+            {
+                case EAttachementStoreOp::STORE:
+                    return VK_ATTACHMENT_STORE_OP_STORE;
+                case EAttachementStoreOp::DONT_CARE:
+                default:
+                    return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            }
+        }
+
         VkFormat toVkTextureFormat(ETextureFormat format)
         {
             switch (format)
@@ -198,7 +260,7 @@ namespace kera
 
         VkPipelineStageFlags2 renderCompleteStageMask()
         {
-            return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+            return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         }
 
         void setDebugObjectName(VkDevice device, VkObjectType object_type, uint64_t object_handle,
@@ -1349,6 +1411,21 @@ namespace kera
             return {};
         }
 
+        const VkSampleCountFlagBits vk_sample_count = toVkSampleCount(desc.sample_count);
+        if (vk_sample_count == 0)
+        {
+            Logger::getInstance().error("Texture sample count is invalid.");
+            return {};
+        }
+
+        if (desc.sample_count != 1 && (requested_mip_levels != 1 || desc.generate_mipmaps ||
+                                       desc.dimension != ETextureDimension::TEXTURE2_D ||
+            desc.sampled))
+        {
+            Logger::getInstance().error("Multisample textures must be single-mip, 2D, not-sampled");
+            return {};
+        }
+
         if (requested_mip_levels > 1 && (desc.depth_stencil || desc.render_target))
         {
             Logger::getInstance().error("Mipmapped render-target or depth textures are not supported.");
@@ -1375,6 +1452,16 @@ namespace kera
             {
                 usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
             }
+        }
+
+        if (desc.transfer_src)
+        {
+            usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        }
+
+        if (desc.transfer_dst)
+        {
+            usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         }
 
         if (usage == 0)
@@ -1404,9 +1491,12 @@ namespace kera
         resource.m_texture_format = desc.format;
         resource.m_extent = {desc.width, desc.height};
         resource.m_mip_levels = requested_mip_levels;
+        resource.m_sample_count = desc.sample_count;
         resource.m_generate_mipmaps = desc.generate_mipmaps && requested_mip_levels > 1;
         resource.m_aspect_mask = desc.depth_stencil ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
         resource.m_sampled = desc.sampled;
+        resource.m_transfer_src = desc.transfer_src;
+        resource.m_transfer_dst = desc.transfer_dst;
         resource.m_render_target = desc.render_target;
         resource.m_depth_stencil = desc.depth_stencil;
         resource.m_current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1433,7 +1523,7 @@ namespace kera
         image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         image_info.usage = usage;
         image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+        image_info.samples = vk_sample_count;
 
         VkDevice vk_device = m_device->getVulkanDevice();
         if (vkCreateImage(vk_device, &image_info, nullptr, &resource.m_image) != VK_SUCCESS)
@@ -1751,6 +1841,12 @@ namespace kera
             return false;
         }
 
+        if (hasActiveFrames() && frameResourceUses(texture))
+        {
+            Logger::getInstance().error("Cannot destroy a Vulkan texture that is still referenced by an active frame.");
+            return false;
+        }
+
         if (descriptorSetsReference(texture))
         {
             Logger::getInstance().error(
@@ -1907,6 +2003,106 @@ namespace kera
         return m_render_targets.remove(render_target);
     }
 
+    uint32_t VulkanRenderer::getAttachementSupportedSampleCounts() const
+    {
+        if (!m_device)
+        {
+            return 1;
+        }
+
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(m_device->getVulkanPhysicalDevice(), &properties);
+        return toAttachementSampleCountMask(properties.limits.framebufferColorSampleCounts &
+            properties.limits.framebufferDepthSampleCounts);
+    }
+
+    RendererResult<TextureHandle> VulkanRenderer::createAttachementTexture(const AttachementTextureDesc& desc)
+    {
+        if (desc.width == 0 || desc.height == 0)
+        {
+            return RendererResult<TextureHandle>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                          "Attachement texture dimensions must be non-zero.");
+        }
+
+        if (toVkSampleCount(desc.sample_count) == 0 || (getAttachementSupportedSampleCounts() & desc.sample_count) == 0)
+        {
+            return RendererResult<TextureHandle>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                          "Attachement texture sample count is invalid.");
+        }
+
+        if (desc.sample_count != 1 && (desc.sampled || desc.transfer_src))
+        {
+            return RendererResult<TextureHandle>::failure(
+                ERendererErrorCode::UNSUPPORTED,
+                "Multisample attachement texturtes must be resolved before sampling or transfer readbakc");
+        }
+
+        if (desc.color_attachement == desc.depth_stencil_attachement)
+        {
+            return RendererResult<TextureHandle>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Attachement texture cannot be both a color and depth-stencil attachement.");
+        }
+
+        if (desc.color_attachement && desc.format == ETextureFormat::DEPTH32)
+        {
+            return RendererResult<TextureHandle>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Attachement texture cannot be a color attachement with a depth format.");
+        }
+
+        if (desc.depth_stencil_attachement && desc.format != ETextureFormat::DEPTH32)
+        {
+            return RendererResult<TextureHandle>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Attachement texture cannot be a depth-stencil attachement with a non-depth format.");
+        }
+
+        TextureDesc texture_desc{};
+        texture_desc.width = desc.width;
+        texture_desc.height = desc.height;
+        texture_desc.format = desc.format;
+        texture_desc.mip_levels = 1;
+        texture_desc.generate_mipmaps = false;
+        texture_desc.render_target = true;
+        texture_desc.sampled = desc.sampled;
+        texture_desc.transfer_src = desc.transfer_src || (desc.color_attachement && desc.sample_count != 1);
+        texture_desc.transfer_dst = desc.color_attachement && desc.sample_count == 1;
+        texture_desc.depth_stencil = desc.depth_stencil_attachement;
+        texture_desc.sample_count = desc.sample_count;
+        texture_desc.debug_name = desc.debug_name;
+
+        TextureHandle handle = createTexture(texture_desc);
+        if (!handle.isValid())
+        {
+            return RendererResult<TextureHandle>::failure(ERendererErrorCode::BACKEND_FAILURE,
+                                                          "Failed to create attachement Vulkan texture.");
+        }
+
+        VulkanTextureResource* resource = m_textures.get(handle);
+        if (!resource)
+        {
+            return RendererResult<TextureHandle>::failure(ERendererErrorCode::BACKEND_FAILURE,
+                                                          "Failed to retrieve attachement Vulkan texture resource.");
+        }
+
+        resource->m_sample_count = desc.sample_count;
+        if (resource->m_depth_stencil)
+        {
+            resource->m_descriptor_layout = desc.sampled ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                                         : VK_IMAGE_LAYOUT_UNDEFINED;
+            resource->m_render_target_final_layout = desc.sampled ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                                                  : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        }
+        else
+        {
+            resource->m_render_target_final_layout =
+                desc.sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
+
+        return RendererResult<TextureHandle>::success(handle);
+    }
+
     GraphicsPipelineHandle VulkanRenderer::createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                                   ShaderProgramHandle program)
     {
@@ -1916,11 +2112,12 @@ namespace kera
             return {};
         }
 
-        VkFormat color_format = VK_FORMAT_UNDEFINED;
+        std::vector<VkFormat> color_formats;
         VkFormat depth_format = VK_FORMAT_UNDEFINED;
-        if (!resolvePipelineRenderingFormats(desc.render_target, color_format, depth_format))
+        VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
+        if (!resolvePipelineRenderingFormats(desc, color_formats, depth_format, sample_count))
         {
-            Logger::getInstance().error("Invalid render target passed to createGraphicsPipeline.");
+            Logger::getInstance().error("Invalid rendering signature passed to createGraphicsPipeline.");
             return {};
         }
 
@@ -1952,7 +2149,8 @@ namespace kera
         resource.m_desc = effective_desc;
         resource.m_program = program;
         if (!resource.m_pipeline.initialize(
-                *m_device, m_pipeline_cache, color_format, depth_format,
+                *m_device, m_pipeline_cache, std::span<const VkFormat>(color_formats.data(), color_formats.size()),
+                depth_format, sample_count,
                 std::span<const Shader* const>(graphics_shaders.data(), graphics_shaders.size()), effective_desc))
         {
             Logger::getInstance().error("Failed to create Vulkan graphics pipeline.");
@@ -2007,6 +2205,93 @@ namespace kera
         }
 
         return createGraphicsPipeline(pipeline_desc, desc.shader_program);
+    }
+
+    RendererResult<GraphicsPipelineHandle> VulkanRenderer::createAttachementGraphicsPipeline(
+        const AttachementGraphicsPipelineCreateDesc& desc)
+    {
+
+        const AttachementPipelineSignature& signature = desc.attachement_signature;
+        if (signature.color_formats.empty() && !signature.has_depth_attachement)
+        {
+            return RendererResult<GraphicsPipelineHandle>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Attachement graphics pipeline must have at least one color or depth attachement.");
+        }
+
+        if (signature.color_formats.size() > kMaxAttachementColorAttachements)
+        {
+            return RendererResult<GraphicsPipelineHandle>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Attachement graphics pipeline exceeds the maximum number of color attachements.");
+        }
+
+        if (toVkSampleCount(signature.sample_count) == 0 ||
+            (getAttachementSupportedSampleCounts() & signature.sample_count) == 0)
+        {
+            return RendererResult<GraphicsPipelineHandle>::failure(
+                ERendererErrorCode::UNSUPPORTED, "Attachement graphics pipeline sample count is invalid.");
+        }
+
+        for (const ETextureFormat format : signature.color_formats)
+        {
+            if (format == ETextureFormat::DEPTH32)
+            {
+                return RendererResult<GraphicsPipelineHandle>::failure(
+                    ERendererErrorCode::VALIDATION_FAILED,
+                    "Attachement graphics pipeline color attachements cannot use a depth format.");
+            }
+        }
+
+        if (signature.has_depth_attachement && signature.depth_format != ETextureFormat::DEPTH32)
+        {
+            return RendererResult<GraphicsPipelineHandle>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Attachement graphics pipeline depth attachement must use a depth format.");
+        }
+
+        const GraphicsPipelineCreateDesc& graphics = desc.graphics;
+        GraphicsPipelineDesc pipeline_desc{};
+        pipeline_desc.topology = graphics.topology;
+        pipeline_desc.cull_mode = graphics.cull_mode;
+        pipeline_desc.front_face = graphics.front_face;
+        pipeline_desc.blend_mode = graphics.blend_mode;
+        pipeline_desc.vertex_layout = graphics.vertex_layout;
+        pipeline_desc.descriptor_sets = graphics.descriptor_sets;
+        pipeline_desc.depth_test = graphics.depth_test;
+        pipeline_desc.depth_write = graphics.depth_write;
+        pipeline_desc.uses_attachement_rendering = true;
+        pipeline_desc.attachement_signature = signature;
+        pipeline_desc.debug_name = graphics.debug_name;
+
+        if (!graphics.vertex_bindings.empty() || !graphics.vertex_fields.empty())
+        {
+            const SlangReflectionMetadata* reflection = getShaderProgramReflection(graphics.shader_program);
+            if (!reflection)
+            {
+                return RendererResult<GraphicsPipelineHandle>::failure(
+                    ERendererErrorCode::REFLECTION_MISSING,
+                    "Shader program reflection is missing while validating vertex input.");
+            }
+            const VertexInputLayoutBuildResult vertex_input =
+                buildValidatedVertexInputLayout(*reflection, {
+                                                                 .debug_name = graphics.debug_name,
+                                                                 .bindings = graphics.vertex_bindings,
+                                                                 .fields = graphics.vertex_fields,
+                                                             });
+            if (!vertex_input)
+            {
+                return RendererResult<GraphicsPipelineHandle>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                                       vertex_input.errorMessage());
+            }
+            pipeline_desc.vertex_layout = vertex_input.layout();
+        }
+
+        const GraphicsPipelineHandle handle = createGraphicsPipeline(pipeline_desc, graphics.shader_program);
+        return handle.isValid()
+                   ? RendererResult<GraphicsPipelineHandle>::success(handle)
+                   : RendererResult<GraphicsPipelineHandle>::failure(ERendererErrorCode::BACKEND_FAILURE,
+                                                                     "Failed to create Vulkan attachment graphics pipeline.");
     }
 
     std::vector<DescriptorSetLayoutDesc> VulkanRenderer::getGraphicsPipelineDescriptorSets(
@@ -2833,15 +3118,30 @@ namespace kera
             Logger::getInstance().error("Invalid frame handle passed to endRenderPass.");
             return;
         }
+
+        if (frame->m_attachement_rendering_active)
+        {
+            Logger::getInstance().error(
+                "Cannot end a Vulkan render pass while an attachement rendering pass is active.");
+            return;
+        }
+
         if (!frame->m_render_pass_active)
         {
             Logger::getInstance().error("Cannot end a Vulkan render pass when no render pass is active.");
             return;
         }
 
+        if (frame->m_attachement_rendering_active)
+        {
+            Logger::getInstance().error("Attachement rendering must be ended through endAttachementRendering.");
+            return;
+        }
+
         vkCmdEndRendering(frame->m_command_buffer);
         endDebugLabel(m_device->getVulkanDevice(), frame->m_command_buffer);
         frame->m_render_pass_active = false;
+
         if (frame->m_active_render_target_texture.isValid())
         {
             VulkanTextureResource* texture = m_textures.get(frame->m_active_render_target_texture);
@@ -2856,6 +3156,7 @@ namespace kera
             transitionSwapchainImageLayout(frame->m_command_buffer, frame->m_image_index,
                                            frame->m_render_pass_final_layout);
         }
+
         if (frame->m_active_depth_texture.isValid())
         {
             VulkanTextureResource* texture = m_textures.get(frame->m_active_depth_texture);
@@ -2865,7 +3166,463 @@ namespace kera
             }
             frame->m_active_depth_texture = {};
         }
+
         frame->m_render_pass_final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+
+    RendererResult<void> VulkanRenderer::validateAttachementRendering(const AttachementRenderingDesc& desc)
+    {
+        if (desc.color_attachements.empty() && !desc.has_depth_attachement)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::VALIDATION_FAILED, 
+                "Attachement rendering requires at least one color or depth attachement");
+        }
+
+        if (desc.color_attachements.size() > kMaxAttachementColorAttachements)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Attachement rendering has too many color attachements");
+        }
+
+        const VulkanTextureResource* first_attachement = nullptr;
+        std::vector<TextureHandle> attachement_handles;
+        attachement_handles.reserve(desc.color_attachements.size() + (desc.has_depth_attachement ? 1u : 0u));
+        for (const AttachementColorDesc& color_attachement : desc.color_attachements)
+        {
+            const VulkanTextureResource* texture = m_textures.get(color_attachement.texture);
+            if (!texture)
+            {
+                return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                     "Attachement rendering references an invalid color texture");
+            }
+
+            if (!texture->m_render_target || texture->m_depth_stencil)
+            {
+                return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                     "Attachement rendering color texture lacks color attachement usage.");
+            }
+
+            if (color_attachement.load_op == EAttachementLoadOp::LOAD && !texture->m_attachement_contents_defined)
+            {
+                return RendererResult<void>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                     "Attachement rendering cannot load undefined color attachement contents.");
+            }
+
+            if (std::find(attachement_handles.begin(), attachement_handles.end(), color_attachement.texture) != attachement_handles.end())
+            {
+                return RendererResult<void>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                     "Attachement rendering cannot alias a texture in multiple slots");
+            }
+
+            attachement_handles.push_back(color_attachement.texture);
+            if (!first_attachement)
+            {
+                first_attachement = texture;
+            }
+            else if (texture->m_extent.width != first_attachement->m_extent.width ||
+                texture->m_extent.height != first_attachement->m_extent.height ||
+                texture->m_sample_count != first_attachement->m_sample_count)
+            {
+                return RendererResult<void>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                     "Attachement rendering color textures must have matching extens and sample counts.");
+            }
+        }
+
+        if (desc.has_depth_attachement)
+        {
+            const VulkanTextureResource* texture = m_textures.get(desc.depth_attachement.texture);
+            if (!texture)
+            {
+                return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                     "Attachement rendering references an invalid depth texture");
+            }
+
+            if (!texture->m_render_target || texture->m_depth_stencil)
+            {
+                return RendererResult<void>::failure(
+                    ERendererErrorCode::INVALID_HANDLE,
+                    "Attachement rendering depth texture lacks depth attachement usage.");
+            }
+
+            if (desc.depth_attachement.load_op == EAttachementLoadOp::LOAD && !texture->m_attachement_contents_defined)
+            {
+                return RendererResult<void>::failure(
+                    ERendererErrorCode::VALIDATION_FAILED,
+                    "Attachement rendering cannot load undefined depth attachement contents.");
+            }
+
+            if (std::find(attachement_handles.begin(), attachement_handles.end(), desc.depth_attachement.texture) !=
+                attachement_handles.end())
+            {
+                return RendererResult<void>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                     "Attachement rendering cannot alias color and depth textures");
+            }
+
+            if (!first_attachement)
+            {
+                first_attachement = texture;
+            }
+            else if (texture->m_extent.width != first_attachement->m_extent.width ||
+                     texture->m_extent.height != first_attachement->m_extent.height ||
+                     texture->m_sample_count != first_attachement->m_sample_count)
+            {
+                return RendererResult<void>::failure(
+                    ERendererErrorCode::VALIDATION_FAILED,
+                    "Attachement rendering depth textures must have matching extens and sample counts.");
+            }
+        }
+
+        if (!first_attachement || (getAttachementSupportedSampleCounts() & first_attachement->m_sample_count) == 0)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::UNSUPPORTED,
+                "Attachement rendering sample count is not supported by this device");
+        }
+
+        return RendererResult<void>::success();
+    }
+
+    RendererResult<void> VulkanRenderer::beginAttachementRendering(FrameHandle frame, const AttachementRenderingDesc& desc)
+    {
+        VulkanFrameResource* frame_resource = m_frames.get(frame);
+        if (!frame_resource)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                               "Invalid frame handle passed to beginAttachementRendering.");
+        }
+
+        if (frame_resource->m_render_pass_active)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::INVALID_STATE,
+                "Cannot begin attachement rendering while another render pass is active.");
+        }
+
+        const RendererResult<void> validation_result = validateAttachementRendering(desc);
+        if (!validation_result.ok())
+        {
+            return validation_result;
+        }
+        
+        const VulkanTextureResource* first_attachement = desc.color_attachements.empty()
+                                                             ? m_textures.get(desc.depth_attachement.texture)
+                                                             : m_textures.get(desc.color_attachements.front().texture);
+
+        std::vector<VkRenderingAttachmentInfo> color_attachments(desc.color_attachements.size());
+        AttachementPipelineSignature signature{};
+        signature.sample_count = first_attachement->m_sample_count;
+        signature.color_formats.reserve(desc.color_attachements.size());
+
+        VulkanFrameResourceUse& resource_use =
+            m_frame_sync_resources[frame_resource->m_sync_index].m_resource_use;
+
+        const auto record_texture_use = [&resource_use](TextureHandle texture_handle) 
+        { 
+            if (std::find(resource_use.m_textures.begin(), resource_use.m_textures.end(), texture_handle) == resource_use.m_textures.end()) 
+            { 
+                resource_use.m_textures.push_back(texture_handle); 
+            } 
+        };
+
+        frame_resource->m_active_attachement_color_textures.clear();
+        for (size_t i = 0; i < desc.color_attachements.size(); ++i)
+        {
+            const AttachementColorDesc& color_desc = desc.color_attachements[i];
+            VulkanTextureResource* texture = m_textures.get(color_desc.texture);
+            transitionTextureLayout(frame_resource->m_command_buffer, *texture,
+                                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            VkRenderingAttachmentInfo& attachment_info = color_attachments[i];
+            attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            attachment_info.imageView = texture->m_image_view;
+            attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            attachment_info.loadOp = toVkAttachementLoadOp(color_desc.load_op);
+            attachment_info.storeOp = toVkAttachementStoreOp(color_desc.store_op);
+            attachment_info.clearValue.color = {{color_desc.clear_color.r, color_desc.clear_color.g,
+                                                  color_desc.clear_color.b, color_desc.clear_color.a}};
+            signature.color_formats.push_back(texture->m_texture_format);
+            texture->m_attachement_contents_defined = color_desc.store_op == EAttachementStoreOp::STORE &&
+                                                      color_desc.load_op != EAttachementLoadOp::DONT_CARE;
+            frame_resource->m_active_attachement_color_textures.push_back(color_desc.texture);
+            record_texture_use(color_desc.texture);
+        }
+
+        VkRenderingAttachmentInfo depth_attachment{};
+        if (desc.has_depth_attachement)
+        {
+            VulkanTextureResource* depth_texture = m_textures.get(desc.depth_attachement.texture);
+            transitionTextureLayout(frame_resource->m_command_buffer, *depth_texture,
+                                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            depth_attachment.imageView = depth_texture->m_image_view;
+            depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depth_attachment.loadOp = toVkAttachementLoadOp(desc.depth_attachement.load_op);
+            depth_attachment.storeOp = toVkAttachementStoreOp(desc.depth_attachement.store_op);
+            depth_attachment.clearValue.depthStencil = {desc.depth_attachement.clear_depth, 0};
+            signature.has_depth_attachement = true;
+            signature.depth_format = depth_texture->m_texture_format;
+            depth_texture->m_attachement_contents_defined =
+                desc.depth_attachement.store_op == EAttachementStoreOp::STORE &&
+                desc.depth_attachement.load_op != EAttachementLoadOp::DONT_CARE;
+            frame_resource->m_active_attachement_depth_texture = desc.depth_attachement.texture;
+            record_texture_use(desc.depth_attachement.texture);
+        }
+        else
+        {
+            frame_resource->m_active_attachement_depth_texture = {};
+        }
+
+        VkRenderingInfo rendering_info{};
+        rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        rendering_info.renderArea.offset = {0, 0};
+        rendering_info.renderArea.extent = {first_attachement->m_extent.width, first_attachement->m_extent.height};
+        rendering_info.layerCount = 1;
+        rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachments.size());
+        rendering_info.pColorAttachments = color_attachments.data();
+        rendering_info.pDepthAttachment = desc.has_depth_attachement ? &depth_attachment : nullptr;
+
+        beginDebugLabel(m_device->getVulkanDevice(), frame_resource->m_command_buffer, "Kera Attachement Rendering", 0.8f,
+                        0.4f, 0.4f);
+
+        vkCmdBeginRendering(frame_resource->m_command_buffer, &rendering_info);
+        frame_resource->m_render_pass_active = true;
+        frame_resource->m_attachement_rendering_active = true;
+        frame_resource->m_active_attachemenmt_signature = std::move(signature);
+
+        VkViewport viewport {};
+        viewport.width = static_cast<float>(first_attachement->m_extent.width);
+        viewport.height = static_cast<float>(first_attachement->m_extent.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(frame_resource->m_command_buffer, 0, 1, &viewport);
+        VkRect2D scissor{};
+        scissor.extent = {first_attachement->m_extent.width, first_attachement->m_extent.height};
+        vkCmdSetScissor(frame_resource->m_command_buffer, 0, 1, &scissor);
+        return RendererResult<void>::success();
+    }
+
+    RendererResult<void> VulkanRenderer::endAttachementRendering(FrameHandle frame)
+    {
+        VulkanFrameResource* frame_resource = m_frames.get(frame);
+        if (!frame_resource)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                 "Invalid frame handle passed to endAttachementRendering.");
+        }
+
+        if (!frame_resource->m_render_pass_active || !frame_resource->m_attachement_rendering_active)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::INVALID_STATE,
+                "Cannot end attachement rendering when no attachement rendering is active.");
+        }
+
+
+        vkCmdEndRendering(frame_resource->m_command_buffer);
+        endDebugLabel(m_device->getVulkanDevice(), frame_resource->m_command_buffer);
+        frame_resource->m_render_pass_active = false;
+        frame_resource->m_attachement_rendering_active = false;
+
+        for (const TextureHandle& color_texture_handle : frame_resource->m_active_attachement_color_textures)
+        {
+            VulkanTextureResource* texture = m_textures.get(color_texture_handle);
+            if (texture)
+            {
+                transitionTextureLayout(frame_resource->m_command_buffer, *texture,
+                                        texture->m_render_target_final_layout);
+            }
+        }
+
+        if (frame_resource->m_active_attachement_depth_texture.isValid())
+        {
+            VulkanTextureResource* depth_texture = m_textures.get(frame_resource->m_active_attachement_depth_texture);
+            if (depth_texture)
+            {
+                transitionTextureLayout(frame_resource->m_command_buffer, *depth_texture,
+                                        depth_texture->m_render_target_final_layout);
+            }
+        }
+
+        frame_resource->m_active_attachement_color_textures.clear();
+        frame_resource->m_active_attachement_depth_texture = {};
+        frame_resource->m_active_attachemenmt_signature = {};
+        return RendererResult<void>::success();
+    }
+
+    RendererResult<void> VulkanRenderer::resolveAttachementTexture(FrameHandle frame, TextureHandle src_texture,
+        TextureHandle dst_texture)
+    {
+        VulkanFrameResource* frame_resource = m_frames.get(frame);
+        if (!frame_resource)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                 "Invalid frame handle passed to resolveAttachementTexture.");
+        }
+
+        if (!frame_resource->m_render_pass_active)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::INVALID_STATE,
+                "Attachement resolve must be requested after the active rendering pass ends.");
+        }
+
+        if (src_texture == dst_texture)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Source and destination textures must be different for attachement resolve.");
+        }
+
+        VulkanTextureResource* src_texture_resource = m_textures.get(src_texture);
+        VulkanTextureResource* dst_texture_resource = m_textures.get(dst_texture);
+
+        if (!src_texture_resource || !dst_texture_resource)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                 "Invalid texture handle passed to resolveAttachementTexture.");
+        }
+
+        if (!src_texture_resource->m_render_target || src_texture_resource->m_depth_stencil || !dst_texture_resource->m_render_target ||
+            dst_texture_resource->m_depth_stencil)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Both source and destination textures must be color render targets for attachement resolve.");
+        }
+
+        if (src_texture_resource->m_sample_count == 1 || dst_texture_resource->m_sample_count != 1)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                 "Source texture must be multisampled and destination texture must be "
+                                                 "single-sampled for attachement resolve.");
+        }
+
+        if (src_texture_resource->m_format != dst_texture_resource->m_format || 
+            src_texture_resource->m_extent.width != dst_texture_resource->m_extent.width || 
+            src_texture_resource->m_extent.height != dst_texture_resource->m_extent.height)
+        {
+            return RendererResult<void>::failure(
+                ERendererErrorCode::VALIDATION_FAILED,
+                "Source and destination textures must have the same format and extent for attachement resolve.");
+        }
+
+        if (!src_texture_resource->m_attachement_contents_defined || !src_texture_resource->m_transfer_src || !dst_texture_resource->m_transfer_dst)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_STATE,
+                                                 "Attahcement resolve requires stored multisample contents and a resolve-capable destination");
+        }
+
+        transitionTextureLayout(frame_resource->m_command_buffer, *src_texture_resource,
+                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        transitionTextureLayout(frame_resource->m_command_buffer, *dst_texture_resource,
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkImageResolve resolve_region{};
+        resolve_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        resolve_region.srcSubresource.layerCount = 1;
+        resolve_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        resolve_region.dstSubresource.layerCount = 1;
+        resolve_region.extent = {src_texture_resource->m_extent.width, src_texture_resource->m_extent.height, 1};
+        vkCmdResolveImage(frame_resource->m_command_buffer, src_texture_resource->m_image,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_texture_resource->m_image,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &resolve_region);
+
+        transitionTextureLayout(frame_resource->m_command_buffer, *src_texture_resource,
+                                src_texture_resource->m_render_target_final_layout);
+        transitionTextureLayout(frame_resource->m_command_buffer, *dst_texture_resource, dst_texture_resource->m_render_target_final_layout);
+        dst_texture_resource->m_attachement_contents_defined = true;
+
+        VulkanFrameResourceUse& resource_use = m_frame_sync_resources[frame_resource->m_sync_index].m_resource_use;
+        const auto record_texture_use = [&resource_use](TextureHandle texture_handle)
+        {
+            if (std::find(resource_use.m_textures.begin(), resource_use.m_textures.end(), texture_handle) ==
+                resource_use.m_textures.end())
+            {
+                resource_use.m_textures.push_back(texture_handle);
+            }
+        };
+
+        record_texture_use(src_texture);
+        record_texture_use(dst_texture);
+        return RendererResult<void>::success();
+    }
+
+    RendererResult<void> VulkanRenderer::requestAttachementCapture(FrameHandle frame_handle, TextureHandle texture_handle,
+                                            std::string& name)
+    {
+        if (name.empty())
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::VALIDATION_FAILED,
+                                                 "Attachement capture names must not be empty.");
+        }
+
+        VulkanFrameResource* frame = m_frames.get(frame_handle);
+        if (!frame)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                 "Invalid frame handle passed to requestAttachementCapture.");
+        }
+
+        if (frame->m_render_pass_active)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_STATE,
+                                                 "Attachement capture must be requestewd after the active rendering pass ends.");
+        }
+
+        VulkanTextureResource* texture = m_textures.get(texture_handle);
+        if (!texture)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::INVALID_HANDLE,
+                                                 "Attachement capture references an invalid texture.");
+        }
+
+
+        if (texture->m_texture_format != ETextureFormat::RGBA8 || texture->m_sample_count != 1 || texture->m_transfer_src ||
+            texture->m_extent.width == 0 || texture->m_extent.height == 0)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                 "Attachement capture requires  non-empty, single-sample, transfer-source EKRA_TEXTURE_FORMAT_RGBA8 textures.");
+        }
+
+        const uint64_t byte_count =
+            static_cast<uint64_t>(texture->m_extent.width) * static_cast<uint64_t>(texture->m_extent.height) * 4u;
+        if (byte_count > static_cast<uint64_t>(std::numeric_limits<std::size_t>::max()))
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::OUT_OF_MEMORY,
+                                                 "Attachement capture size exceeds host address space");
+        }
+
+        Buffer readback_buffer;
+        if (readback_buffer.initialize(*m_device, byte_count, EBufferUsage::TRANSFER_DST,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::OUT_OF_MEMORY,
+                                                 "Failed to allocate attachement readback buffer.");
+        }
+
+        transitionTextureLayout(frame->m_command_buffer, *texture, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        VkBufferImageCopy copy_region{};
+        copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copy_region.imageSubresource.mipLevel = 0;
+        copy_region.imageSubresource.baseArrayLayer = 0;
+        copy_region.imageSubresource.baseArrayLayer = 1;
+        copy_region.imageExtent = {texture->m_extent.width, texture->m_extent.height};
+        vkCmdCopyImageToBuffer(frame->m_command_buffer, texture->m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                          readback_buffer.getVulkanBuffer(), 1, &copy_region);
+        transitionTextureLayout(frame->m_command_buffer, *texture, texture->m_render_target_final_layout);
+        
+        VulkanFrameResourceUse& resource_use = m_frame_sync_resources[frame->m_sync_index].m_resource_use;
+        if (std::find(resource_use.m_textures.begin(), resource_use.m_textures.end(), texture_handle) == resource_use.m_textures.end())
+        {
+            resource_use.m_textures.push_back(texture_handle);
+        }
+
+        m_attachement_captures.push_back({name, texture_handle, std::move(readback_buffer), texture->m_extent,
+                                          texture->m_texture_format, 0, frame->m_sync_index});
+
+        return RendererResult<void>::success();
     }
 
     void VulkanRenderer::bindPipeline(FrameHandle frame_handle, GraphicsPipelineHandle pipeline_handle)
@@ -2878,14 +3635,32 @@ namespace kera
             Logger::getInstance().error("Invalid handle passed to bindPipeline.");
             return;
         }
+
         if (!frame->m_render_pass_active)
         {
             Logger::getInstance().error("Cannot bind a Vulkan graphics pipeline outside an active render pass.");
             return;
         }
 
+        if (frame->m_attachement_rendering_active)
+        {
+            if (!pipeline->m_desc.uses_attachement_rendering || !pipeline->m_desc.attachement_signature.matches(frame->m_active_attachemenmt_signature))
+            {
+                Logger::getInstance().error(
+                    "Attachement pipeline signature does not match the active rendering attachements.");
+                return;
+            }
+        }
+        else if (pipeline->m_desc.uses_attachement_rendering)
+        {
+            Logger::getInstance().error("Attachement pipelines can only bind during attachement rendering.");
+            return;
+        }
+
         vkCmdBindPipeline(frame->m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline->m_pipeline.getVulkanPipeline());
+
+
         ++m_stats.pipelines_bound_this_frame;
     }
 
@@ -2974,6 +3749,21 @@ namespace kera
         {
             Logger::getInstance().error("Descriptor set layout is not compatible with the requested pipeline.");
             return;
+        }
+
+        if (frame->m_attachement_rendering_active)
+        {
+            for (const VulkanDescriptorBindingReference<TextureHandle>& reference : descriptor_set->m_textures)
+            {
+                if (reference.m_handle == frame->m_active_attachement_depth_texture ||
+                    std::find(frame->m_active_attachement_color_textures.begin(),
+                        frame->m_active_attachement_color_textures.end(),
+                        reference.m_handle) != frame->m_active_attachement_color_textures.end())
+                {
+                    Logger::getInstance().error(
+                        "Cannot bind a descriptor set that samples an active attachement texture");
+                }
+            }
         }
 
         vkCmdBindDescriptorSets(frame->m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -3248,16 +4038,18 @@ namespace kera
                     return false;
                 }
 
-                VkFormat color_format = VK_FORMAT_UNDEFINED;
+                std::vector<VkFormat> color_formats;
                 VkFormat depth_format = VK_FORMAT_UNDEFINED;
-                if (!resolvePipelineRenderingFormats(resource.m_desc.render_target, color_format, depth_format))
+                VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
+                if (!resolvePipelineRenderingFormats(resource.m_desc, color_formats, depth_format, sample_count))
                 {
                     Logger::getInstance().error("Live graphics pipeline references an invalid render target.");
                     return false;
                 }
 
                 if (!resource.m_pipeline.initialize(
-                        *m_device, m_pipeline_cache, color_format, depth_format,
+                        *m_device, m_pipeline_cache, std::span<const VkFormat>(color_formats.data(), color_formats.size()), 
+                        depth_format, sample_count,
                         std::span<const Shader* const>(graphics_shaders.data(), graphics_shaders.size()),
                         resource.m_desc))
                 {
@@ -3885,10 +4677,12 @@ namespace kera
         {
             add_descriptor_use(resource_use.m_buffers, reference.m_handle);
         }
+
         for (const auto& reference : descriptor_set.m_textures)
         {
             add_descriptor_use(resource_use.m_textures, reference.m_handle);
         }
+
         for (const auto& reference : descriptor_set.m_samplers)
         {
             add_descriptor_use(resource_use.m_samplers, reference.m_handle);
@@ -3901,9 +4695,16 @@ namespace kera
         {
             return false;
         }
-        for (const VulkanFrameSyncResource& frame_sync : m_frame_sync_resources)
+
+        for (uint32_t sync_index = 0; sync_index < m_frame_sync_resources.size(); ++sync_index)
         {
-            for (const BufferHandle& used_buffer : frame_sync.m_resource_use.m_buffers)
+            if (!m_active_frame_handles[sync_index].isValid())
+            {
+                continue;
+            }
+
+            const VulkanFrameResourceUse& resource_use = m_frame_sync_resources[sync_index].m_resource_use;
+            for (const BufferHandle& used_buffer : resource_use.m_buffers)
             {
                 if (used_buffer == buffer)
                 {
@@ -3920,9 +4721,16 @@ namespace kera
         {
             return false;
         }
-        for (const VulkanFrameSyncResource& frame_sync : m_frame_sync_resources)
+
+        for (uint32_t sync_index = 0; sync_index < m_frame_sync_resources.size(); ++sync_index)
         {
-            for (const TextureHandle& used_texture : frame_sync.m_resource_use.m_textures)
+            if (!m_active_frame_handles[sync_index].isValid())
+            {
+                continue;
+            }
+
+            const VulkanFrameResourceUse& resource_use = m_frame_sync_resources[sync_index].m_resource_use;
+            for (const TextureHandle& used_texture : resource_use.m_textures)
             {
                 if (used_texture == texture)
                 {
@@ -3930,6 +4738,7 @@ namespace kera
                 }
             }
         }
+
         return false;
     }
 
@@ -3939,9 +4748,16 @@ namespace kera
         {
             return false;
         }
-        for (const VulkanFrameSyncResource& frame_sync : m_frame_sync_resources)
+
+        for (uint32_t sync_index = 0; sync_index < m_frame_sync_resources.size(); ++sync_index)
         {
-            for (const SamplerHandle& used_sampler : frame_sync.m_resource_use.m_samplers)
+            if (!m_active_frame_handles[sync_index].isValid())
+            {
+                continue;
+            }
+
+            const VulkanFrameResourceUse& resource_use = m_frame_sync_resources[sync_index].m_resource_use;
+            for (const SamplerHandle& used_sampler : resource_use.m_samplers)
             {
                 if (used_sampler == sampler)
                 {
@@ -3958,9 +4774,16 @@ namespace kera
         {
             return false;
         }
-        for (const VulkanFrameSyncResource& frame_sync : m_frame_sync_resources)
+
+        for (uint32_t sync_index = 0; sync_index < m_frame_sync_resources.size(); ++sync_index)
         {
-            for (const DescriptorSetHandle& used_descriptor_set : frame_sync.m_resource_use.m_descriptor_sets)
+            if (!m_active_frame_handles[sync_index].isValid())
+            {
+                continue;
+            }
+
+            const VulkanFrameResourceUse& resource_use = m_frame_sync_resources[sync_index].m_resource_use;
+            for (const DescriptorSetHandle& used_descriptor_set : resource_use.m_descriptor_sets)
             {
                 if (used_descriptor_set == descriptor_set)
                 {
@@ -4160,38 +4983,84 @@ namespace kera
         return report;
     }
 
-    bool VulkanRenderer::resolvePipelineRenderingFormats(RenderTargetHandle render_target, VkFormat& color_format,
-                                                         VkFormat& depth_format) const
+    bool VulkanRenderer::resolvePipelineRenderingFormats(const GraphicsPipelineDesc& pipeline_desc,
+                                                         std::vector<VkFormat>& color_formats,
+                                                         VkFormat& depth_format, VkSampleCountFlagBits& sample_count) const
     {
-        if (!render_target.isValid())
+        color_formats.clear();
+        depth_format = VK_FORMAT_UNDEFINED;
+        sample_count = VK_SAMPLE_COUNT_1_BIT;
+
+        if (pipeline_desc.uses_attachement_rendering)
+        {
+            const AttachementPipelineSignature& signature = pipeline_desc.attachement_signature;
+            if ((signature.color_formats.empty() && !signature.has_depth_attachement) ||
+                (signature.color_formats.size() > kMaxAttachementColorAttachements))
+            {
+                return false;
+            }
+            
+            sample_count = toVkSampleCount(signature.sample_count);
+            if (sample_count == 0 || (getAttachementSupportedSampleCounts() & signature.sample_count) == 0)
+            {
+                return false;
+            }
+
+            color_formats.reserve(signature.color_formats.size());
+            for (const ETextureFormat format : signature.color_formats)
+            {
+                if (format == ETextureFormat::DEPTH32)
+                {
+                    return false;
+                }
+
+                const VkFormat vk_format = toVkTextureFormat(format);
+                if (vk_format == VK_FORMAT_UNDEFINED)
+                {
+                    return false;
+                }
+                color_formats.push_back(vk_format);
+            }
+
+            if (signature.has_depth_attachement)
+            {
+                if (signature.depth_format != ETextureFormat::DEPTH32)
+                {
+                    return false;
+                }
+                depth_format = toVkTextureFormat(signature.depth_format);
+            }
+            return true;
+        }
+
+        if (!pipeline_desc.render_target.isValid())
         {
             if (!m_swapchain)
             {
                 return false;
             }
-            color_format = m_swapchain->getImageFormat();
-            depth_format = VK_FORMAT_UNDEFINED;
+
+            color_formats.push_back(m_swapchain->getImageFormat());
             return true;
         }
 
-        const VulkanRenderTargetResource* resource = m_render_targets.get(render_target);
+        const VulkanRenderTargetResource* resource = m_render_targets.get(pipeline_desc.render_target);
         if (!resource)
         {
             return false;
         }
 
         const VulkanTextureResource* color_texture = m_textures.get(resource->m_color_texture);
-        if (!color_texture)
+        if (!color_texture || color_texture->m_sample_count != 1)
         {
             return false;
         }
 
-        color_format = color_texture->m_format;
-        depth_format = VK_FORMAT_UNDEFINED;
+        color_formats.push_back(color_texture->m_format);
         if (resource->m_depth_texture.isValid())
         {
             const VulkanTextureResource* depth_texture = m_textures.get(resource->m_depth_texture);
-            if (!depth_texture)
+            if (!depth_texture || depth_texture->m_sample_count != color_texture->m_sample_count)
             {
                 return false;
             }
