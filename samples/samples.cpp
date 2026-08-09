@@ -8,6 +8,7 @@
 #include "damaged_helmet_sample.h"
 #include "instanced_triangle_many_lights_sample.h"
 #include "instanced_triangle_sample.h"
+#include "multi_pass_rendering_sample.h"
 #include "render_context.h"
 #include "sample_utils.h"
 #include "stats_overlay.h"
@@ -25,6 +26,8 @@ namespace kera
         constexpr int kInitialWindowHeight = 720;
         constexpr Extent2D kResizeSmokeExtent{800, 600};
         constexpr Extent2D kZeroResizeSmokeExtent{0, 0};
+        constexpr Extent2D kMultiPassRestoreSmokeExtent{960, 540};
+        constexpr Extent2D kMultiPassSecondResizeSmokeExtent{1024, 640};
 
         bool isPreviousSampleKey(const SDL_Event& event)
         {
@@ -306,6 +309,20 @@ namespace kera
         addSample(std::make_unique<DamagedHelmetIBLLightingSample>(*m_renderer, options.damaged_helmet_debug_view,
                                                                    options.damaged_helmet_fixed_yaw,
                                                                    options.damaged_helmet_yaw_radians));
+        AttachmentPlaygroundConfig attachment_config{
+            .requested_msaa_samples = options.multi_pass_requested_msaa_samples,
+            .shadow_resolution = options.multi_pass_shadow_resolution,
+            .shadows_enabled = options.multi_pass_shadows_enabled,
+            .preview_shadow_map = options.multi_pass_preview_shadow_map,
+            .preview_shadow_inset = options.multi_pass_preview_shadow_inset,
+            .preview_msaa_comparison = options.multi_pass_preview_msaa_comparison,
+            .preview_shadow_comparison = options.multi_pass_preview_shadow_comparison,
+        };
+        addSample(std::make_unique<MultiPassRenderingSample>(
+            *m_renderer, options.multi_pass_capture_smoke,
+            options.multi_pass_capture_smoke && options.multi_pass_resize_smoke, attachment_config,
+            options.multi_pass_reconfigure_smoke, options.multi_pass_performance_smoke,
+            options.multi_pass_sun_orbit_phase_radians, options.multi_pass_sun_orbit_enabled));
 
         sampleLogInfo("Available samples:");
         for (size_t i = 0; i < m_samples.size(); ++i)
