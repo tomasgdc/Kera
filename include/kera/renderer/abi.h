@@ -400,6 +400,12 @@ extern "C"
         KeraGltfMaterialFactors material_factors;
     } KeraGltfLoadedModel;
 
+    typedef struct KeraGltfLoadedScene
+    {
+        KeraGltfLoadedModel* draw_items;
+        uint32_t draw_count;
+    } KeraGltfLoadedScene;
+
     typedef struct KeraGltfLoadDesc
     {
         KeraStringView path;
@@ -445,11 +451,125 @@ extern "C"
         uint32_t slot_count;
     } KeraUniformRingBufferInfo;
 
+    // Attachment rendering is part of the primary V1 renderer table.
+#define KERA_RENDERER_ATTACHMENTS_MAX_COLOR_ATTACHMENTS 4u
+
+    typedef enum EKeraAttachmentTextureUsage
+    {
+        KERA_ATTACHMENT_TEXTURE_USAGE_COLOR_ATTACHMENT = 1u << 0u,
+        KERA_ATTACHMENT_TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT = 1u << 1u,
+        KERA_ATTACHMENT_TEXTURE_USAGE_SAMPLED = 1u << 2u,
+        KERA_ATTACHMENT_TEXTURE_USAGE_TRANSFER_SRC = 1u << 3u,
+    } KeraAttachmentTextureUsage;
+
+    typedef enum EKeraAttachmentSampleCount
+    {
+        KERA_ATTACHMENT_SAMPLE_COUNT_1 = 1,
+        KERA_ATTACHMENT_SAMPLE_COUNT_2 = 2,
+        KERA_ATTACHMENT_SAMPLE_COUNT_4 = 4,
+        KERA_ATTACHMENT_SAMPLE_COUNT_8 = 8,
+    } KeraAttachmentSampleCount;
+
+    typedef enum EKeraAttachmentLoadOp
+    {
+        KERA_ATTACHMENT_LOAD_OP_LOAD = 0,
+        KERA_ATTACHMENT_LOAD_OP_CLEAR = 1,
+        KERA_ATTACHMENT_LOAD_OP_DONT_CARE = 2,
+    } KeraAttachmentLoadOp;
+
+    typedef enum EKeraAttachmentStoreOp
+    {
+        KERA_ATTACHMENT_STORE_OP_STORE = 0,
+        KERA_ATTACHMENT_STORE_OP_DONT_CARE = 1,
+    } KeraAttachmentStoreOp;
+
+    typedef enum EKeraAttachmentErrorCode
+    {
+        KERA_ATTACHMENT_ERROR_NONE = 0,
+        KERA_ATTACHMENT_ERROR_INVALID_HANDLE = 1,
+        KERA_ATTACHMENT_ERROR_INVALID_STATE = 2,
+        KERA_ATTACHMENT_ERROR_UNSUPPORTED = 3,
+        KERA_ATTACHMENT_ERROR_OUT_OF_MEMORY = 4,
+        KERA_ATTACHMENT_ERROR_VALIDATION_FAILED = 8,
+        KERA_ATTACHMENT_ERROR_RESOURCE_IN_USE = 9,
+        KERA_ATTACHMENT_ERROR_BACKEND_FAILURE = 10,
+    } KeraAttachmentErrorCode;
+
+    typedef struct KeraAttachmentError
+    {
+        KeraAttachmentErrorCode code;
+        // Borrowed renderer-owned storage, invalidated by the next attachment call on that renderer.
+        KeraStringView message;
+    } KeraAttachmentError;
+
+    typedef struct KeraAttachmentCapabilities
+    {
+        uint32_t max_color_attachments;
+        uint32_t supported_sample_counts;
+        uint8_t supports_depth_only_rendering;
+    } KeraAttachmentCapabilities;
+
+    typedef struct KeraAttachmentTextureDesc
+    {
+        uint32_t struct_size;
+        uint32_t width;
+        uint32_t height;
+        KeraTextureFormat format;
+        uint32_t usage_flags;
+        KeraAttachmentSampleCount sample_count;
+        KeraStringView debug_name;
+    } KeraAttachmentTextureDesc;
+
+    typedef struct KeraColorAttachmentDesc
+    {
+        KeraTextureHandle texture;
+        KeraAttachmentLoadOp load_op;
+        KeraAttachmentStoreOp store_op;
+        KeraClearColorValue clear_color;
+    } KeraColorAttachmentDesc;
+
+    typedef struct KeraDepthAttachmentDesc
+    {
+        KeraTextureHandle texture;
+        KeraAttachmentLoadOp load_op;
+        KeraAttachmentStoreOp store_op;
+        float clear_depth;
+    } KeraDepthAttachmentDesc;
+
+    typedef struct KeraAttachmentRenderingDesc
+    {
+        uint32_t struct_size;
+        const KeraColorAttachmentDesc* color_attachments;
+        uint32_t color_attachment_count;
+        const KeraDepthAttachmentDesc* depth_attachment;
+    } KeraAttachmentRenderingDesc;
+
+    typedef struct KeraAttachmentGraphicsPipelineDesc
+    {
+        uint32_t struct_size;
+        KeraShaderProgramHandle shader_program;
+        KeraVertexInputLayout vertex_input;
+        const KeraTextureFormat* color_formats;
+        uint32_t color_format_count;
+        KeraTextureFormat depth_format;
+        uint8_t has_depth_attachment;
+        KeraAttachmentSampleCount sample_count;
+        KeraPrimitiveTopologyKind topology;
+        KeraCullModeKind cull_mode;
+        KeraFrontFaceKind front_face;
+        KeraBlendModeKind blend_mode;
+        uint8_t depth_test;
+        uint8_t depth_write;
+        KeraStringView debug_name;
+    } KeraAttachmentGraphicsPipelineDesc;
+
     typedef struct KeraRenderer KeraRenderer;
 
     typedef struct KeraRendererApiV1
     {
         uint32_t abi_version;
+        // Total bytes populated by this runtime. New V1 members append to this table only.
+        uint32_t struct_size;
         KeraRenderer* (*create_renderer)(const KeraRendererCreateDesc* desc);
         void (*destroy)(KeraRenderer* renderer);
         void (*shutdown)(KeraRenderer* renderer);
@@ -526,7 +646,29 @@ extern "C"
         int (*load_ibl_environment)(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
                                     KeraIblEnvironment* out_environment);
         void (*destroy_ibl_environment)(KeraRenderer* renderer, KeraIblEnvironment* env);
+        KeraAttachmentCapabilities (*get_attachment_capabilities)(const KeraRenderer* renderer);
+        int (*validate_attachment_texture_desc)(const KeraAttachmentTextureDesc* desc, KeraAttachmentError* error);
+        int (*validate_attachment_rendering_desc)(const KeraAttachmentRenderingDesc* desc, KeraAttachmentError* error);
+        int (*validate_attachment_graphics_pipeline_desc)(const KeraAttachmentGraphicsPipelineDesc* desc,
+                                                          KeraAttachmentError* error);
+        KeraTextureHandle (*create_attachment_texture)(KeraRenderer* renderer, const KeraAttachmentTextureDesc* desc,
+                                                       KeraAttachmentError* error);
+        KeraGraphicsPipelineHandle (*create_attachment_graphics_pipeline)(
+            KeraRenderer* renderer, const KeraAttachmentGraphicsPipelineDesc* desc, KeraAttachmentError* error);
+        int (*begin_attachment_rendering)(KeraRenderer* renderer, KeraFrameHandle frame,
+                                          const KeraAttachmentRenderingDesc* desc, KeraAttachmentError* error);
+        int (*end_attachment_rendering)(KeraRenderer* renderer, KeraFrameHandle frame, KeraAttachmentError* error);
+        int (*resolve_attachment_texture)(KeraRenderer* renderer, KeraFrameHandle frame, KeraTextureHandle source,
+                                          KeraTextureHandle destination, KeraAttachmentError* error);
+        int (*load_gltf_scene)(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedScene* out_scene);
+        void (*destroy_gltf_scene)(KeraRenderer* renderer, KeraGltfLoadedScene* scene);
     } KeraRendererApiV1;
+
+#define KERA_RENDERER_API_V1_SIZE_THROUGH(member) \
+    (offsetof(KeraRendererApiV1, member) + sizeof(((KeraRendererApiV1*)0)->member))
+
+#define KERA_RENDERER_API_HAS_MEMBER(api, member) \
+    ((api) != NULL && (api)->struct_size >= KERA_RENDERER_API_V1_SIZE_THROUGH(member) && (api)->member != NULL)
 
     KERA_API const KeraRendererApiV1* keraGetRendererApiV1(void);
     KERA_API void keraLog(KeraLogLevel level, KeraStringView message);

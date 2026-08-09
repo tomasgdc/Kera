@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include <string>
+#include <vector>
 
 namespace kera
 {
@@ -73,7 +74,14 @@ namespace kera
         GltfMaterialFactors material_factors;
     };
 
+    struct GltfLoadedScene
+    {
+        std::vector<GltfLoadedModel> draw_items;
+    };
+
     RendererResult<GltfLoadedModel> loadGltfModel(IRenderer& renderer, const GltfLoadDesc& desc);
     void destroyGltfModel(IRenderer& renderer, GltfLoadedModel& model);
+    RendererResult<GltfLoadedScene> loadGltfScene(IRenderer& renderer, const GltfLoadDesc& desc);
+    void destroyGltfScene(IRenderer& renderer, GltfLoadedScene& scene);
 
 }  // namespace kera

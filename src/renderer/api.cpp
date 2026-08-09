@@ -7,9 +7,11 @@
 #include "kera/renderer/interfaces.h"
 #include "kera/renderer/ktx_loader.h"
 #include "kera/renderer/reflection_contracts.h"
+#include "kera/renderer/test_attachment_capture.h"
 #include "kera/utilities/logger.h"
 
 #include <memory>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -19,6 +21,7 @@ struct KeraRenderer
     mutable std::vector<KeraRendererValidationIssue> validation_issues;
     mutable std::vector<std::string> validation_messages;
     mutable std::vector<std::string> validation_names;
+    mutable std::string attachment_error_message;
 };
 
 namespace
@@ -882,6 +885,66 @@ namespace
         *model = {};
     }
 
+    int loadGltfScene(KeraRenderer* renderer, const KeraGltfLoadDesc* desc, KeraGltfLoadedScene* out_scene)
+    {
+        if (!renderer || !renderer->renderer || !desc || !out_scene)
+        {
+            return 0;
+        }
+        *out_scene = {};
+        kera::RendererResult<kera::GltfLoadedScene> result = kera::loadGltfScene(
+            *renderer->renderer, {.path = toString(desc->path),
+                                  .debug_name = toString(desc->debug_name),
+                                  .require_material_textures = desc->require_material_textures != 0});
+        if (!result)
+        {
+            kera::Logger::getInstance().error("glTF scene load failed: " + result.errorMessage());
+            return 0;
+        }
+        const std::vector<kera::GltfLoadedModel>& draws = result.value().draw_items;
+        if (draws.size() > UINT32_MAX)
+        {
+            kera::destroyGltfScene(*renderer->renderer, result.value());
+            return 0;
+        }
+        KeraGltfLoadedModel* public_draws = new (std::nothrow) KeraGltfLoadedModel[draws.size()];
+        if (!public_draws)
+        {
+            kera::destroyGltfScene(*renderer->renderer, result.value());
+            kera::Logger::getInstance().error("glTF scene load failed: insufficient memory for public draw items.");
+            return 0;
+        }
+        for (size_t i = 0; i < draws.size(); ++i)
+        {
+            public_draws[i] = toKera(draws[i]);
+        }
+        out_scene->draw_items = public_draws;
+        out_scene->draw_count = static_cast<uint32_t>(draws.size());
+        return 1;
+    }
+
+    void destroyGltfScene(KeraRenderer* renderer, KeraGltfLoadedScene* scene)
+    {
+        if (!renderer || !renderer->renderer || !scene)
+        {
+            return;
+        }
+        if (scene->draw_count != 0 && !scene->draw_items)
+        {
+            *scene = {};
+            return;
+        }
+        kera::GltfLoadedScene internal_scene;
+        internal_scene.draw_items.reserve(scene->draw_count);
+        for (uint32_t i = 0; i < scene->draw_count; ++i)
+        {
+            internal_scene.draw_items.push_back(fromKeraModel(scene->draw_items[i]));
+        }
+        kera::destroyGltfScene(*renderer->renderer, internal_scene);
+        delete[] scene->draw_items;
+        *scene = {};
+    }
+
     int loadIblEnvironment(KeraRenderer* renderer, const KeraIblEnvironmentLoadDesc* desc,
                            KeraIblEnvironment* out_environment)
     {
@@ -918,8 +981,470 @@ namespace
         *environment = {};
     }
 
+    KeraAttachmentErrorCode attachmentErrorCode(kera::ERendererErrorCode code)
+    {
+        switch (code)
+        {
+            case kera::ERendererErrorCode::NONE:
+                return KERA_ATTACHMENT_ERROR_NONE;
+            case kera::ERendererErrorCode::INVALID_HANDLE:
+                return KERA_ATTACHMENT_ERROR_INVALID_HANDLE;
+            case kera::ERendererErrorCode::INVALID_STATE:
+                return KERA_ATTACHMENT_ERROR_INVALID_STATE;
+            case kera::ERendererErrorCode::UNSUPPORTED:
+                return KERA_ATTACHMENT_ERROR_UNSUPPORTED;
+            case kera::ERendererErrorCode::OUT_OF_MEMORY:
+                return KERA_ATTACHMENT_ERROR_OUT_OF_MEMORY;
+            case kera::ERendererErrorCode::VALIDATION_FAILED:
+                return KERA_ATTACHMENT_ERROR_VALIDATION_FAILED;
+            case kera::ERendererErrorCode::RESOURCE_IN_USE:
+                return KERA_ATTACHMENT_ERROR_RESOURCE_IN_USE;
+            case kera::ERendererErrorCode::DEVICE_LOST:
+            case kera::ERendererErrorCode::SWAPCHAIN_OUT_OF_DATE:
+            case kera::ERendererErrorCode::REFLECTION_MISSING:
+            case kera::ERendererErrorCode::BACKEND_FAILURE:
+            default:
+                return KERA_ATTACHMENT_ERROR_BACKEND_FAILURE;
+        }
+    }
+
+    void setAttachmentError(KeraRenderer* renderer, KeraAttachmentError* error, KeraAttachmentErrorCode code,
+                            std::string message)
+    {
+        if (renderer)
+        {
+            renderer->attachment_error_message = std::move(message);
+            if (error)
+            {
+                error->code = code;
+                error->message = toView(renderer->attachment_error_message);
+            }
+            return;
+        }
+
+        static thread_local std::string no_renderer_attachment_error_message;
+        no_renderer_attachment_error_message = std::move(message);
+        if (error)
+        {
+            error->code = code;
+            error->message = toView(no_renderer_attachment_error_message);
+        }
+    }
+
+    void clearAttachmentError(KeraRenderer* renderer, KeraAttachmentError* error)
+    {
+        if (renderer)
+        {
+            renderer->attachment_error_message.clear();
+        }
+        if (error)
+        {
+            *error = {};
+        }
+    }
+
+    int validateAttachmentTextureDesc(const KeraAttachmentTextureDesc* desc, KeraAttachmentError* error)
+    {
+        if (!desc || desc->struct_size < sizeof(KeraAttachmentTextureDesc))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment texture descriptor has an invalid struct_size.");
+            return 0;
+        }
+        if (desc->width == 0 || desc->height == 0)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment texture dimensions must be non-zero.");
+            return 0;
+        }
+        if (static_cast<int>(desc->format) < static_cast<int>(KERA_TEXTURE_FORMAT_RGBA8) ||
+            desc->format > KERA_TEXTURE_FORMAT_DEPTH32)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment texture format is invalid.");
+            return 0;
+        }
+        constexpr uint32_t known_usage_flags =
+            KERA_ATTACHMENT_TEXTURE_USAGE_COLOR_ATTACHMENT | KERA_ATTACHMENT_TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT |
+            KERA_ATTACHMENT_TEXTURE_USAGE_SAMPLED | KERA_ATTACHMENT_TEXTURE_USAGE_TRANSFER_SRC;
+        if ((desc->usage_flags & ~known_usage_flags) != 0)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment texture usage contains unsupported flags.");
+            return 0;
+        }
+        if (desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_1 &&
+            desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_2 &&
+            desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_4 &&
+            desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_8)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment texture sample count is invalid.");
+            return 0;
+        }
+        const bool color = (desc->usage_flags & KERA_ATTACHMENT_TEXTURE_USAGE_COLOR_ATTACHMENT) != 0;
+        const bool depth = (desc->usage_flags & KERA_ATTACHMENT_TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT) != 0;
+        if (color == depth)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment textures must declare exactly one of color or depth-stencil usage.");
+            return 0;
+        }
+        if ((color && desc->format == KERA_TEXTURE_FORMAT_DEPTH32) ||
+            (depth && desc->format != KERA_TEXTURE_FORMAT_DEPTH32))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment texture format does not match its attachment usage.");
+            return 0;
+        }
+        if (error)
+        {
+            *error = {};
+        }
+        return 1;
+    }
+
+    int validateAttachmentRenderingDesc(const KeraAttachmentRenderingDesc* desc, KeraAttachmentError* error)
+    {
+        if (!desc || desc->struct_size < sizeof(KeraAttachmentRenderingDesc))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment rendering descriptor has an invalid struct_size.");
+            return 0;
+        }
+        if (desc->color_attachment_count > KERA_RENDERER_ATTACHMENTS_MAX_COLOR_ATTACHMENTS ||
+            (desc->color_attachment_count != 0 && !desc->color_attachments))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment rendering has an invalid color attachment array.");
+            return 0;
+        }
+        if (desc->color_attachment_count == 0 && !desc->depth_attachment)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment rendering requires at least one color or depth attachment.");
+            return 0;
+        }
+        for (uint32_t index = 0; index < desc->color_attachment_count; ++index)
+        {
+            const KeraColorAttachmentDesc& attachment = desc->color_attachments[index];
+            if (static_cast<int>(attachment.load_op) < static_cast<int>(KERA_ATTACHMENT_LOAD_OP_LOAD) ||
+                attachment.load_op > KERA_ATTACHMENT_LOAD_OP_DONT_CARE ||
+                static_cast<int>(attachment.store_op) < static_cast<int>(KERA_ATTACHMENT_STORE_OP_STORE) ||
+                attachment.store_op > KERA_ATTACHMENT_STORE_OP_DONT_CARE)
+            {
+                setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                                   "Attachment rendering contains an invalid color load or store operation.");
+                return 0;
+            }
+        }
+        if (desc->depth_attachment &&
+            (static_cast<int>(desc->depth_attachment->load_op) < static_cast<int>(KERA_ATTACHMENT_LOAD_OP_LOAD) ||
+             desc->depth_attachment->load_op > KERA_ATTACHMENT_LOAD_OP_DONT_CARE ||
+             static_cast<int>(desc->depth_attachment->store_op) < static_cast<int>(KERA_ATTACHMENT_STORE_OP_STORE) ||
+             desc->depth_attachment->store_op > KERA_ATTACHMENT_STORE_OP_DONT_CARE))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment rendering contains an invalid depth load or store operation.");
+            return 0;
+        }
+        if (error)
+        {
+            *error = {};
+        }
+        return 1;
+    }
+
+    int validateAttachmentGraphicsPipelineDesc(const KeraAttachmentGraphicsPipelineDesc* desc,
+                                               KeraAttachmentError* error)
+    {
+        if (!desc || desc->struct_size < sizeof(KeraAttachmentGraphicsPipelineDesc))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment graphics pipeline descriptor has an invalid struct_size.");
+            return 0;
+        }
+        if (desc->topology != KERA_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST ||
+            static_cast<int>(desc->cull_mode) < static_cast<int>(KERA_CULL_MODE_NONE) ||
+            desc->cull_mode > KERA_CULL_MODE_BACK ||
+            static_cast<int>(desc->front_face) < static_cast<int>(KERA_FRONT_FACE_CLOCKWISE) ||
+            desc->front_face > KERA_FRONT_FACE_COUNTER_CLOCKWISE ||
+            static_cast<int>(desc->blend_mode) < static_cast<int>(KERA_BLEND_MODE_OPAQUE) ||
+            desc->blend_mode > KERA_BLEND_MODE_ALPHA)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment graphics pipeline contains an invalid graphics-state enum.");
+            return 0;
+        }
+        if (desc->color_format_count > KERA_RENDERER_ATTACHMENTS_MAX_COLOR_ATTACHMENTS ||
+            (desc->color_format_count != 0 && !desc->color_formats))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment graphics pipeline has an invalid color format array.");
+            return 0;
+        }
+        if (desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_1 &&
+            desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_2 &&
+            desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_4 &&
+            desc->sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_8)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment pipeline sample count is invalid.");
+            return 0;
+        }
+        if (desc->has_depth_attachment > 1)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment pipeline depth attachment flag is invalid.");
+            return 0;
+        }
+        if (desc->color_format_count == 0 && !desc->has_depth_attachment)
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment graphics pipelines require at least one color or depth attachment.");
+            return 0;
+        }
+        for (uint32_t index = 0; index < desc->color_format_count; ++index)
+        {
+            if (static_cast<int>(desc->color_formats[index]) < static_cast<int>(KERA_TEXTURE_FORMAT_RGBA8) ||
+                desc->color_formats[index] > KERA_TEXTURE_FORMAT_DEPTH32 ||
+                desc->color_formats[index] == KERA_TEXTURE_FORMAT_DEPTH32)
+            {
+                setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                                   "Attachment graphics pipeline color formats cannot be depth formats.");
+                return 0;
+            }
+        }
+        if (desc->has_depth_attachment &&
+            (static_cast<int>(desc->depth_format) < static_cast<int>(KERA_TEXTURE_FORMAT_RGBA8) ||
+             desc->depth_format != KERA_TEXTURE_FORMAT_DEPTH32))
+        {
+            setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
+                               "Attachment graphics pipeline depth format must be DEPTH32.");
+            return 0;
+        }
+        if (error)
+        {
+            *error = {};
+        }
+        return 1;
+    }
+
+    kera::AttachmentTextureDesc fromKera(const KeraAttachmentTextureDesc& desc)
+    {
+        return {
+            .width = desc.width,
+            .height = desc.height,
+            .format = fromKera(desc.format),
+            .color_attachment = (desc.usage_flags & KERA_ATTACHMENT_TEXTURE_USAGE_COLOR_ATTACHMENT) != 0,
+            .depth_stencil_attachment =
+                (desc.usage_flags & KERA_ATTACHMENT_TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT) != 0,
+            .sampled = (desc.usage_flags & KERA_ATTACHMENT_TEXTURE_USAGE_SAMPLED) != 0,
+            .transfer_src = (desc.usage_flags & KERA_ATTACHMENT_TEXTURE_USAGE_TRANSFER_SRC) != 0,
+            .sample_count = static_cast<uint32_t>(desc.sample_count),
+            .debug_name = toString(desc.debug_name),
+        };
+    }
+
+    kera::AttachmentRenderingDesc fromKera(const KeraAttachmentRenderingDesc& desc)
+    {
+        kera::AttachmentRenderingDesc result{};
+        result.color_attachments.reserve(desc.color_attachment_count);
+        for (uint32_t index = 0; index < desc.color_attachment_count; ++index)
+        {
+            const KeraColorAttachmentDesc& attachment = desc.color_attachments[index];
+            result.color_attachments.push_back({
+                .texture = fromKera<kera::TextureHandle>(attachment.texture),
+                .load_op = static_cast<kera::EAttachmentLoadOp>(attachment.load_op),
+                .store_op = static_cast<kera::EAttachmentStoreOp>(attachment.store_op),
+                .clear_color = fromKera(attachment.clear_color),
+            });
+        }
+        if (desc.depth_attachment)
+        {
+            result.has_depth_attachment = true;
+            result.depth_attachment = {
+                .texture = fromKera<kera::TextureHandle>(desc.depth_attachment->texture),
+                .load_op = static_cast<kera::EAttachmentLoadOp>(desc.depth_attachment->load_op),
+                .store_op = static_cast<kera::EAttachmentStoreOp>(desc.depth_attachment->store_op),
+                .clear_depth = desc.depth_attachment->clear_depth,
+            };
+        }
+        return result;
+    }
+
+    kera::AttachmentGraphicsPipelineCreateDesc fromKera(const KeraAttachmentGraphicsPipelineDesc& desc)
+    {
+        kera::AttachmentGraphicsPipelineCreateDesc result{};
+        result.graphics.shader_program = fromKera<kera::ShaderProgramHandle>(desc.shader_program);
+        result.graphics.topology = fromKera(desc.topology);
+        result.graphics.cull_mode = fromKera(desc.cull_mode);
+        result.graphics.front_face = fromKera(desc.front_face);
+        result.graphics.blend_mode = fromKera(desc.blend_mode);
+        result.graphics.depth_test = desc.depth_test != 0;
+        result.graphics.depth_write = desc.depth_write != 0;
+        result.graphics.vertex_bindings = fromKeraVertexBindings(desc.vertex_input);
+        result.graphics.vertex_fields = fromKeraVertexFields(desc.vertex_input);
+        result.graphics.debug_name = toString(desc.debug_name);
+        result.attachment_signature.color_formats.reserve(desc.color_format_count);
+        for (uint32_t index = 0; index < desc.color_format_count; ++index)
+        {
+            result.attachment_signature.color_formats.push_back(fromKera(desc.color_formats[index]));
+        }
+        result.attachment_signature.has_depth_attachment = desc.has_depth_attachment != 0;
+        result.attachment_signature.depth_format = fromKera(desc.depth_format);
+        result.attachment_signature.sample_count = static_cast<uint32_t>(desc.sample_count);
+        return result;
+    }
+
+    KeraAttachmentCapabilities getAttachmentCapabilities(const KeraRenderer* renderer)
+    {
+        if (!renderer || !renderer->renderer)
+        {
+            return {};
+        }
+        return {
+            .max_color_attachments = KERA_RENDERER_ATTACHMENTS_MAX_COLOR_ATTACHMENTS,
+            .supported_sample_counts = renderer->renderer->getAttachmentSupportedSampleCounts(),
+            .supports_depth_only_rendering = 1,
+        };
+    }
+
+    KeraTextureHandle createAttachmentTexture(KeraRenderer* renderer, const KeraAttachmentTextureDesc* desc,
+                                              KeraAttachmentError* error)
+    {
+        clearAttachmentError(renderer, error);
+        if (!renderer || !renderer->renderer)
+        {
+            setAttachmentError(renderer, error, KERA_ATTACHMENT_ERROR_INVALID_STATE,
+                               "Attachment API received an invalid renderer.");
+            return {};
+        }
+        if (!validateAttachmentTextureDesc(desc, error))
+        {
+            if (error && error->message.data)
+            {
+                renderer->attachment_error_message.assign(error->message.data, error->message.size);
+                error->message = toView(renderer->attachment_error_message);
+            }
+            return {};
+        }
+
+        const kera::RendererResult<kera::TextureHandle> result =
+            renderer->renderer->createAttachmentTexture(fromKera(*desc));
+        if (!result)
+        {
+            setAttachmentError(renderer, error, attachmentErrorCode(result.errorCode()), result.errorMessage());
+            return {};
+        }
+        return toKera(result.value());
+    }
+
+    KeraGraphicsPipelineHandle createAttachmentGraphicsPipeline(KeraRenderer* renderer,
+                                                                const KeraAttachmentGraphicsPipelineDesc* desc,
+                                                                KeraAttachmentError* error)
+    {
+        clearAttachmentError(renderer, error);
+        if (!renderer || !renderer->renderer)
+        {
+            setAttachmentError(renderer, error, KERA_ATTACHMENT_ERROR_INVALID_STATE,
+                               "Attachment API received an invalid renderer.");
+            return {};
+        }
+        if (!validateAttachmentGraphicsPipelineDesc(desc, error))
+        {
+            if (error && error->message.data)
+            {
+                renderer->attachment_error_message.assign(error->message.data, error->message.size);
+                error->message = toView(renderer->attachment_error_message);
+            }
+            return {};
+        }
+
+        const kera::RendererResult<kera::GraphicsPipelineHandle> result =
+            renderer->renderer->createAttachmentGraphicsPipeline(fromKera(*desc));
+        if (!result)
+        {
+            setAttachmentError(renderer, error, attachmentErrorCode(result.errorCode()), result.errorMessage());
+            return {};
+        }
+        return toKera(result.value());
+    }
+
+    int beginAttachmentRendering(KeraRenderer* renderer, KeraFrameHandle frame, const KeraAttachmentRenderingDesc* desc,
+                                 KeraAttachmentError* error)
+    {
+        clearAttachmentError(renderer, error);
+        if (!renderer || !renderer->renderer)
+        {
+            setAttachmentError(renderer, error, KERA_ATTACHMENT_ERROR_INVALID_STATE,
+                               "Attachment API received an invalid renderer.");
+            return 0;
+        }
+        if (!validateAttachmentRenderingDesc(desc, error))
+        {
+            if (error && error->message.data)
+            {
+                renderer->attachment_error_message.assign(error->message.data, error->message.size);
+                error->message = toView(renderer->attachment_error_message);
+            }
+            return 0;
+        }
+
+        const kera::RendererResult<void> result =
+            renderer->renderer->beginAttachmentRendering(fromKera<kera::FrameHandle>(frame), fromKera(*desc));
+        if (!result)
+        {
+            setAttachmentError(renderer, error, attachmentErrorCode(result.errorCode()), result.errorMessage());
+            return 0;
+        }
+        return 1;
+    }
+
+    int endAttachmentRendering(KeraRenderer* renderer, KeraFrameHandle frame, KeraAttachmentError* error)
+    {
+        clearAttachmentError(renderer, error);
+        if (!renderer || !renderer->renderer)
+        {
+            setAttachmentError(renderer, error, KERA_ATTACHMENT_ERROR_INVALID_STATE,
+                               "Attachment API received an invalid renderer.");
+            return 0;
+        }
+
+        const kera::RendererResult<void> result =
+            renderer->renderer->endAttachmentRendering(fromKera<kera::FrameHandle>(frame));
+        if (!result)
+        {
+            setAttachmentError(renderer, error, attachmentErrorCode(result.errorCode()), result.errorMessage());
+            return 0;
+        }
+        return 1;
+    }
+
+    int resolveAttachmentTexture(KeraRenderer* renderer, KeraFrameHandle frame, KeraTextureHandle source,
+                                 KeraTextureHandle destination, KeraAttachmentError* error)
+    {
+        clearAttachmentError(renderer, error);
+        if (!renderer || !renderer->renderer)
+        {
+            setAttachmentError(renderer, error, KERA_ATTACHMENT_ERROR_INVALID_STATE,
+                               "Attachment API received an invalid renderer.");
+            return 0;
+        }
+        const kera::RendererResult<void> result = renderer->renderer->resolveAttachmentTexture(
+            fromKera<kera::FrameHandle>(frame), fromKera<kera::TextureHandle>(source),
+            fromKera<kera::TextureHandle>(destination));
+        if (!result)
+        {
+            setAttachmentError(renderer, error, attachmentErrorCode(result.errorCode()), result.errorMessage());
+            return 0;
+        }
+        return 1;
+    }
+
     const KeraRendererApiV1 kGApi{
         .abi_version = KERA_RENDERER_ABI_VERSION,
+        .struct_size = sizeof(KeraRendererApiV1),
         .create_renderer = createRenderer,
         .destroy = destroy,
         .shutdown = shutdown,
@@ -977,7 +1502,20 @@ namespace
         .destroy_gltf_model = destroyGltfModel,
         .load_ibl_environment = loadIblEnvironment,
         .destroy_ibl_environment = destroyIblEnvironment,
+        .get_attachment_capabilities = getAttachmentCapabilities,
+        .validate_attachment_texture_desc = validateAttachmentTextureDesc,
+        .validate_attachment_rendering_desc = validateAttachmentRenderingDesc,
+        .validate_attachment_graphics_pipeline_desc = validateAttachmentGraphicsPipelineDesc,
+        .create_attachment_texture = createAttachmentTexture,
+        .create_attachment_graphics_pipeline = createAttachmentGraphicsPipeline,
+        .begin_attachment_rendering = beginAttachmentRendering,
+        .end_attachment_rendering = endAttachmentRendering,
+        .resolve_attachment_texture = resolveAttachmentTexture,
+        .load_gltf_scene = loadGltfScene,
+        .destroy_gltf_scene = destroyGltfScene,
+        .copy_completed_gpu_timings = copyCompletedGpuTimings,
     };
+
 }  // namespace
 
 const KeraRendererApiV1* keraGetRendererApiV1(void)
@@ -1007,3 +1545,38 @@ void keraLog(KeraLogLevel level, KeraStringView message)
             break;
     }
 }
+
+namespace kera::test
+{
+    bool requestAttachmentCapture(KeraRenderer* renderer, KeraFrameHandle frame, KeraTextureHandle texture,
+                                  const std::string& name) noexcept
+    {
+        if (!renderer || !renderer->renderer)
+        {
+            return false;
+        }
+        return static_cast<bool>(renderer->renderer->requestTestAttachmentCapture(
+            fromKera<kera::FrameHandle>(frame), fromKera<kera::TextureHandle>(texture), name));
+    }
+
+    bool takeAttachmentCapture(KeraRenderer* renderer, const std::string& name, AttachmentCapture& capture,
+                               bool wait_for_completion) noexcept
+    {
+        if (!renderer || !renderer->renderer)
+        {
+            return false;
+        }
+        kera::RendererResult<kera::TestAttachmentCapture> result =
+            renderer->renderer->takeTestAttachmentCapture(name, wait_for_completion);
+        if (!result)
+        {
+            return false;
+        }
+        const kera::TestAttachmentCapture& captured = result.value();
+        capture.width = captured.extent.width;
+        capture.height = captured.extent.height;
+        capture.format = static_cast<KeraTextureFormat>(captured.format);
+        capture.bytes = captured.bytes;
+        return true;
+    }
+}  // namespace kera::test

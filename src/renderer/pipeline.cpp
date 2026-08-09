@@ -285,27 +285,27 @@ namespace kera
         multisampling.rasterizationSamples = sample_count;
 
         // Color blending
-        std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachements(color_formats.size());
-        for (VkPipelineColorBlendAttachmentState& color_blend_attachement : color_blend_attachements)
+        std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments(color_formats.size());
+        for (VkPipelineColorBlendAttachmentState& color_blend_attachment : color_blend_attachments)
         {
-            color_blend_attachement.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             if (desc.blend_mode == EBlendModeKind::ALPHA)
             {
-                color_blend_attachement.blendEnable = VK_TRUE;
-                color_blend_attachement.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-                color_blend_attachement.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-                color_blend_attachement.colorBlendOp = VK_BLEND_OP_ADD;
-                color_blend_attachement.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-                color_blend_attachement.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-                color_blend_attachement.alphaBlendOp = VK_BLEND_OP_ADD;
+                color_blend_attachment.blendEnable = VK_TRUE;
+                color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+                color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+                color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+                color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+                color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+                color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
             }
         }
 
         VkPipelineColorBlendStateCreateInfo color_blending{};
         color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        color_blending.attachmentCount = 1;
-        color_blending.pAttachments = color_blend_attachements.empty() ? nullptr : color_blend_attachements.data();
+        color_blending.attachmentCount = static_cast<uint32_t>(color_blend_attachments.size());
+        color_blending.pAttachments = color_blend_attachments.empty() ? nullptr : color_blend_attachments.data();
 
         VkPipelineDepthStencilStateCreateInfo depth_stencil{};
         depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -325,7 +325,7 @@ namespace kera
 
         VkPipelineRenderingCreateInfo rendering_info{};
         rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-        rendering_info.colorAttachmentCount = 1;
+        rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_formats.size());
         rendering_info.pColorAttachmentFormats = color_formats.empty() ? nullptr : color_formats.data();
         rendering_info.depthAttachmentFormat = depth_format;
 

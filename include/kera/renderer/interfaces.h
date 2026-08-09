@@ -72,6 +72,15 @@ namespace kera
         uint32_t slot_count = 0;
     };
 
+
+    // Internal test-only readback payload. This is intentionally not exposed through a public ABI table.
+    struct TestAttachmentCapture
+    {
+        Extent2D extent{};
+        ETextureFormat format = ETextureFormat::RGBA8;
+        std::vector<uint8_t> bytes;
+    };
+
     class IRenderer
     {
     public:
@@ -128,17 +137,28 @@ namespace kera
         virtual bool destroySampler(SamplerHandle sampler) = 0;
         virtual RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) = 0;
         virtual bool destroyRenderTarget(RenderTargetHandle render_target) = 0;
-        virtual uint32_t getAttachementSupportedSampleCounts() const = 0;
-        virtual RendererResult<TextureHandle> createAttachementTexture(const AttachementTextureDesc& desc) = 0;
+        virtual uint32_t getAttachmentSupportedSampleCounts() const
+        {
+            return 1;
+        }
+        virtual RendererResult<TextureHandle> createAttachmentTexture(const AttachmentTextureDesc&)
+        {
+            return RendererResult<TextureHandle>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                          "Attachment textures are not supported by this renderer.");
+        }
 
         virtual GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                               ShaderProgramHandle program) = 0;
         virtual GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineCreateDesc& desc) = 0;
+        virtual RendererResult<GraphicsPipelineHandle> createAttachmentGraphicsPipeline(
+            const AttachmentGraphicsPipelineCreateDesc&)
+        {
+            return RendererResult<GraphicsPipelineHandle>::failure(
+                ERendererErrorCode::UNSUPPORTED, "Attachment graphics pipelines are not supported by this renderer.");
+        }
         virtual std::vector<DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
             GraphicsPipelineHandle pipeline) const = 0;
         virtual VertexLayoutDesc getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipeline) const;
-        virtual RendererResult<GraphicsPipelineHandle> createAttachementGraphicsPipeline(
-            const AttachementGraphicsPipelineCreateDesc& desc) = 0;
         virtual bool destroyGraphicsPipeline(GraphicsPipelineHandle pipeline) = 0;
         virtual DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline) = 0;
         virtual DescriptorSetHandle createDescriptorSet(GraphicsPipelineHandle pipeline, uint32_t set) = 0;
@@ -167,14 +187,36 @@ namespace kera
         virtual void beginRenderPass(FrameHandle frame, const RenderPassDesc& desc) = 0;
         virtual void beginRenderPass(FrameHandle frame, RenderTargetHandle target, const RenderPassDesc& desc) = 0;
         virtual void endRenderPass(FrameHandle frame) = 0;
-        virtual RendererResult<void> validateAttachementRendering(const AttachementRenderingDesc& desc) = 0;
-        virtual RendererResult<void> beginAttachementRendering(FrameHandle frame,
-                                                               const AttachementRenderingDesc& desc) = 0;
-        virtual RendererResult<void> endAttachementRendering(FrameHandle frame) = 0;
-        virtual RendererResult<void> resolveAttachementTexture(FrameHandle frame, TextureHandle src_texture,
-                                                               TextureHandle dst_texture) = 0;
-        virtual RendererResult<void> requestAttachementCapture(FrameHandle frame, TextureHandle texture,
-                                                               std::string& name) = 0;
+        virtual RendererResult<void> validateAttachmentRendering(const AttachmentRenderingDesc&) const
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                 "Attachment rendering is not supported by this renderer.");
+        }
+        virtual RendererResult<void> beginAttachmentRendering(FrameHandle, const AttachmentRenderingDesc&)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                 "Attachment rendering is not supported by this renderer.");
+        }
+        virtual RendererResult<void> endAttachmentRendering(FrameHandle)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                 "Attachment rendering is not supported by this renderer.");
+        }
+        virtual RendererResult<void> resolveAttachmentTexture(FrameHandle, TextureHandle, TextureHandle)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                 "Attachment resolving is not supported by this renderer.");
+        }
+        virtual RendererResult<void> requestTestAttachmentCapture(FrameHandle, TextureHandle, const std::string&)
+        {
+            return RendererResult<void>::failure(ERendererErrorCode::UNSUPPORTED,
+                                                 "Attachment capture is not supported by this renderer.");
+        }
+        virtual RendererResult<TestAttachmentCapture> takeTestAttachmentCapture(const std::string&, bool)
+        {
+            return RendererResult<TestAttachmentCapture>::failure(
+                ERendererErrorCode::UNSUPPORTED, "Attachment capture is not supported by this renderer.");
+        }
         virtual void bindPipeline(FrameHandle frame, GraphicsPipelineHandle pipeline) = 0;
         virtual void bindVertexBuffer(FrameHandle frame, uint32_t slot, BufferHandle buffer,
                                       std::size_t offset = 0) = 0;

@@ -247,75 +247,6 @@ namespace kera
         std::string debug_name;
     };
 
-    inline constexpr uint32_t kMaxAttachementColorAttachements = 4;
-
-    enum class EAttachementLoadOp
-    {
-        LOAD,
-        CLEAR,
-        DONT_CARE
-    };
-
-    enum class EAttachementStoreOp
-    {
-        STORE,
-        DONT_CARE
-    };
-
-    struct AttachementTextureDesc
-    {
-        uint32_t width = 0;
-        uint32_t height = 0;
-        ETextureFormat format = ETextureFormat::RGBA8;
-        bool color_attachement = false;
-        bool depth_stencil_attachement = false;
-        bool sampled = false;
-        bool transfer_src = false;
-        uint32_t sample_count = 1;
-        std::string debug_name;
-    };
-
-    struct AttachementPipelineSignature
-    {
-        std::vector<ETextureFormat> color_formats;
-        bool has_depth_attachement = false;
-        ETextureFormat depth_format = ETextureFormat::DEPTH32;
-        uint32_t sample_count = 1;
-
-        bool matches(const AttachementPipelineSignature& other) const noexcept
-        {
-            if (color_formats.size() != other.color_formats.size())
-            {
-                return false;
-            }
-
-            for (std::size_t i = 0; i < color_formats.size(); ++i)
-            {
-                if (color_formats[i] != other.color_formats[i])
-                {
-                    return false;
-                }
-            }
-
-            if (has_depth_attachement != other.has_depth_attachement)
-            {
-                return false;
-            }
-
-            if (has_depth_attachement && depth_format != other.depth_format)
-            {
-                return false;
-            }
-
-            if (sample_count != other.sample_count)
-            {
-                return false;
-            }
-
-            return true;
-        }
-    };
-
     struct SamplerDesc
     {
         ESamplerFilter min_filter = ESamplerFilter::LINEAR;
@@ -339,13 +270,53 @@ namespace kera
         std::string debug_name;
     };
 
+    inline constexpr uint32_t kMaxAttachmentColorAttachments = 4;
+
+    enum class EAttachmentLoadOp
+    {
+        LOAD,
+        CLEAR,
+        DONT_CARE,
+    };
+
+    enum class EAttachmentStoreOp
+    {
+        STORE,
+        DONT_CARE,
+    };
+
+    struct AttachmentTextureDesc
+    {
+        uint32_t width = 0;
+        uint32_t height = 0;
+        ETextureFormat format = ETextureFormat::RGBA8;
+        bool color_attachment = false;
+        bool depth_stencil_attachment = false;
+        bool sampled = false;
+        bool transfer_src = false;
+        uint32_t sample_count = 1;
+        std::string debug_name;
+    };
+
+    struct AttachmentPipelineSignature
+    {
+        std::vector<ETextureFormat> color_formats;
+        bool has_depth_attachment = false;
+        ETextureFormat depth_format = ETextureFormat::DEPTH32;
+        uint32_t sample_count = 1;
+
+        bool matches(const AttachmentPipelineSignature& other) const noexcept
+        {
+            return color_formats == other.color_formats && has_depth_attachment == other.has_depth_attachment &&
+                   (!has_depth_attachment || depth_format == other.depth_format) && sample_count == other.sample_count;
+        }
+    };
+
     struct InstanceBufferDesc
     {
         std::size_t size = 0;
         EBufferUsageKind usage = EBufferUsageKind::VERTEX;
         EMemoryAccess memory_access = EMemoryAccess::GPU_ONLY;
-        bool uses_attachement_redenring = false;
-        AttachementPipelineSignature attachement_signature;
     };
 
     struct VertexBindingDesc
@@ -395,8 +366,8 @@ namespace kera
         EBlendModeKind blend_mode = EBlendModeKind::OPAQUE;
         bool depth_test = false;
         bool depth_write = false;
-        bool uses_attachement_rendering = false;
-        AttachementPipelineSignature attachement_signature;
+        bool uses_attachment_rendering = false;
+        AttachmentPipelineSignature attachment_signature;
         std::string debug_name;
     };
 
@@ -408,27 +379,27 @@ namespace kera
         float a = 1.0f;
     };
 
-    struct AttachementColorDesc
+    struct AttachmentColorDesc
     {
         TextureHandle texture;
-        EAttachementLoadOp load_op = EAttachementLoadOp::CLEAR;
-        EAttachementStoreOp store_op = EAttachementStoreOp::STORE;
+        EAttachmentLoadOp load_op = EAttachmentLoadOp::CLEAR;
+        EAttachmentStoreOp store_op = EAttachmentStoreOp::STORE;
         ClearColorValue clear_color;
     };
 
-    struct AttachementDepthDesc
+    struct AttachmentDepthDesc
     {
         TextureHandle texture;
-        EAttachementLoadOp load_op = EAttachementLoadOp::CLEAR;
-        EAttachementStoreOp store_op = EAttachementStoreOp::STORE;
+        EAttachmentLoadOp load_op = EAttachmentLoadOp::CLEAR;
+        EAttachmentStoreOp store_op = EAttachmentStoreOp::STORE;
         float clear_depth = 1.0f;
     };
 
-    struct AttachementRenderingDesc
+    struct AttachmentRenderingDesc
     {
-        std::vector<AttachementColorDesc> color_attachements;
-        bool has_depth_attachement = false;
-        AttachementDepthDesc depth_attachement;
+        std::vector<AttachmentColorDesc> color_attachments;
+        bool has_depth_attachment = false;
+        AttachmentDepthDesc depth_attachment;
     };
 
     struct RenderPassDesc
