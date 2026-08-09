@@ -200,7 +200,15 @@ namespace
         {
             return false;
         }
-
+        uint32_t getAttachementSupportedSampleCounts() const override
+        {
+            return 0;
+        }
+        kera::RendererResult<kera::TextureHandle> createAttachementTexture(const kera::AttachementTextureDesc& desc) override
+        {
+            kera::TextureHandle a{};
+            return kera::RendererResult<kera::TextureHandle>::success(a);
+        }
         kera::GraphicsPipelineHandle createGraphicsPipeline(const kera::GraphicsPipelineDesc&,
                                                             kera::ShaderProgramHandle) override
         {
@@ -209,6 +217,12 @@ namespace
         kera::GraphicsPipelineHandle createGraphicsPipeline(const kera::GraphicsPipelineCreateDesc&) override
         {
             return {};
+        }
+        kera::RendererResult<kera::GraphicsPipelineHandle> createAttachementGraphicsPipeline(
+            const kera::AttachementGraphicsPipelineCreateDesc& desc)
+        {
+            kera::GraphicsPipelineHandle g{};
+            return kera::RendererResult<kera::GraphicsPipelineHandle>::success(g);
         }
         std::vector<kera::DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
             kera::GraphicsPipelineHandle) const override
@@ -265,6 +279,29 @@ namespace
         void beginRenderPass(kera::FrameHandle, const kera::RenderPassDesc&) override {}
         void beginRenderPass(kera::FrameHandle, kera::RenderTargetHandle, const kera::RenderPassDesc&) override {}
         void endRenderPass(kera::FrameHandle) override {}
+        kera::RendererResult<void> validateAttachementRendering(const kera::AttachementRenderingDesc& desc) override
+        {
+            return kera::RendererResult<void>::success();
+        }
+        kera::RendererResult<void> beginAttachementRendering(kera::FrameHandle frame,
+            const kera::AttachementRenderingDesc& desc) override
+        {
+            return kera::RendererResult<void>::success();
+        }
+        kera::RendererResult<void> endAttachementRendering(kera::FrameHandle frame) override
+        {
+            return kera::RendererResult<void>::success();
+        }
+        kera::RendererResult<void> resolveAttachementTexture(kera::FrameHandle frame, kera::TextureHandle src_texture,
+                                                       kera::TextureHandle dst_texture) override
+        {
+            return kera::RendererResult<void>::success();
+        }
+        kera::RendererResult<void> requestAttachementCapture(kera::FrameHandle frame, kera::TextureHandle texture,
+                                                       std::string& name) override
+        {
+            return kera::RendererResult<void>::success();
+        }
         void bindPipeline(kera::FrameHandle, kera::GraphicsPipelineHandle) override {}
         void bindVertexBuffer(kera::FrameHandle, uint32_t, kera::BufferHandle, std::size_t) override {}
         void bindIndexBuffer(kera::FrameHandle, kera::BufferHandle, kera::EIndexFormat, std::size_t) override {}
