@@ -23,6 +23,8 @@ add_executable(kera_samples
     instanced_triangle_sample.h
     instanced_triangle_many_lights_sample.cpp
     instanced_triangle_many_lights_sample.h
+    multi_pass_rendering_sample.cpp
+    multi_pass_rendering_sample.h
     damaged_helmet_sample.cpp
     damaged_helmet_sample.h
     damaged_helmet_ibl_lighting_sample.cpp
@@ -91,8 +93,8 @@ endif()
 
 if(BUILD_TESTING)
     function(kera_add_sample_smoke test_name)
-        set(options VALIDATION_LAYER)
-        set(one_value_args LABEL LOG SCREENSHOT_FRAMES SCREENSHOT_DIR)
+        set(options VALIDATION_LAYER VALIDATION_SYNC)
+        set(one_value_args LABEL LOG SCREENSHOT_FRAMES SCREENSHOT_DIR REQUIRED_OUTPUT TIMEOUT)
         set(multi_value_args ARGS LABELS METRICS_ARGS)
         cmake_parse_arguments(SMOKE "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
@@ -114,19 +116,40 @@ if(BUILD_TESTING)
                 "-DKERA_SAMPLE_SCREENSHOT_METRICS_ARGS=${sample_metrics_args}"
             )
         endif()
+        if(SMOKE_REQUIRED_OUTPUT)
+            list(APPEND sample_smoke_args "-DKERA_SAMPLE_REQUIRED_OUTPUT=${SMOKE_REQUIRED_OUTPUT}")
+        endif()
+
+        if(SMOKE_TIMEOUT)
+            list(APPEND sample_smoke_args "-DKERA_SAMPLE_TIMEOUT=${SMOKE_TIMEOUT}")
+        endif()
 
         add_test(NAME ${test_name}
             COMMAND ${CMAKE_COMMAND}
                 ${sample_smoke_args}
                 -P "${CMAKE_SOURCE_DIR}/cmake/RunKeraSampleSmoke.cmake"
         )
-        set_tests_properties(${test_name} PROPERTIES LABELS "${SMOKE_LABELS}")
+        set_tests_properties(${test_name} PROPERTIES
+            LABELS "${SMOKE_LABELS}"
+            SKIP_REGULAR_EXPRESSION "KERA_GPU_SMOKE_SKIPPED"
+        )
         if(SMOKE_VALIDATION_LAYER)
-            set_tests_properties(${test_name} PROPERTIES
-                ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
-            )
+            set(validation_environment "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation")
+            if(SMOKE_VALIDATION_SYNC)
+                list(APPEND validation_environment "VK_LAYER_VALIDATE_SYNC=1")
+            endif()
+            set_tests_properties(${test_name} PROPERTIES ENVIRONMENT "${validation_environment}")
         endif()
     endfunction()
+
+    add_test(NAME kera_samples_sponza_asset_layout_smoke
+        COMMAND ${CMAKE_COMMAND}
+            "-DKERA_SPONZA_ASSET_DIR=$<TARGET_FILE_DIR:kera_samples>/../assets/gltf/Sponza"
+            -P "${CMAKE_SOURCE_DIR}/cmake/VerifySponzaSampleAsset.cmake"
+    )
+    set_tests_properties(kera_samples_sponza_asset_layout_smoke PROPERTIES
+        LABELS "quick;sample;asset"
+    )
 
     kera_add_sample_smoke(kera_samples_validation_smoke
         LABEL Kera_validation_sample_smoke
@@ -237,5 +260,176 @@ if(BUILD_TESTING)
         SCREENSHOT_FRAMES 1
         SCREENSHOT_DIR visual_regression/damaged_helmet_ibl
         METRICS_ARGS --min-coverage 0.75 --max-coverage 1.00 --min-luma-range 0.45
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_capture_smoke
+        LABEL Kera_multi_pass_capture_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 2 --sample attachment-playground --multi-pass-capture-smoke --hide-stats-overlay
+        LOG kera_multi_pass_capture_smoke.log
+        LABELS vulkan validation render attachment readback
+        # This smoke validates offscreen readback; the shadow lens smokes below validate cast-shadow output.
+        REQUIRED_OUTPUT "Multi-Pass Sponza scene capture verified."
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_shadows_disabled_smoke
+        LABEL Kera_multi_pass_shadows_disabled_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 2 --sample attachment-playground --multi-pass-capture-smoke --multi-pass-shadows-disabled --hide-stats-overlay
+        LOG kera_multi_pass_shadows_disabled_smoke.log
+        LABELS vulkan validation render attachment shadow readback
+        REQUIRED_OUTPUT "Multi-Pass Sponza shadows-disabled scene capture verified."
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_resize_smoke
+        LABEL Kera_multi_pass_resize_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 6 --sample attachment-playground --multi-pass-resize-smoke --multi-pass-capture-smoke --hide-stats-overlay
+        LOG kera_multi_pass_resize_smoke.log
+        LABELS vulkan validation render attachment resize readback
+        REQUIRED_OUTPUT "after final resize"
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_msaa_smoke
+        LABEL Kera_multi_pass_msaa_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 4 --sample attachment-playground --attachment-msaa 4 --multi-pass-capture-smoke --hide-stats-overlay --hide-sample-ui
+        LOG kera_multi_pass_msaa_smoke.log
+        LABELS vulkan validation render attachment msaa resolve readback visual
+        REQUIRED_OUTPUT "Multi-Pass 4x MSAA resolve enabled"
+        SCREENSHOT_FRAMES 3
+        SCREENSHOT_DIR visual_regression/multi_pass_msaa
+        METRICS_ARGS --min-coverage 0.60 --max-coverage 0.90 --min-luma-range 0.45
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_attachment_reconfigure_smoke
+        LABEL Kera_attachment_reconfigure_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 9 --sample attachment-playground --attachment-msaa 4 --attachment-reconfigure-smoke --multi-pass-capture-smoke --hide-stats-overlay
+        LOG kera_attachment_reconfigure_smoke.log
+        LABELS vulkan validation render attachment msaa shadow reconfigure readback synchronization
+        REQUIRED_OUTPUT "ATTACHMENT_PLAYGROUND_RECONFIGURE_SMOKE complete active_msaa=4 shadow_resolution=1024 shadows=on preview=off"
+        VALIDATION_LAYER
+        VALIDATION_SYNC
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_shadow_preview_smoke
+        LABEL Kera_multi_pass_shadow_preview_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 2 --sample attachment-playground --attachment-preview-shadow-map --hide-stats-overlay --hide-sample-ui
+        LOG kera_multi_pass_shadow_preview_smoke.log
+        LABELS vulkan validation render attachment shadow depth visual
+        REQUIRED_OUTPUT "Multi-Pass shadow depth preview enabled"
+        SCREENSHOT_FRAMES 1
+        SCREENSHOT_DIR visual_regression/multi_pass_shadow_preview
+        METRICS_ARGS --min-coverage 0.35 --max-coverage 0.75 --min-luma-range 0.70 --min-dark-coverage 0.30
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_shadow_inset_smoke
+        LABEL Kera_multi_pass_shadow_inset_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 4 --sample attachment-playground --attachment-shadow-inset --hide-stats-overlay --hide-sample-ui
+        LOG kera_multi_pass_shadow_inset_smoke.log
+        REQUIRED_OUTPUT "Multi-Pass shadow inset diagnostic enabled."
+        LABELS vulkan validation render attachment shadow visual
+        SCREENSHOT_FRAMES 3
+        SCREENSHOT_DIR visual_regression/multi_pass_shadow_inset
+        METRICS_ARGS --min-coverage 0.60 --max-coverage 0.90 --min-luma-range 0.45
+        VALIDATION_LAYER
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_msaa_comparison_smoke
+        LABEL Kera_multi_pass_msaa_comparison_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 4 --sample attachment-playground --attachment-msaa 4 --attachment-msaa-comparison --hide-stats-overlay --hide-sample-ui
+        LOG kera_multi_pass_msaa_comparison_smoke.log
+        REQUIRED_OUTPUT "Multi-Pass MSAA comparison diagnostic enabled."
+        LABELS vulkan validation render attachment msaa resolve visual
+        SCREENSHOT_FRAMES 3
+        SCREENSHOT_DIR visual_regression/multi_pass_msaa_comparison
+        METRICS_ARGS --min-coverage 0.60 --max-coverage 0.90 --min-luma-range 0.45 --min-msaa-marker-coverage 0.003
+        VALIDATION_LAYER
+        VALIDATION_SYNC
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_shadow_comparison_smoke
+        LABEL Kera_multi_pass_shadow_comparison_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 4 --sample attachment-playground --attachment-msaa 4 --attachment-shadow-resolution 4096 --attachment-shadow-comparison --hide-stats-overlay --hide-sample-ui
+        LOG kera_multi_pass_shadow_comparison_smoke.log
+        REQUIRED_OUTPUT "Multi-Pass shadow comparison diagnostic enabled."
+        LABELS vulkan validation render attachment shadow visual
+        SCREENSHOT_FRAMES 3
+        SCREENSHOT_DIR visual_regression/multi_pass_shadow_comparison
+        METRICS_ARGS --min-coverage 0.60 --max-coverage 0.90 --min-luma-range 0.45 --min-shadow-marker-coverage 0.003 --min-shadow-pane-delta 0.005 --min-shadow-pane-luma-range 0.45 --min-shadow-diagonal-contrast 0.015 --min-shadow-diagonal-mean-delta 0.00015
+        VALIDATION_LAYER
+        VALIDATION_SYNC
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_shadow_comparison_single_sample_smoke
+        LABEL Kera_multi_pass_shadow_comparison_single_sample_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 4 --sample attachment-playground --attachment-msaa 1 --attachment-shadow-resolution 4096 --attachment-shadow-comparison --hide-stats-overlay --hide-sample-ui
+        LOG kera_multi_pass_shadow_comparison_single_sample_smoke.log
+        REQUIRED_OUTPUT "ATTACHMENT_PLAYGROUND_CONFIG requested_msaa=1 active_msaa=1"
+        LABELS vulkan validation render attachment shadow visual single_sample
+        SCREENSHOT_FRAMES 3
+        SCREENSHOT_DIR visual_regression/multi_pass_shadow_comparison_single_sample
+        METRICS_ARGS --min-coverage 0.60 --max-coverage 0.90 --min-luma-range 0.45 --min-shadow-marker-coverage 0.003 --min-shadow-pane-delta 0.005 --min-shadow-pane-luma-range 0.45 --min-shadow-diagonal-contrast 0.015 --min-shadow-diagonal-mean-delta 0.00015
+        VALIDATION_LAYER
+        VALIDATION_SYNC
+    )
+
+    kera_add_sample_smoke(kera_samples_attachment_performance_smoke
+        LABEL Kera_attachment_performance_smoke
+        TIMEOUT 60
+        ARGS --smoke-test --smoke-frames 10 --sample attachment-playground --attachment-msaa 4 --attachment-shadow-resolution 4096 --attachment-shadow-comparison --attachment-performance-smoke --hide-stats-overlay --hide-sample-ui
+        LOG kera_attachment_performance_smoke.log
+        LABELS vulkan validation render attachment performance timestamp msaa shadow synchronization
+        REQUIRED_OUTPUT "ATTACHMENT_PERFORMANCE_SMOKE verified"
+        VALIDATION_LAYER
+        VALIDATION_SYNC
+    )
+
+    kera_add_sample_smoke(kera_samples_attachment_performance_shadows_disabled_smoke
+        LABEL Kera_attachment_performance_shadows_disabled_smoke
+        TIMEOUT 60
+        ARGS --smoke-test --smoke-frames 10 --sample attachment-playground --attachment-msaa 1 --multi-pass-shadows-disabled --attachment-performance-smoke --hide-stats-overlay --hide-sample-ui
+        LOG kera_attachment_performance_shadows_disabled_smoke.log
+        LABELS vulkan validation render attachment performance timestamp shadow synchronization
+        REQUIRED_OUTPUT "expected_count=3 observed_count=3"
+        VALIDATION_LAYER
+        VALIDATION_SYNC
+    )
+
+    kera_add_sample_smoke(kera_samples_attachment_performance_ui_smoke
+        LABEL Kera_attachment_performance_ui_smoke
+        TIMEOUT 60
+        ARGS --smoke-test --smoke-frames 10 --sample attachment-playground --attachment-msaa 4 --attachment-shadow-resolution 4096 --attachment-shadow-comparison --attachment-performance-smoke --hide-stats-overlay
+        LOG kera_attachment_performance_ui_smoke.log
+        LABELS vulkan validation render attachment performance timestamp msaa shadow synchronization visual ui
+        SCREENSHOT_FRAMES 9
+        SCREENSHOT_DIR visual_regression/attachment_performance_ui
+        METRICS_ARGS --min-coverage 0.40 --max-coverage 0.95 --min-luma-range 0.45 --min-ui-status-coverage 0.50
+        REQUIRED_OUTPUT "ATTACHMENT_PERFORMANCE_SMOKE verified"
+        VALIDATION_LAYER
+        VALIDATION_SYNC
+    )
+
+    kera_add_sample_smoke(kera_samples_multi_pass_visual_smoke
+        LABEL Kera_multi_pass_visual_smoke
+        TIMEOUT 45
+        ARGS --smoke-test --smoke-frames 4 --sample attachment-playground --hide-stats-overlay --hide-sample-ui
+        LOG kera_multi_pass_visual_smoke.log
+        LABELS vulkan validation render attachment visual
+        SCREENSHOT_FRAMES 3
+        SCREENSHOT_DIR visual_regression/multi_pass
+        METRICS_ARGS --min-coverage 0.60 --max-coverage 0.90 --min-luma-range 0.45
+        VALIDATION_LAYER
     )
 endif()
