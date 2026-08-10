@@ -3808,12 +3808,6 @@ namespace kera
             releaseFrame(frame_handle, sync_index);
             return false;
         }
-        if (frame->m_gpu_timing_scope_active)
-        {
-            Logger::getInstance().error("Cannot end a Vulkan frame with an active GPU timing scope.");
-            releaseFrame(frame_handle, sync_index);
-            return false;
-        }
 
         VulkanFrameSyncResource& frame_sync = m_frame_sync_resources[sync_index];
         CommandBuffer& command_buffer = *m_command_buffers[sync_index];
@@ -5370,7 +5364,7 @@ namespace kera
         m_images_in_flight.assign(m_swapchain->getImageCount(), 0);
         m_active_frame_handles.assign(frame_sync_count, {});
 
-        const QueueFamilyIndices& queue_families = m_physical_device->getQueueFamilyIndices();
+        // const QueueFamilyIndices& queue_families = m_physical_device->getQueueFamilyIndices();
         uint32_t queue_family_count = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device->getVulkanPhysicalDevice(), &queue_family_count,
                                                  nullptr);

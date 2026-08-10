@@ -173,7 +173,6 @@ namespace kera
         AttachmentPlaygroundConfig m_active_config;
         AttachmentPlaygroundConfig m_requested_config;
         bool m_reconfigure_smoke = false;
-        std::array<PassTimingHistory, static_cast<size_t>(AttachmentPassTimingScope::COUNT)> m_pass_timing_history{};
         uint32_t m_update_count = 0;
         uint32_t m_reconfigure_smoke_stage = 0;
         bool m_config_dirty = false;

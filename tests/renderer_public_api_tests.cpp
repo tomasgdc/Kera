@@ -120,68 +120,6 @@ TEST(KeraRendererPublicApi, GltfSceneLoaderAppendsToTheCoreTable)
     EXPECT_FALSE(KERA_RENDERER_API_HAS_MEMBER(&truncated, load_gltf_scene));
 }
 
-TEST(KeraRendererPublicApi, GpuTimingAppendsToTheCoreTable)
-{
-    const KeraRendererApiV1* api = keraGetRendererApiV1();
-    ASSERT_NE(api, nullptr);
-    EXPECT_EQ(api->abi_version, KERA_RENDERER_ABI_VERSION);
-    EXPECT_TRUE(KERA_RENDERER_API_HAS_MEMBER(api, get_gpu_timing_capabilities));
-    EXPECT_TRUE(KERA_RENDERER_API_HAS_MEMBER(api, begin_gpu_timing_scope));
-    EXPECT_TRUE(KERA_RENDERER_API_HAS_MEMBER(api, end_gpu_timing_scope));
-    EXPECT_TRUE(KERA_RENDERER_API_HAS_MEMBER(api, copy_completed_gpu_timings));
-
-    KeraRendererApiV1 truncated = *api;
-    truncated.struct_size = KERA_RENDERER_API_V1_SIZE_THROUGH(destroy_gltf_scene);
-    EXPECT_FALSE(KERA_RENDERER_API_HAS_MEMBER(&truncated, get_gpu_timing_capabilities));
-
-    truncated.destroy = +[](KeraRenderer*) {};
-    kera::Renderer truncated_renderer(reinterpret_cast<KeraRenderer*>(static_cast<uintptr_t>(1u)), &truncated);
-    EXPECT_FALSE(truncated_renderer.supportsGpuTiming());
-    EXPECT_EQ(truncated_renderer.getGpuTimingCapabilities().max_scopes_per_frame, 0u);
-    EXPECT_FALSE(truncated_renderer.beginGpuTimingScope({}, 1u, 1u));
-    EXPECT_FALSE(truncated_renderer.endGpuTimingScope({}));
-    EXPECT_EQ(truncated_renderer.copyCompletedGpuTimings(nullptr, 0), 0u);
-
-    kera::Renderer renderer;
-    EXPECT_FALSE(renderer.supportsGpuTiming());
-    EXPECT_EQ(renderer.getGpuTimingCapabilities().max_scopes_per_frame, 0u);
-    EXPECT_FALSE(renderer.beginGpuTimingScope({}, 1u, 1u));
-    EXPECT_FALSE(renderer.endGpuTimingScope({}));
-    EXPECT_EQ(renderer.copyCompletedGpuTimings(nullptr, 0), 0u);
-}
-
-TEST(KeraRendererPublicApi, GpuTimingHelpersForwardAvailableCoreTableMembers)
-{
-    g_gpu_timing_wrapper_test_state = {};
-
-    KeraRendererApiV1 api = *keraGetRendererApiV1();
-    api.destroy = +[](KeraRenderer*) {};
-    api.get_gpu_timing_capabilities = getGpuTimingCapabilitiesForTest;
-    api.begin_gpu_timing_scope = beginGpuTimingScopeForTest;
-    api.end_gpu_timing_scope = endGpuTimingScopeForTest;
-    api.copy_completed_gpu_timings = copyCompletedGpuTimingsForTest;
-
-    kera::Renderer renderer(reinterpret_cast<KeraRenderer*>(static_cast<uintptr_t>(1u)), &api);
-    EXPECT_TRUE(renderer.supportsGpuTiming());
-    EXPECT_EQ(renderer.getGpuTimingCapabilities().max_scopes_per_frame, 12u);
-    EXPECT_TRUE(renderer.beginGpuTimingScope({}, 7u, 42u));
-    EXPECT_TRUE(renderer.endGpuTimingScope({}));
-
-    kera::GpuTimingSample samples[2]{};
-    EXPECT_EQ(renderer.copyCompletedGpuTimings(samples, 2u), 1u);
-    EXPECT_EQ(g_gpu_timing_wrapper_test_state.begin_calls, 1u);
-    EXPECT_EQ(g_gpu_timing_wrapper_test_state.end_calls, 1u);
-    EXPECT_EQ(g_gpu_timing_wrapper_test_state.copy_calls, 1u);
-    EXPECT_EQ(g_gpu_timing_wrapper_test_state.scope_id, 7u);
-    EXPECT_EQ(g_gpu_timing_wrapper_test_state.generation, 42u);
-    EXPECT_EQ(samples[0].scope_id, 7u);
-    EXPECT_EQ(samples[0].generation, 42u);
-    EXPECT_EQ(samples[0].frame_index, 9u);
-    EXPECT_DOUBLE_EQ(samples[0].gpu_ms, 1.5);
-    EXPECT_DOUBLE_EQ(samples[0].cpu_encode_ms, 0.25);
-    EXPECT_TRUE(samples[0].valid);
-}
-
 TEST(KeraRendererPublicApi, AttachmentRendererHelpersRejectUnavailableCoreTable)
 {
     kera::Renderer renderer;

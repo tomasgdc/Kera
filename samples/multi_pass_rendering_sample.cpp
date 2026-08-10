@@ -174,15 +174,12 @@ namespace kera
         , m_active_config(config)
         , m_requested_config(config)
         , m_reconfigure_smoke(reconfigure_smoke)
-        , m_performance_smoke(performance_smoke)
     {
         m_sun_orbit_phase_radians = sun_orbit_phase_radians;
         m_sun_orbit_enabled = sun_orbit_enabled;
     }
 
-    std::array<bool, static_cast<size_t>(MultiPassRenderingSample::AttachmentPassTimingScope::COUNT)>
-
-        void MultiPassRenderingSample::initialize()
+    void MultiPassRenderingSample::initialize()
     {
         sampleLogInfo("Initializing " + std::string(getName()));
         if (!m_renderer.supportsAttachmentRendering())
@@ -1529,6 +1526,7 @@ namespace kera
             m_requested_config.preview_msaa_comparison = false;
             m_requested_config.preview_shadow_comparison = false;
         }
+
         if (ImGui::Checkbox("Beauty + shadow inset", &m_requested_config.preview_shadow_inset) &&
             m_requested_config.preview_shadow_inset)
         {
@@ -1536,6 +1534,7 @@ namespace kera
             m_requested_config.preview_msaa_comparison = false;
             m_requested_config.preview_shadow_comparison = false;
         }
+
         if (ImGui::Checkbox("Beauty + MSAA lens", &m_requested_config.preview_msaa_comparison) &&
             m_requested_config.preview_msaa_comparison)
         {
@@ -1543,6 +1542,7 @@ namespace kera
             m_requested_config.preview_shadow_inset = false;
             m_requested_config.preview_shadow_comparison = false;
         }
+
         if (ImGui::Checkbox("Beauty + shadow lens", &m_requested_config.preview_shadow_comparison) &&
             m_requested_config.preview_shadow_comparison)
         {
@@ -1573,6 +1573,7 @@ namespace kera
             ImGui::Text("Sun orbit: %s (%.0f s)", m_sun_orbit_enabled ? "running" : "paused",
                         m_sun_orbit_period_seconds);
         }
+
         if (ImGui::Button("Reset"))
         {
             m_requested_config = {};
@@ -1591,6 +1592,7 @@ namespace kera
                 ImGui::TextDisabled("MSAA lens needs active MSAA above 1x");
             }
         }
+
         if (m_active_config.preview_shadow_comparison)
         {
             if (m_attachment_resources.shadow_comparison_reference.isValid())
@@ -1603,6 +1605,7 @@ namespace kera
                 ImGui::TextDisabled("Shadow lens needs Shadows on and a map above 1024 px");
             }
         }
+
         ImGui::TextUnformatted(m_uses_sponza ? "Scene: Sponza" : "Scene: procedural fallback");
         if (m_config_dirty)
         {
@@ -1612,785 +1615,794 @@ namespace kera
         {
             ImGui::TextDisabled("%s", m_configuration_error.c_str());
         }
-        ImGui::EndChild();
-    }
-}
-ImGui::End();
 
-const bool configuration_changed = !attachmentConfigsEqual(m_active_config, m_requested_config);
-if (configuration_changed)
-{
-    m_configuration_error.clear();
-}
-m_config_dirty = configuration_changed;
+        ImGui::End();
+
+        const bool configuration_changed = !attachmentConfigsEqual(m_active_config, m_requested_config);
+        if (configuration_changed)
+        {
+            m_configuration_error.clear();
+        }
+        m_config_dirty = configuration_changed;
 #endif
-}
-
-bool MultiPassRenderingSample::uploadSponzaUniforms(FrameHandle frame)
-{
-    if (!m_uses_sponza)
-    {
-        return true;
     }
 
-    const float aspect = m_render_extent.height == 0
-                             ? 16.0f / 9.0f
-                             : static_cast<float>(m_render_extent.width) / static_cast<float>(m_render_extent.height);
-    // The canonical Sponza node applies a 0.008 scale to the raw accessor bounds.
-    const glm::vec3 camera_target(8.50f, 4.25f, -0.31f);
-    const glm::vec3 camera_position(-9.50f, 1.80f, -0.31f);
-    // Match the axial Sponza view that exposes the far brick receiver's cast-shadow boundary.
-    const glm::vec3 shadow_diagnostic_camera_target(10.50f, 4.25f, -0.31f);
-    const glm::vec3 shadow_diagnostic_camera_position(-9.50f, 1.80f, -0.31f);
-    const glm::vec3 shadow_center(-0.48f, 4.50f, -0.31f);
-    const glm::mat4 view = glm::lookAt(camera_position, camera_target, glm::vec3(0.0f, 1.0f, 0.0f));
-    const glm::mat4 projection = glm::perspectiveRH_ZO(glm::radians(52.0f), aspect, 0.1f, 100.0f);
-    const glm::mat4 shadow_diagnostic_view =
-        glm::lookAt(shadow_diagnostic_camera_position, shadow_diagnostic_camera_target, glm::vec3(0.0f, 1.0f, 0.0f));
-    const glm::mat4 shadow_diagnostic_projection = glm::perspectiveRH_ZO(glm::radians(52.0f), aspect, 0.1f, 100.0f);
-    const glm::vec3 initial_light_direction = glm::normalize(glm::vec3(-0.45f, 0.78f, -0.43f));
-    const float orbit_sine = std::sin(m_sun_orbit_phase_radians);
-    const float orbit_cosine = std::cos(m_sun_orbit_phase_radians);
-    const glm::vec3 light_direction(initial_light_direction.x * orbit_cosine - initial_light_direction.z * orbit_sine,
-                                    initial_light_direction.y,
-                                    initial_light_direction.x * orbit_sine + initial_light_direction.z * orbit_cosine);
-    const glm::vec3 light_position = shadow_center + light_direction * 32.0f;
-    const glm::mat4 light_view = glm::lookAt(light_position, shadow_center, glm::vec3(0.0f, 1.0f, 0.0f));
-    const glm::mat4 light_projection = glm::orthoRH_ZO(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
-
-    std::vector<SponzaSceneUniforms> scene_uniforms;
-    std::vector<SponzaSceneUniforms> shadow_diagnostic_uniforms;
-    std::vector<SponzaShadowUniforms> shadow_uniforms;
-    scene_uniforms.reserve(m_sponza_scene.draw_count);
-    shadow_diagnostic_uniforms.reserve(m_sponza_scene.draw_count);
-    shadow_uniforms.reserve(m_sponza_scene.draw_count);
-    const auto append_scene_uniforms = [&](std::vector<SponzaSceneUniforms>& uniforms, const glm::mat4& camera_view,
-                                           const glm::mat4& camera_projection, const glm::vec3& frame_camera_position)
+    bool MultiPassRenderingSample::uploadSponzaUniforms(FrameHandle frame)
     {
+        if (!m_uses_sponza)
+        {
+            return true;
+        }
+
+        const float aspect = m_render_extent.height == 0 ? 16.0f / 9.0f
+                                                         : static_cast<float>(m_render_extent.width) /
+                                                               static_cast<float>(m_render_extent.height);
+        // The canonical Sponza node applies a 0.008 scale to the raw accessor bounds.
+        const glm::vec3 camera_target(8.50f, 4.25f, -0.31f);
+        const glm::vec3 camera_position(-9.50f, 1.80f, -0.31f);
+        // Match the axial Sponza view that exposes the far brick receiver's cast-shadow boundary.
+        const glm::vec3 shadow_diagnostic_camera_target(10.50f, 4.25f, -0.31f);
+        const glm::vec3 shadow_diagnostic_camera_position(-9.50f, 1.80f, -0.31f);
+        const glm::vec3 shadow_center(-0.48f, 4.50f, -0.31f);
+        const glm::mat4 view = glm::lookAt(camera_position, camera_target, glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::mat4 projection = glm::perspectiveRH_ZO(glm::radians(52.0f), aspect, 0.1f, 100.0f);
+        const glm::mat4 shadow_diagnostic_view = glm::lookAt(
+            shadow_diagnostic_camera_position, shadow_diagnostic_camera_target, glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::mat4 shadow_diagnostic_projection = glm::perspectiveRH_ZO(glm::radians(52.0f), aspect, 0.1f, 100.0f);
+        const glm::vec3 initial_light_direction = glm::normalize(glm::vec3(-0.45f, 0.78f, -0.43f));
+        const float orbit_sine = std::sin(m_sun_orbit_phase_radians);
+        const float orbit_cosine = std::cos(m_sun_orbit_phase_radians);
+        const glm::vec3 light_direction(
+            initial_light_direction.x * orbit_cosine - initial_light_direction.z * orbit_sine,
+            initial_light_direction.y,
+            initial_light_direction.x * orbit_sine + initial_light_direction.z * orbit_cosine);
+        const glm::vec3 light_position = shadow_center + light_direction * 32.0f;
+        const glm::mat4 light_view = glm::lookAt(light_position, shadow_center, glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::mat4 light_projection = glm::orthoRH_ZO(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
+
+        std::vector<SponzaSceneUniforms> scene_uniforms;
+        std::vector<SponzaSceneUniforms> shadow_diagnostic_uniforms;
+        std::vector<SponzaShadowUniforms> shadow_uniforms;
+        scene_uniforms.reserve(m_sponza_scene.draw_count);
+        shadow_diagnostic_uniforms.reserve(m_sponza_scene.draw_count);
+        shadow_uniforms.reserve(m_sponza_scene.draw_count);
+        const auto append_scene_uniforms = [&](std::vector<SponzaSceneUniforms>& uniforms, const glm::mat4& camera_view,
+                                               const glm::mat4& camera_projection,
+                                               const glm::vec3& frame_camera_position)
+        {
+            for (uint32_t draw_index = 0; draw_index < m_sponza_scene.draw_count; ++draw_index)
+            {
+                const KeraGltfLoadedModel& draw = m_sponza_scene.draw_items[draw_index];
+                const glm::mat4 model = glm::make_mat4(draw.transform);
+                uniforms.push_back({
+                    .model = model,
+                    .normal_matrix = glm::transpose(glm::inverse(model)),
+                    .view = camera_view,
+                    .projection = camera_projection,
+                    .light_view = light_view,
+                    .light_projection = light_projection,
+                    .camera_position = glm::vec4(frame_camera_position, 1.0f),
+                    .light_direction_shadow_bias = glm::vec4(light_direction, 0.0015f),
+                    .base_color_factor =
+                        glm::vec4(draw.material_factors.base_color[0], draw.material_factors.base_color[1],
+                                  draw.material_factors.base_color[2], draw.material_factors.base_color[3]),
+                    .emissive_factor_normal_scale =
+                        glm::vec4(draw.material_factors.emissive[0], draw.material_factors.emissive[1],
+                                  draw.material_factors.emissive[2], draw.material_factors.normal_scale),
+                    .metallic_roughness_occlusion =
+                        glm::vec4(draw.material_factors.metallic, draw.material_factors.roughness,
+                                  draw.material_factors.occlusion_strength, 0.0f),
+                    .alpha_mode_cutoff_double_sided = glm::vec4(
+                        toShaderAlphaMode(draw.material_factors.alpha_mode), draw.material_factors.alpha_cutoff,
+                        draw.material_factors.double_sided != 0 ? 1.0f : 0.0f, 0.0f),
+                });
+            }
+        };
+        append_scene_uniforms(scene_uniforms, view, projection, camera_position);
+        append_scene_uniforms(shadow_diagnostic_uniforms, shadow_diagnostic_view, shadow_diagnostic_projection,
+                              shadow_diagnostic_camera_position);
+
         for (uint32_t draw_index = 0; draw_index < m_sponza_scene.draw_count; ++draw_index)
         {
             const KeraGltfLoadedModel& draw = m_sponza_scene.draw_items[draw_index];
-            const glm::mat4 model = glm::make_mat4(draw.transform);
-            uniforms.push_back({
-                .model = model,
-                .normal_matrix = glm::transpose(glm::inverse(model)),
-                .view = camera_view,
-                .projection = camera_projection,
+            shadow_uniforms.push_back({
+                .model = glm::make_mat4(draw.transform),
                 .light_view = light_view,
                 .light_projection = light_projection,
-                .camera_position = glm::vec4(frame_camera_position, 1.0f),
-                .light_direction_shadow_bias = glm::vec4(light_direction, 0.0015f),
-                .base_color_factor =
-                    glm::vec4(draw.material_factors.base_color[0], draw.material_factors.base_color[1],
-                              draw.material_factors.base_color[2], draw.material_factors.base_color[3]),
-                .emissive_factor_normal_scale =
-                    glm::vec4(draw.material_factors.emissive[0], draw.material_factors.emissive[1],
-                              draw.material_factors.emissive[2], draw.material_factors.normal_scale),
-                .metallic_roughness_occlusion =
-                    glm::vec4(draw.material_factors.metallic, draw.material_factors.roughness,
-                              draw.material_factors.occlusion_strength, 0.0f),
-                .alpha_mode_cutoff_double_sided =
+                .alpha_mode_cutoff_base_alpha =
                     glm::vec4(toShaderAlphaMode(draw.material_factors.alpha_mode), draw.material_factors.alpha_cutoff,
-                              draw.material_factors.double_sided != 0 ? 1.0f : 0.0f, 0.0f),
+                              draw.material_factors.base_color[3], 0.0f),
             });
         }
-    };
-    append_scene_uniforms(scene_uniforms, view, projection, camera_position);
-    append_scene_uniforms(shadow_diagnostic_uniforms, shadow_diagnostic_view, shadow_diagnostic_projection,
-                          shadow_diagnostic_camera_position);
 
-    for (uint32_t draw_index = 0; draw_index < m_sponza_scene.draw_count; ++draw_index)
-    {
-        const KeraGltfLoadedModel& draw = m_sponza_scene.draw_items[draw_index];
-        shadow_uniforms.push_back({
-            .model = glm::make_mat4(draw.transform),
-            .light_view = light_view,
-            .light_projection = light_projection,
-            .alpha_mode_cutoff_base_alpha =
-                glm::vec4(toShaderAlphaMode(draw.material_factors.alpha_mode), draw.material_factors.alpha_cutoff,
-                          draw.material_factors.base_color[3], 0.0f),
-        });
+        for (uint32_t draw_index = 0; draw_index < m_sponza_scene.draw_count; ++draw_index)
+        {
+            if (!m_renderer.uploadUniformRingBuffer(m_sponza_scene_uniform_buffers[draw_index], frame,
+                                                    &scene_uniforms[draw_index], sizeof(SponzaSceneUniforms)) ||
+                !m_renderer.uploadUniformRingBuffer(m_sponza_shadow_diagnostic_uniform_buffers[draw_index], frame,
+                                                    &shadow_diagnostic_uniforms[draw_index],
+                                                    sizeof(SponzaSceneUniforms)) ||
+                !m_renderer.uploadUniformRingBuffer(m_sponza_shadow_uniform_buffers[draw_index], frame,
+                                                    &shadow_uniforms[draw_index], sizeof(SponzaShadowUniforms)))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
-    for (uint32_t draw_index = 0; draw_index < m_sponza_scene.draw_count; ++draw_index)
+    void MultiPassRenderingSample::drawSponzaScene(FrameHandle frame, bool shadow_pass, SponzaSceneRenderMode mode)
     {
-        if (!m_renderer.uploadUniformRingBuffer(m_sponza_scene_uniform_buffers[draw_index], frame,
-                                                &scene_uniforms[draw_index], sizeof(SponzaSceneUniforms)) ||
-            !m_renderer.uploadUniformRingBuffer(m_sponza_shadow_diagnostic_uniform_buffers[draw_index], frame,
-                                                &shadow_diagnostic_uniforms[draw_index], sizeof(SponzaSceneUniforms)) ||
-            !m_renderer.uploadUniformRingBuffer(m_sponza_shadow_uniform_buffers[draw_index], frame,
-                                                &shadow_uniforms[draw_index], sizeof(SponzaShadowUniforms)))
+        const bool shadow_diagnostic = mode == SponzaSceneRenderMode::SHADOW_COMPARISON_ACTIVE ||
+                                       mode == SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE;
+        const std::vector<BufferHandle>& uniform_buffers =
+            shadow_pass
+                ? m_sponza_shadow_uniform_buffers
+                : (shadow_diagnostic ? m_sponza_shadow_diagnostic_uniform_buffers : m_sponza_scene_uniform_buffers);
+        if (uniform_buffers.empty())
         {
+            sampleLogError("Attachment Playground Sponza has no per-draw uniform buffers.");
+            m_initialized = false;
+            return;
+        }
+        const uint32_t slot = m_renderer.getUniformRingBufferSlot(uniform_buffers.front(), frame);
+        const uint32_t slot_count = m_renderer.getUniformRingBufferInfo(uniform_buffers.front()).slot_count;
+        if (slot >= slot_count)
+        {
+            sampleLogError("Attachment Playground Sponza selected an invalid uniform-ring slot.");
+            m_initialized = false;
+            return;
+        }
+
+        for (uint32_t draw_index = 0; draw_index < m_sponza_scene.draw_count; ++draw_index)
+        {
+            const KeraGltfLoadedModel& draw = m_sponza_scene.draw_items[draw_index];
+            const bool double_sided = draw.material_factors.double_sided != 0;
+            const GraphicsPipelineHandle pipeline =
+                shadow_pass ? (double_sided ? m_sponza_shadow_double_sided_pipeline : m_sponza_shadow_pipeline)
+                : mode == SponzaSceneRenderMode::MSAA_REFERENCE
+                    ? (double_sided ? m_attachment_pipelines.msaa_reference_sponza_scene_double_sided
+                                    : m_attachment_pipelines.msaa_reference_sponza_scene)
+                    : (double_sided ? m_attachment_pipelines.sponza_scene_double_sided
+                                    : m_attachment_pipelines.sponza_scene);
+            const std::vector<DescriptorSetHandle>& descriptor_sets =
+                shadow_pass ? (double_sided ? m_attachment_resources.sponza_shadow_double_sided_descriptor_sets
+                                            : m_attachment_resources.sponza_shadow_descriptor_sets)
+                : mode == SponzaSceneRenderMode::MSAA_REFERENCE
+                    ? (double_sided ? m_attachment_resources.msaa_reference_sponza_scene_double_sided_descriptor_sets
+                                    : m_attachment_resources.msaa_reference_sponza_scene_descriptor_sets)
+                : mode == SponzaSceneRenderMode::SHADOW_COMPARISON_ACTIVE
+                    ? (double_sided
+                           ? m_attachment_resources.shadow_comparison_active_sponza_scene_double_sided_descriptor_sets
+                           : m_attachment_resources.shadow_comparison_active_sponza_scene_descriptor_sets)
+                : mode == SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE
+                    ? (double_sided ? m_attachment_resources.shadow_comparison_sponza_scene_double_sided_descriptor_sets
+                                    : m_attachment_resources.shadow_comparison_sponza_scene_descriptor_sets)
+                    : (double_sided ? m_attachment_resources.sponza_scene_double_sided_descriptor_sets
+                                    : m_attachment_resources.sponza_scene_descriptor_sets);
+            const size_t descriptor_index = static_cast<size_t>(draw_index) * slot_count + slot;
+            if (descriptor_index >= descriptor_sets.size())
+            {
+                sampleLogError("Attachment Playground Sponza descriptor-set layout is incomplete.");
+                m_initialized = false;
+                return;
+            }
+
+            m_renderer.bindPipeline(frame, pipeline);
+            m_renderer.bindVertexBuffer(frame, 0, draw.vertex_buffer);
+            m_renderer.bindIndexBuffer(frame, draw.index_buffer, static_cast<EIndexFormat>(draw.index_format));
+            m_renderer.bindDescriptorSet(frame, pipeline, descriptor_sets[descriptor_index]);
+            m_renderer.drawIndexed(frame, draw.index_count);
+        }
+    }
+
+    bool MultiPassRenderingSample::verifyCapture()
+    {
+        test::AttachmentCapture capture{};
+        if (!test::takeAttachmentCapture(m_renderer.native(), kCaptureName, capture))
+        {
+            sampleLogError("Failed to retire the Multi-Pass offscreen capture.");
             return false;
         }
-    }
-    return true;
-}
-
-void MultiPassRenderingSample::drawSponzaScene(FrameHandle frame, bool shadow_pass, SponzaSceneRenderMode mode)
-{
-    const bool shadow_diagnostic = mode == SponzaSceneRenderMode::SHADOW_COMPARISON_ACTIVE ||
-                                   mode == SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE;
-    const std::vector<BufferHandle>& uniform_buffers =
-        shadow_pass ? m_sponza_shadow_uniform_buffers
-                    : (shadow_diagnostic ? m_sponza_shadow_diagnostic_uniform_buffers : m_sponza_scene_uniform_buffers);
-    if (uniform_buffers.empty())
-    {
-        sampleLogError("Attachment Playground Sponza has no per-draw uniform buffers.");
-        m_initialized = false;
-        return;
-    }
-    const uint32_t slot = m_renderer.getUniformRingBufferSlot(uniform_buffers.front(), frame);
-    const uint32_t slot_count = m_renderer.getUniformRingBufferInfo(uniform_buffers.front()).slot_count;
-    if (slot >= slot_count)
-    {
-        sampleLogError("Attachment Playground Sponza selected an invalid uniform-ring slot.");
-        m_initialized = false;
-        return;
-    }
-
-    for (uint32_t draw_index = 0; draw_index < m_sponza_scene.draw_count; ++draw_index)
-    {
-        const KeraGltfLoadedModel& draw = m_sponza_scene.draw_items[draw_index];
-        const bool double_sided = draw.material_factors.double_sided != 0;
-        const GraphicsPipelineHandle pipeline =
-            shadow_pass ? (double_sided ? m_sponza_shadow_double_sided_pipeline : m_sponza_shadow_pipeline)
-            : mode == SponzaSceneRenderMode::MSAA_REFERENCE
-                ? (double_sided ? m_attachment_pipelines.msaa_reference_sponza_scene_double_sided
-                                : m_attachment_pipelines.msaa_reference_sponza_scene)
-                : (double_sided ? m_attachment_pipelines.sponza_scene_double_sided
-                                : m_attachment_pipelines.sponza_scene);
-        const std::vector<DescriptorSetHandle>& descriptor_sets =
-            shadow_pass ? (double_sided ? m_attachment_resources.sponza_shadow_double_sided_descriptor_sets
-                                        : m_attachment_resources.sponza_shadow_descriptor_sets)
-            : mode == SponzaSceneRenderMode::MSAA_REFERENCE
-                ? (double_sided ? m_attachment_resources.msaa_reference_sponza_scene_double_sided_descriptor_sets
-                                : m_attachment_resources.msaa_reference_sponza_scene_descriptor_sets)
-            : mode == SponzaSceneRenderMode::SHADOW_COMPARISON_ACTIVE
-                ? (double_sided
-                       ? m_attachment_resources.shadow_comparison_active_sponza_scene_double_sided_descriptor_sets
-                       : m_attachment_resources.shadow_comparison_active_sponza_scene_descriptor_sets)
-            : mode == SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE
-                ? (double_sided ? m_attachment_resources.shadow_comparison_sponza_scene_double_sided_descriptor_sets
-                                : m_attachment_resources.shadow_comparison_sponza_scene_descriptor_sets)
-                : (double_sided ? m_attachment_resources.sponza_scene_double_sided_descriptor_sets
-                                : m_attachment_resources.sponza_scene_descriptor_sets);
-        const size_t descriptor_index = static_cast<size_t>(draw_index) * slot_count + slot;
-        if (descriptor_index >= descriptor_sets.size())
+        const size_t expected_size = static_cast<size_t>(capture.width) * static_cast<size_t>(capture.height) * 4u;
+        if (capture.width != m_render_extent.width || capture.height != m_render_extent.height ||
+            capture.format != KERA_TEXTURE_FORMAT_RGBA8 || capture.bytes.size() != expected_size ||
+            capture.bytes.empty())
         {
-            sampleLogError("Attachment Playground Sponza descriptor-set layout is incomplete.");
-            m_initialized = false;
-            return;
+            sampleLogError("Multi-Pass offscreen capture returned unexpected dimensions, format, or byte count.");
+            return false;
         }
-
-        m_renderer.bindPipeline(frame, pipeline);
-        m_renderer.bindVertexBuffer(frame, 0, draw.vertex_buffer);
-        m_renderer.bindIndexBuffer(frame, draw.index_buffer, static_cast<EIndexFormat>(draw.index_format));
-        m_renderer.bindDescriptorSet(frame, pipeline, descriptor_sets[descriptor_index]);
-        m_renderer.drawIndexed(frame, draw.index_count);
-    }
-}
-
-bool MultiPassRenderingSample::verifyCapture()
-{
-    test::AttachmentCapture capture{};
-    if (!test::takeAttachmentCapture(m_renderer.native(), kCaptureName, capture))
-    {
-        sampleLogError("Failed to retire the Multi-Pass offscreen capture.");
-        return false;
-    }
-    const size_t expected_size = static_cast<size_t>(capture.width) * static_cast<size_t>(capture.height) * 4u;
-    if (capture.width != m_render_extent.width || capture.height != m_render_extent.height ||
-        capture.format != KERA_TEXTURE_FORMAT_RGBA8 || capture.bytes.size() != expected_size || capture.bytes.empty())
-    {
-        sampleLogError("Multi-Pass offscreen capture returned unexpected dimensions, format, or byte count.");
-        return false;
-    }
-    const size_t row_stride = static_cast<size_t>(capture.width) * 4u;
-    const std::array<size_t, 4> corner_offsets = {
-        0u,
-        (static_cast<size_t>(capture.width) - 1u) * 4u,
-        (static_cast<size_t>(capture.height) - 1u) * row_stride,
-        (static_cast<size_t>(capture.height) - 1u) * row_stride + (static_cast<size_t>(capture.width) - 1u) * 4u,
-    };
-    std::array<uint32_t, 3> background_sum = {};
-    for (const size_t corner_offset : corner_offsets)
-    {
-        for (size_t channel = 0; channel < background_sum.size(); ++channel)
+        const size_t row_stride = static_cast<size_t>(capture.width) * 4u;
+        const std::array<size_t, 4> corner_offsets = {
+            0u,
+            (static_cast<size_t>(capture.width) - 1u) * 4u,
+            (static_cast<size_t>(capture.height) - 1u) * row_stride,
+            (static_cast<size_t>(capture.height) - 1u) * row_stride + (static_cast<size_t>(capture.width) - 1u) * 4u,
+        };
+        std::array<uint32_t, 3> background_sum = {};
+        for (const size_t corner_offset : corner_offsets)
         {
-            background_sum[channel] += capture.bytes[corner_offset + channel];
-        }
-    }
-    std::array<uint8_t, 3> background_rgb = {};
-    for (size_t channel = 0; channel < background_rgb.size(); ++channel)
-    {
-        background_rgb[channel] = static_cast<uint8_t>(background_sum[channel] / corner_offsets.size());
-    }
-
-    size_t scene_pixel_count = 0;
-    size_t shadowed_scene_pixel_count = 0;
-    for (size_t offset = 0; offset < capture.bytes.size(); offset += 4u)
-    {
-        const uint32_t colour_distance =
-            static_cast<uint32_t>(
-                std::abs(static_cast<int>(capture.bytes[offset + 0u]) - static_cast<int>(background_rgb[0]))) +
-            static_cast<uint32_t>(
-                std::abs(static_cast<int>(capture.bytes[offset + 1u]) - static_cast<int>(background_rgb[1]))) +
-            static_cast<uint32_t>(
-                std::abs(static_cast<int>(capture.bytes[offset + 2u]) - static_cast<int>(background_rgb[2])));
-        if (colour_distance <= 18u)
-        {
-            continue;
-        }
-        ++scene_pixel_count;
-        const uint32_t luma =
-            54u * capture.bytes[offset + 0u] + 182u * capture.bytes[offset + 1u] + 18u * capture.bytes[offset + 2u];
-        // Exclude partially covered edge pixels blended with the dark clear colour.
-        shadowed_scene_pixel_count += colour_distance > 96u && luma < 51u * 255u ? 1u : 0u;
-    }
-    const size_t pixel_count = capture.bytes.size() / 4u;
-    sampleLogInfo("Multi-Pass capture metrics: scene_pixels=" + std::to_string(scene_pixel_count) +
-                  " shadowed_scene_pixels=" + std::to_string(shadowed_scene_pixel_count) +
-                  " total_pixels=" + std::to_string(pixel_count));
-    const size_t min_scene_coverage_denominator = m_uses_sponza ? 7u : 5u;
-    if (scene_pixel_count * min_scene_coverage_denominator < pixel_count)
-    {
-        sampleLogError("Multi-Pass offscreen capture did not contain sufficient scene coverage.");
-        return false;
-    }
-    if (!m_uses_sponza && m_active_config.shadows_enabled && shadowed_scene_pixel_count * 200u < pixel_count)
-    {
-        sampleLogError("Multi-Pass offscreen capture did not contain sufficient shadow coverage.");
-        return false;
-    }
-    // The procedural fallback has no intentionally dark albedo, while Sponza does.
-    // Allow a small antialiasing fringe without accepting visible fallback shadow coverage.
-    if (!m_uses_sponza && !m_active_config.shadows_enabled && shadowed_scene_pixel_count * 1000u > pixel_count)
-    {
-        sampleLogError("Multi-Pass shadows-disabled capture contained excessive shadowed scene pixels.");
-        return false;
-    }
-    const std::string capture_suffix = m_capture_after_resize_smoke ? " after final resize" : "";
-    sampleLogInfo("Multi-Pass offscreen capture verified" + capture_suffix + ": " + std::to_string(capture.width) +
-                  "x" + std::to_string(capture.height) + " RGBA8 " + std::to_string(capture.bytes.size()) + " bytes.");
-    if (!m_active_config.shadows_enabled)
-    {
-        sampleLogInfo(m_uses_sponza ? "Multi-Pass Sponza shadows-disabled scene capture verified."
-                                    : "Multi-Pass shadows-disabled capture verified.");
-    }
-    else if (m_uses_sponza)
-    {
-        sampleLogInfo("Multi-Pass Sponza scene capture verified.");
-    }
-    else
-    {
-        sampleLogInfo("Multi-Pass shadow coverage verified.");
-    }
-    return true;
-}
-
-void MultiPassRenderingSample::render(RenderContext& context)
-{
-    if (!m_initialized)
-    {
-        return;
-    }
-    if (m_capture_requested && !m_capture_verified)
-    {
-        m_capture_verified = verifyCapture();
-        if (!m_capture_verified)
-        {
-            m_initialized = false;
-            return;
-        }
-    }
-
-    if (!uploadSponzaUniforms(context.frame()))
-    {
-        sampleLogError("Failed to upload Multi-Pass Sponza per-draw uniforms.");
-        m_initialized = false;
-        return;
-    }
-
-    KeraAttachmentError error{};
-    const KeraDepthAttachmentDesc shadow_depth_attachment{
-        .texture = m_attachment_resources.shadow,
-        .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
-        .store_op = KERA_ATTACHMENT_STORE_OP_STORE,
-        .clear_depth = 1.0f,
-    };
-    const KeraAttachmentRenderingDesc shadow_rendering_desc{
-        .struct_size = sizeof(KeraAttachmentRenderingDesc),
-        .color_attachments = nullptr,
-        .color_attachment_count = 0,
-        .depth_attachment = &shadow_depth_attachment,
-    };
-    {
-        if (!m_renderer.beginAttachmentRendering(context.frame(), shadow_rendering_desc, &error))
-        {
-            sampleLogError("Failed to begin Multi-Pass shadow rendering: " + attachmentErrorText(error));
-            m_initialized = false;
-            return;
-        }
-        if (m_active_config.shadows_enabled)
-        {
-            if (m_uses_sponza)
+            for (size_t channel = 0; channel < background_sum.size(); ++channel)
             {
-                drawSponzaScene(context.frame(), true);
-            }
-            else
-            {
-                m_renderer.bindPipeline(context.frame(), m_shadow_pipeline);
-                m_renderer.bindVertexBuffer(context.frame(), 0, m_scene_vertex_buffer);
-                m_renderer.bindIndexBuffer(context.frame(), m_scene_index_buffer, EIndexFormat::U_INT16);
-                m_renderer.drawIndexed(context.frame(), m_scene_index_count);
+                background_sum[channel] += capture.bytes[corner_offset + channel];
             }
         }
-        if (!m_renderer.endAttachmentRendering(context.frame(), &error))
+        std::array<uint8_t, 3> background_rgb = {};
+        for (size_t channel = 0; channel < background_rgb.size(); ++channel)
         {
-            sampleLogError("Failed to end Multi-Pass shadow rendering: " + attachmentErrorText(error));
+            background_rgb[channel] = static_cast<uint8_t>(background_sum[channel] / corner_offsets.size());
+        }
+
+        size_t scene_pixel_count = 0;
+        size_t shadowed_scene_pixel_count = 0;
+        for (size_t offset = 0; offset < capture.bytes.size(); offset += 4u)
+        {
+            const uint32_t colour_distance =
+                static_cast<uint32_t>(
+                    std::abs(static_cast<int>(capture.bytes[offset + 0u]) - static_cast<int>(background_rgb[0]))) +
+                static_cast<uint32_t>(
+                    std::abs(static_cast<int>(capture.bytes[offset + 1u]) - static_cast<int>(background_rgb[1]))) +
+                static_cast<uint32_t>(
+                    std::abs(static_cast<int>(capture.bytes[offset + 2u]) - static_cast<int>(background_rgb[2])));
+            if (colour_distance <= 18u)
+            {
+                continue;
+            }
+            ++scene_pixel_count;
+            const uint32_t luma =
+                54u * capture.bytes[offset + 0u] + 182u * capture.bytes[offset + 1u] + 18u * capture.bytes[offset + 2u];
+            // Exclude partially covered edge pixels blended with the dark clear colour.
+            shadowed_scene_pixel_count += colour_distance > 96u && luma < 51u * 255u ? 1u : 0u;
+        }
+        const size_t pixel_count = capture.bytes.size() / 4u;
+        sampleLogInfo("Multi-Pass capture metrics: scene_pixels=" + std::to_string(scene_pixel_count) +
+                      " shadowed_scene_pixels=" + std::to_string(shadowed_scene_pixel_count) +
+                      " total_pixels=" + std::to_string(pixel_count));
+        const size_t min_scene_coverage_denominator = m_uses_sponza ? 7u : 5u;
+        if (scene_pixel_count * min_scene_coverage_denominator < pixel_count)
+        {
+            sampleLogError("Multi-Pass offscreen capture did not contain sufficient scene coverage.");
+            return false;
+        }
+        if (!m_uses_sponza && m_active_config.shadows_enabled && shadowed_scene_pixel_count * 200u < pixel_count)
+        {
+            sampleLogError("Multi-Pass offscreen capture did not contain sufficient shadow coverage.");
+            return false;
+        }
+        // The procedural fallback has no intentionally dark albedo, while Sponza does.
+        // Allow a small antialiasing fringe without accepting visible fallback shadow coverage.
+        if (!m_uses_sponza && !m_active_config.shadows_enabled && shadowed_scene_pixel_count * 1000u > pixel_count)
+        {
+            sampleLogError("Multi-Pass shadows-disabled capture contained excessive shadowed scene pixels.");
+            return false;
+        }
+        const std::string capture_suffix = m_capture_after_resize_smoke ? " after final resize" : "";
+        sampleLogInfo("Multi-Pass offscreen capture verified" + capture_suffix + ": " + std::to_string(capture.width) +
+                      "x" + std::to_string(capture.height) + " RGBA8 " + std::to_string(capture.bytes.size()) +
+                      " bytes.");
+        if (!m_active_config.shadows_enabled)
+        {
+            sampleLogInfo(m_uses_sponza ? "Multi-Pass Sponza shadows-disabled scene capture verified."
+                                        : "Multi-Pass shadows-disabled capture verified.");
+        }
+        else if (m_uses_sponza)
+        {
+            sampleLogInfo("Multi-Pass Sponza scene capture verified.");
+        }
+        else
+        {
+            sampleLogInfo("Multi-Pass shadow coverage verified.");
+        }
+        return true;
+    }
+
+    void MultiPassRenderingSample::render(RenderContext& context)
+    {
+        if (!m_initialized)
+        {
+            return;
+        }
+        if (m_capture_requested && !m_capture_verified)
+        {
+            m_capture_verified = verifyCapture();
+            if (!m_capture_verified)
+            {
+                m_initialized = false;
+                return;
+            }
+        }
+
+        if (!uploadSponzaUniforms(context.frame()))
+        {
+            sampleLogError("Failed to upload Multi-Pass Sponza per-draw uniforms.");
             m_initialized = false;
             return;
         }
-    }
 
-    if (m_active_config.shadows_enabled && m_attachment_resources.shadow_comparison_reference.isValid())
-    {
-        const KeraDepthAttachmentDesc shadow_reference_depth_attachment{
-            .texture = m_attachment_resources.shadow_comparison_reference,
+        KeraAttachmentError error{};
+        const KeraDepthAttachmentDesc shadow_depth_attachment{
+            .texture = m_attachment_resources.shadow,
             .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
             .store_op = KERA_ATTACHMENT_STORE_OP_STORE,
             .clear_depth = 1.0f,
         };
-        const KeraAttachmentRenderingDesc shadow_reference_rendering_desc{
+        const KeraAttachmentRenderingDesc shadow_rendering_desc{
             .struct_size = sizeof(KeraAttachmentRenderingDesc),
             .color_attachments = nullptr,
             .color_attachment_count = 0,
-            .depth_attachment = &shadow_reference_depth_attachment,
+            .depth_attachment = &shadow_depth_attachment,
         };
         {
-            if (!m_renderer.beginAttachmentRendering(context.frame(), shadow_reference_rendering_desc, &error))
+            if (!m_renderer.beginAttachmentRendering(context.frame(), shadow_rendering_desc, &error))
             {
-                sampleLogError("Failed to begin Multi-Pass shadow comparison reference rendering: " +
-                               attachmentErrorText(error));
+                sampleLogError("Failed to begin Multi-Pass shadow rendering: " + attachmentErrorText(error));
                 m_initialized = false;
                 return;
             }
+            if (m_active_config.shadows_enabled)
+            {
+                if (m_uses_sponza)
+                {
+                    drawSponzaScene(context.frame(), true);
+                }
+                else
+                {
+                    m_renderer.bindPipeline(context.frame(), m_shadow_pipeline);
+                    m_renderer.bindVertexBuffer(context.frame(), 0, m_scene_vertex_buffer);
+                    m_renderer.bindIndexBuffer(context.frame(), m_scene_index_buffer, EIndexFormat::U_INT16);
+                    m_renderer.drawIndexed(context.frame(), m_scene_index_count);
+                }
+            }
+            if (!m_renderer.endAttachmentRendering(context.frame(), &error))
+            {
+                sampleLogError("Failed to end Multi-Pass shadow rendering: " + attachmentErrorText(error));
+                m_initialized = false;
+                return;
+            }
+        }
+
+        if (m_active_config.shadows_enabled && m_attachment_resources.shadow_comparison_reference.isValid())
+        {
+            const KeraDepthAttachmentDesc shadow_reference_depth_attachment{
+                .texture = m_attachment_resources.shadow_comparison_reference,
+                .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
+                .store_op = KERA_ATTACHMENT_STORE_OP_STORE,
+                .clear_depth = 1.0f,
+            };
+            const KeraAttachmentRenderingDesc shadow_reference_rendering_desc{
+                .struct_size = sizeof(KeraAttachmentRenderingDesc),
+                .color_attachments = nullptr,
+                .color_attachment_count = 0,
+                .depth_attachment = &shadow_reference_depth_attachment,
+            };
+            {
+                if (!m_renderer.beginAttachmentRendering(context.frame(), shadow_reference_rendering_desc, &error))
+                {
+                    sampleLogError("Failed to begin Multi-Pass shadow comparison reference rendering: " +
+                                   attachmentErrorText(error));
+                    m_initialized = false;
+                    return;
+                }
+                if (m_uses_sponza)
+                {
+                    drawSponzaScene(context.frame(), true);
+                }
+                else
+                {
+                    m_renderer.bindPipeline(context.frame(), m_shadow_pipeline);
+                    m_renderer.bindVertexBuffer(context.frame(), 0, m_scene_vertex_buffer);
+                    m_renderer.bindIndexBuffer(context.frame(), m_scene_index_buffer, EIndexFormat::U_INT16);
+                    m_renderer.drawIndexed(context.frame(), m_scene_index_count);
+                }
+                if (!m_renderer.endAttachmentRendering(context.frame(), &error))
+                {
+                    sampleLogError("Failed to end Multi-Pass shadow comparison reference rendering: " +
+                                   attachmentErrorText(error));
+                    m_initialized = false;
+                    return;
+                }
+            }
+        }
+
+        const TextureHandle scene_color_texture = m_scene_sample_count == KERA_ATTACHMENT_SAMPLE_COUNT_1
+                                                      ? m_attachment_resources.scene
+                                                      : m_attachment_resources.scene_msaa;
+        const KeraColorAttachmentDesc color_attachment{
+            .texture = scene_color_texture,
+            .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
+            .store_op = KERA_ATTACHMENT_STORE_OP_STORE,
+            .clear_color = {0.025f, 0.035f, 0.085f, 1.0f},
+        };
+        const KeraDepthAttachmentDesc depth_attachment{
+            .texture = m_attachment_resources.scene_depth,
+            .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
+            .store_op = KERA_ATTACHMENT_STORE_OP_DONT_CARE,
+            .clear_depth = 1.0f,
+        };
+        const KeraAttachmentRenderingDesc rendering_desc{
+            .struct_size = sizeof(KeraAttachmentRenderingDesc),
+            .color_attachments = &color_attachment,
+            .color_attachment_count = 1,
+            .depth_attachment = &depth_attachment,
+        };
+        {
+            if (!m_renderer.beginAttachmentRendering(context.frame(), rendering_desc, &error))
+            {
+                sampleLogError("Failed to begin Multi-Pass attachment rendering: " + attachmentErrorText(error));
+                m_initialized = false;
+                return;
+            }
+
             if (m_uses_sponza)
             {
-                drawSponzaScene(context.frame(), true);
+                drawSponzaScene(context.frame(), false);
             }
             else
             {
-                m_renderer.bindPipeline(context.frame(), m_shadow_pipeline);
+                m_renderer.bindPipeline(context.frame(), m_attachment_pipelines.scene);
+                m_renderer.bindDescriptorSet(context.frame(), m_attachment_pipelines.scene,
+                                             m_attachment_resources.scene_descriptor_set);
+                m_renderer.bindVertexBuffer(context.frame(), 0, m_scene_vertex_buffer);
+                m_renderer.bindIndexBuffer(context.frame(), m_scene_index_buffer, EIndexFormat::U_INT16);
+                m_renderer.drawIndexed(context.frame(), m_scene_index_count);
+            }
+
+            if (!m_renderer.endAttachmentRendering(context.frame(), &error))
+            {
+                sampleLogError("Failed to end Multi-Pass attachment rendering: " + attachmentErrorText(error));
+                m_initialized = false;
+                return;
+            }
+        }
+
+        if (m_scene_sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_1)
+        {
+            if (!m_renderer.resolveAttachmentTexture(context.frame(), m_attachment_resources.scene_msaa,
+                                                     m_attachment_resources.scene, &error))
+            {
+                sampleLogError("Failed to resolve Multi-Pass 4x MSAA scene attachment: " + attachmentErrorText(error));
+                m_initialized = false;
+                return;
+            }
+        }
+
+        const auto render_diagnostic_scene =
+            [this, &context, &error](TextureHandle color_texture, TextureHandle depth_texture,
+                                     SponzaSceneRenderMode mode, AttachmentPassTimingScope timing_scope,
+                                     const char* name)
+        {
+            const KeraColorAttachmentDesc diagnostic_color_attachment{
+                .texture = color_texture,
+                .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
+                .store_op = KERA_ATTACHMENT_STORE_OP_STORE,
+                .clear_color = {0.025f, 0.035f, 0.085f, 1.0f},
+            };
+            const KeraDepthAttachmentDesc diagnostic_depth_attachment{
+                .texture = depth_texture,
+                .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
+                .store_op = KERA_ATTACHMENT_STORE_OP_DONT_CARE,
+                .clear_depth = 1.0f,
+            };
+            const KeraAttachmentRenderingDesc diagnostic_rendering_desc{
+                .struct_size = sizeof(KeraAttachmentRenderingDesc),
+                .color_attachments = &diagnostic_color_attachment,
+                .color_attachment_count = 1,
+                .depth_attachment = &diagnostic_depth_attachment,
+            };
+            if (!m_renderer.beginAttachmentRendering(context.frame(), diagnostic_rendering_desc, &error))
+            {
+                sampleLogError(std::string("Failed to begin Multi-Pass ") + name +
+                               " rendering: " + attachmentErrorText(error));
+                return false;
+            }
+            if (m_uses_sponza)
+            {
+                drawSponzaScene(context.frame(), false, mode);
+            }
+            else
+            {
+                const bool msaa_reference = mode == SponzaSceneRenderMode::MSAA_REFERENCE;
+                const bool shadow_reference = mode == SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE;
+                const GraphicsPipelineHandle pipeline =
+                    msaa_reference ? m_attachment_pipelines.msaa_reference_scene : m_attachment_pipelines.scene;
+                const DescriptorSetHandle descriptor_set =
+                    shadow_reference ? m_attachment_resources.shadow_comparison_scene_descriptor_set
+                    : msaa_reference ? m_attachment_resources.msaa_reference_scene_descriptor_set
+                                     : m_attachment_resources.scene_descriptor_set;
+                m_renderer.bindPipeline(context.frame(), pipeline);
+                m_renderer.bindDescriptorSet(context.frame(), pipeline, descriptor_set);
                 m_renderer.bindVertexBuffer(context.frame(), 0, m_scene_vertex_buffer);
                 m_renderer.bindIndexBuffer(context.frame(), m_scene_index_buffer, EIndexFormat::U_INT16);
                 m_renderer.drawIndexed(context.frame(), m_scene_index_count);
             }
             if (!m_renderer.endAttachmentRendering(context.frame(), &error))
             {
-                sampleLogError("Failed to end Multi-Pass shadow comparison reference rendering: " +
-                               attachmentErrorText(error));
+                sampleLogError(std::string("Failed to end Multi-Pass ") + name +
+                               " rendering: " + attachmentErrorText(error));
+                return false;
+            }
+            return true;
+        };
+
+        const bool render_shadow_comparison = m_active_config.shadows_enabled &&
+                                              m_active_config.preview_shadow_comparison &&
+                                              m_attachment_resources.shadow_comparison_reference.isValid() &&
+                                              m_attachment_resources.shadow_comparison_active_scene.isValid();
+        if (render_shadow_comparison)
+        {
+            const bool diagnostic_is_multisampled =
+                m_attachment_resources.shadow_comparison_active_scene_msaa.isValid();
+
+            const TextureHandle active_color_texture = diagnostic_is_multisampled
+                                                           ? m_attachment_resources.shadow_comparison_active_scene_msaa
+                                                           : m_attachment_resources.shadow_comparison_active_scene;
+            if (!render_diagnostic_scene(active_color_texture,
+                                         m_attachment_resources.shadow_comparison_active_scene_depth,
+                                         SponzaSceneRenderMode::SHADOW_COMPARISON_ACTIVE,
+                                         AttachmentPassTimingScope::SHADOW_LENS_ACTIVE, "shadow comparison active"))
+            {
                 m_initialized = false;
                 return;
             }
-        }
-    }
-
-    const TextureHandle scene_color_texture = m_scene_sample_count == KERA_ATTACHMENT_SAMPLE_COUNT_1
-                                                  ? m_attachment_resources.scene
-                                                  : m_attachment_resources.scene_msaa;
-    const KeraColorAttachmentDesc color_attachment{
-        .texture = scene_color_texture,
-        .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
-        .store_op = KERA_ATTACHMENT_STORE_OP_STORE,
-        .clear_color = {0.025f, 0.035f, 0.085f, 1.0f},
-    };
-    const KeraDepthAttachmentDesc depth_attachment{
-        .texture = m_attachment_resources.scene_depth,
-        .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
-        .store_op = KERA_ATTACHMENT_STORE_OP_DONT_CARE,
-        .clear_depth = 1.0f,
-    };
-    const KeraAttachmentRenderingDesc rendering_desc{
-        .struct_size = sizeof(KeraAttachmentRenderingDesc),
-        .color_attachments = &color_attachment,
-        .color_attachment_count = 1,
-        .depth_attachment = &depth_attachment,
-    };
-    {
-        if (!m_renderer.beginAttachmentRendering(context.frame(), rendering_desc, &error))
-        {
-            sampleLogError("Failed to begin Multi-Pass attachment rendering: " + attachmentErrorText(error));
-            m_initialized = false;
-            return;
-        }
-
-        if (m_uses_sponza)
-        {
-            drawSponzaScene(context.frame(), false);
-        }
-        else
-        {
-            m_renderer.bindPipeline(context.frame(), m_attachment_pipelines.scene);
-            m_renderer.bindDescriptorSet(context.frame(), m_attachment_pipelines.scene,
-                                         m_attachment_resources.scene_descriptor_set);
-            m_renderer.bindVertexBuffer(context.frame(), 0, m_scene_vertex_buffer);
-            m_renderer.bindIndexBuffer(context.frame(), m_scene_index_buffer, EIndexFormat::U_INT16);
-            m_renderer.drawIndexed(context.frame(), m_scene_index_count);
-        }
-
-        if (!m_renderer.endAttachmentRendering(context.frame(), &error))
-        {
-            sampleLogError("Failed to end Multi-Pass attachment rendering: " + attachmentErrorText(error));
-            m_initialized = false;
-            return;
-        }
-    }
-
-    if (m_scene_sample_count != KERA_ATTACHMENT_SAMPLE_COUNT_1)
-    {
-        if (!m_renderer.resolveAttachmentTexture(context.frame(), m_attachment_resources.scene_msaa,
-                                                 m_attachment_resources.scene, &error))
-        {
-            sampleLogError("Failed to resolve Multi-Pass 4x MSAA scene attachment: " + attachmentErrorText(error));
-            m_initialized = false;
-            return;
-        }
-    }
-
-    const auto render_diagnostic_scene =
-        [this, &context, &error](TextureHandle color_texture, TextureHandle depth_texture, SponzaSceneRenderMode mode,
-                                 AttachmentPassTimingScope timing_scope, const char* name)
-    {
-        const KeraColorAttachmentDesc diagnostic_color_attachment{
-            .texture = color_texture,
-            .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
-            .store_op = KERA_ATTACHMENT_STORE_OP_STORE,
-            .clear_color = {0.025f, 0.035f, 0.085f, 1.0f},
-        };
-        const KeraDepthAttachmentDesc diagnostic_depth_attachment{
-            .texture = depth_texture,
-            .load_op = KERA_ATTACHMENT_LOAD_OP_CLEAR,
-            .store_op = KERA_ATTACHMENT_STORE_OP_DONT_CARE,
-            .clear_depth = 1.0f,
-        };
-        const KeraAttachmentRenderingDesc diagnostic_rendering_desc{
-            .struct_size = sizeof(KeraAttachmentRenderingDesc),
-            .color_attachments = &diagnostic_color_attachment,
-            .color_attachment_count = 1,
-            .depth_attachment = &diagnostic_depth_attachment,
-        };
-        if (!m_renderer.beginAttachmentRendering(context.frame(), diagnostic_rendering_desc, &error))
-        {
-            sampleLogError(std::string("Failed to begin Multi-Pass ") + name +
-                           " rendering: " + attachmentErrorText(error));
-            return false;
-        }
-        if (m_uses_sponza)
-        {
-            drawSponzaScene(context.frame(), false, mode);
-        }
-        else
-        {
-            const bool msaa_reference = mode == SponzaSceneRenderMode::MSAA_REFERENCE;
-            const bool shadow_reference = mode == SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE;
-            const GraphicsPipelineHandle pipeline =
-                msaa_reference ? m_attachment_pipelines.msaa_reference_scene : m_attachment_pipelines.scene;
-            const DescriptorSetHandle descriptor_set =
-                shadow_reference ? m_attachment_resources.shadow_comparison_scene_descriptor_set
-                : msaa_reference ? m_attachment_resources.msaa_reference_scene_descriptor_set
-                                 : m_attachment_resources.scene_descriptor_set;
-            m_renderer.bindPipeline(context.frame(), pipeline);
-            m_renderer.bindDescriptorSet(context.frame(), pipeline, descriptor_set);
-            m_renderer.bindVertexBuffer(context.frame(), 0, m_scene_vertex_buffer);
-            m_renderer.bindIndexBuffer(context.frame(), m_scene_index_buffer, EIndexFormat::U_INT16);
-            m_renderer.drawIndexed(context.frame(), m_scene_index_count);
-        }
-        if (!m_renderer.endAttachmentRendering(context.frame(), &error))
-        {
-            sampleLogError(std::string("Failed to end Multi-Pass ") + name +
-                           " rendering: " + attachmentErrorText(error));
-            return false;
-        }
-        return true;
-    };
-
-    const bool render_shadow_comparison = m_active_config.shadows_enabled &&
-                                          m_active_config.preview_shadow_comparison &&
-                                          m_attachment_resources.shadow_comparison_reference.isValid() &&
-                                          m_attachment_resources.shadow_comparison_active_scene.isValid();
-    if (render_shadow_comparison)
-    {
-        const bool diagnostic_is_multisampled = m_attachment_resources.shadow_comparison_active_scene_msaa.isValid();
-
-        const TextureHandle active_color_texture = diagnostic_is_multisampled
-                                                       ? m_attachment_resources.shadow_comparison_active_scene_msaa
-                                                       : m_attachment_resources.shadow_comparison_active_scene;
-        if (!render_diagnostic_scene(active_color_texture, m_attachment_resources.shadow_comparison_active_scene_depth,
-                                     SponzaSceneRenderMode::SHADOW_COMPARISON_ACTIVE,
-                                     AttachmentPassTimingScope::SHADOW_LENS_ACTIVE, "shadow comparison active"))
-        {
-            m_initialized = false;
-            return;
-        }
-        if (diagnostic_is_multisampled)
-        {
-            if (!m_renderer.resolveAttachmentTexture(context.frame(),
-                                                     m_attachment_resources.shadow_comparison_active_scene_msaa,
-                                                     m_attachment_resources.shadow_comparison_active_scene, &error))
+            if (diagnostic_is_multisampled)
             {
-                sampleLogError("Failed to resolve Multi-Pass shadow comparison active view: " +
-                               attachmentErrorText(error));
+                if (!m_renderer.resolveAttachmentTexture(context.frame(),
+                                                         m_attachment_resources.shadow_comparison_active_scene_msaa,
+                                                         m_attachment_resources.shadow_comparison_active_scene, &error))
+                {
+                    sampleLogError("Failed to resolve Multi-Pass shadow comparison active view: " +
+                                   attachmentErrorText(error));
+                    m_initialized = false;
+                    return;
+                }
+            }
+
+            const TextureHandle reference_color_texture = diagnostic_is_multisampled
+                                                              ? m_attachment_resources.shadow_comparison_scene_msaa
+                                                              : m_attachment_resources.msaa_reference_scene;
+            const TextureHandle reference_depth_texture = diagnostic_is_multisampled
+                                                              ? m_attachment_resources.shadow_comparison_scene_depth
+                                                              : m_attachment_resources.msaa_reference_scene_depth;
+            if (!render_diagnostic_scene(reference_color_texture, reference_depth_texture,
+                                         SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE,
+                                         AttachmentPassTimingScope::SHADOW_LENS_REFERENCE,
+                                         "shadow comparison reference"))
+            {
+                m_initialized = false;
+                return;
+            }
+            if (diagnostic_is_multisampled)
+            {
+                if (!m_renderer.resolveAttachmentTexture(context.frame(),
+                                                         m_attachment_resources.shadow_comparison_scene_msaa,
+                                                         m_attachment_resources.msaa_reference_scene, &error))
+                {
+                    sampleLogError("Failed to resolve Multi-Pass shadow comparison reference: " +
+                                   attachmentErrorText(error));
+                    m_initialized = false;
+                    return;
+                }
+            }
+        }
+        else if (m_attachment_resources.msaa_reference_scene.isValid())
+        {
+            if (!render_diagnostic_scene(
+                    m_attachment_resources.msaa_reference_scene, m_attachment_resources.msaa_reference_scene_depth,
+                    SponzaSceneRenderMode::MSAA_REFERENCE, AttachmentPassTimingScope::MSAA_REFERENCE, "MSAA reference"))
+            {
                 m_initialized = false;
                 return;
             }
         }
 
-        const TextureHandle reference_color_texture = diagnostic_is_multisampled
-                                                          ? m_attachment_resources.shadow_comparison_scene_msaa
-                                                          : m_attachment_resources.msaa_reference_scene;
-        const TextureHandle reference_depth_texture = diagnostic_is_multisampled
-                                                          ? m_attachment_resources.shadow_comparison_scene_depth
-                                                          : m_attachment_resources.msaa_reference_scene_depth;
-        if (!render_diagnostic_scene(reference_color_texture, reference_depth_texture,
-                                     SponzaSceneRenderMode::SHADOW_COMPARISON_REFERENCE,
-                                     AttachmentPassTimingScope::SHADOW_LENS_REFERENCE, "shadow comparison reference"))
         {
-            m_initialized = false;
-            return;
+            context.renderToBackbuffer(
+                getClearColor(),
+                [this](FrameHandle frame)
+                {
+                    const bool show_shadow_map = m_active_config.shadows_enabled && m_active_config.preview_shadow_map;
+                    const bool show_shadow_inset =
+                        m_active_config.shadows_enabled && m_active_config.preview_shadow_inset;
+                    const bool show_msaa_comparison = m_active_config.preview_msaa_comparison &&
+                                                      m_attachment_resources.msaa_reference_scene.isValid();
+                    const bool show_shadow_comparison =
+                        m_active_config.shadows_enabled && m_active_config.preview_shadow_comparison &&
+                        m_attachment_resources.shadow_comparison_reference.isValid() &&
+                        m_attachment_resources.shadow_comparison_active_scene.isValid() &&
+                        m_attachment_resources.msaa_reference_scene.isValid();
+                    const GraphicsPipelineHandle pipeline = show_shadow_map          ? m_shadow_preview_pipeline
+                                                            : show_shadow_inset      ? m_shadow_inset_pipeline
+                                                            : show_shadow_comparison ? m_shadow_comparison_pipeline
+                                                            : show_msaa_comparison   ? m_msaa_comparison_pipeline
+                                                                                     : m_composite_pipeline;
+                    const DescriptorSetHandle descriptor_set =
+                        show_shadow_map          ? m_attachment_resources.shadow_preview_descriptor_set
+                        : show_shadow_inset      ? m_attachment_resources.shadow_inset_descriptor_set
+                        : show_shadow_comparison ? m_attachment_resources.shadow_comparison_descriptor_set
+                        : show_msaa_comparison   ? m_attachment_resources.msaa_comparison_descriptor_set
+                                                 : m_attachment_resources.composite_descriptor_set;
+                    m_renderer.bindPipeline(frame, pipeline);
+                    m_renderer.bindVertexBuffer(frame, 0, m_fullscreen_vertex_buffer);
+                    m_renderer.bindIndexBuffer(frame, m_fullscreen_index_buffer, EIndexFormat::U_INT16);
+                    m_renderer.bindDescriptorSet(frame, pipeline, descriptor_set);
+                    m_renderer.drawIndexed(frame, m_fullscreen_index_count);
+                });
         }
-        if (diagnostic_is_multisampled)
+
+        if (m_capture_after_resize_frame_pending)
         {
-            if (!m_renderer.resolveAttachmentTexture(context.frame(),
-                                                     m_attachment_resources.shadow_comparison_scene_msaa,
-                                                     m_attachment_resources.msaa_reference_scene, &error))
+            // Render one complete frame at the final extent before scheduling the readback.
+            m_capture_after_resize_frame_pending = false;
+        }
+        else if (m_capture_smoke && !m_capture_requested &&
+                 (!m_capture_after_resize_smoke || m_non_zero_resize_count >= 3) &&
+                 (!m_reconfigure_smoke || m_reconfigure_smoke_stage >= 6))
+        {
+            if (!test::requestAttachmentCapture(m_renderer.native(), context.frame(), m_attachment_resources.scene,
+                                                kCaptureName))
             {
-                sampleLogError("Failed to resolve Multi-Pass shadow comparison reference: " +
-                               attachmentErrorText(error));
+                sampleLogError("Failed to request the Multi-Pass offscreen capture.");
                 m_initialized = false;
                 return;
             }
-        }
-    }
-    else if (m_attachment_resources.msaa_reference_scene.isValid())
-    {
-        if (!render_diagnostic_scene(
-                m_attachment_resources.msaa_reference_scene, m_attachment_resources.msaa_reference_scene_depth,
-                SponzaSceneRenderMode::MSAA_REFERENCE, AttachmentPassTimingScope::MSAA_REFERENCE, "MSAA reference"))
-        {
-            m_initialized = false;
-            return;
+            m_capture_requested = true;
         }
     }
 
+    void MultiPassRenderingSample::destroySponzaResources()
     {
-        context.renderToBackbuffer(
-            getClearColor(),
-            [this](FrameHandle frame)
+        for (BufferHandle uniform_buffer : m_sponza_shadow_uniform_buffers)
+        {
+            if (uniform_buffer.isValid())
             {
-                const bool show_shadow_map = m_active_config.shadows_enabled && m_active_config.preview_shadow_map;
-                const bool show_shadow_inset = m_active_config.shadows_enabled && m_active_config.preview_shadow_inset;
-                const bool show_msaa_comparison =
-                    m_active_config.preview_msaa_comparison && m_attachment_resources.msaa_reference_scene.isValid();
-                const bool show_shadow_comparison = m_active_config.shadows_enabled &&
-                                                    m_active_config.preview_shadow_comparison &&
-                                                    m_attachment_resources.shadow_comparison_reference.isValid() &&
-                                                    m_attachment_resources.shadow_comparison_active_scene.isValid() &&
-                                                    m_attachment_resources.msaa_reference_scene.isValid();
-                const GraphicsPipelineHandle pipeline = show_shadow_map          ? m_shadow_preview_pipeline
-                                                        : show_shadow_inset      ? m_shadow_inset_pipeline
-                                                        : show_shadow_comparison ? m_shadow_comparison_pipeline
-                                                        : show_msaa_comparison   ? m_msaa_comparison_pipeline
-                                                                                 : m_composite_pipeline;
-                const DescriptorSetHandle descriptor_set =
-                    show_shadow_map          ? m_attachment_resources.shadow_preview_descriptor_set
-                    : show_shadow_inset      ? m_attachment_resources.shadow_inset_descriptor_set
-                    : show_shadow_comparison ? m_attachment_resources.shadow_comparison_descriptor_set
-                    : show_msaa_comparison   ? m_attachment_resources.msaa_comparison_descriptor_set
-                                             : m_attachment_resources.composite_descriptor_set;
-                m_renderer.bindPipeline(frame, pipeline);
-                m_renderer.bindVertexBuffer(frame, 0, m_fullscreen_vertex_buffer);
-                m_renderer.bindIndexBuffer(frame, m_fullscreen_index_buffer, EIndexFormat::U_INT16);
-                m_renderer.bindDescriptorSet(frame, pipeline, descriptor_set);
-                m_renderer.drawIndexed(frame, m_fullscreen_index_count);
-            });
+                m_renderer.destroyBuffer(uniform_buffer);
+            }
+        }
+        m_sponza_shadow_uniform_buffers.clear();
+        for (BufferHandle uniform_buffer : m_sponza_shadow_diagnostic_uniform_buffers)
+        {
+            if (uniform_buffer.isValid())
+            {
+                m_renderer.destroyBuffer(uniform_buffer);
+            }
+        }
+        m_sponza_shadow_diagnostic_uniform_buffers.clear();
+        for (BufferHandle uniform_buffer : m_sponza_scene_uniform_buffers)
+        {
+            if (uniform_buffer.isValid())
+            {
+                m_renderer.destroyBuffer(uniform_buffer);
+            }
+        }
+        m_sponza_scene_uniform_buffers.clear();
+        if (m_sponza_scene.draw_items)
+        {
+            m_renderer.destroyGltfScene(m_sponza_scene);
+        }
+        m_sponza_scene = {};
+        m_uses_sponza = false;
     }
 
-    if (m_capture_after_resize_frame_pending)
+    void MultiPassRenderingSample::cleanup()
     {
-        // Render one complete frame at the final extent before scheduling the readback.
-        m_capture_after_resize_frame_pending = false;
-    }
-    else if (m_capture_smoke && !m_capture_requested &&
-             (!m_capture_after_resize_smoke || m_non_zero_resize_count >= 3) &&
-             (!m_reconfigure_smoke || m_reconfigure_smoke_stage >= 6))
-    {
-        if (!test::requestAttachmentCapture(m_renderer.native(), context.frame(), m_attachment_resources.scene,
-                                            kCaptureName))
+        m_initialized = false;
+        destroyAttachmentResources(m_attachment_resources);
+        destroyAttachmentPipelines(m_attachment_pipelines);
+        destroySponzaResources();
+        if (m_shadow_inset_sampler.isValid())
         {
-            sampleLogError("Failed to request the Multi-Pass offscreen capture.");
-            m_initialized = false;
-            return;
+            m_renderer.destroySampler(m_shadow_inset_sampler);
+            m_shadow_inset_sampler = {};
         }
-        m_capture_requested = true;
-    }
-}
-
-void MultiPassRenderingSample::destroySponzaResources()
-{
-    for (BufferHandle uniform_buffer : m_sponza_shadow_uniform_buffers)
-    {
-        if (uniform_buffer.isValid())
+        if (m_scene_sampler.isValid())
         {
-            m_renderer.destroyBuffer(uniform_buffer);
+            m_renderer.destroySampler(m_scene_sampler);
+            m_scene_sampler = {};
         }
-    }
-    m_sponza_shadow_uniform_buffers.clear();
-    for (BufferHandle uniform_buffer : m_sponza_shadow_diagnostic_uniform_buffers)
-    {
-        if (uniform_buffer.isValid())
+        if (m_sponza_shadow_double_sided_pipeline.isValid())
         {
-            m_renderer.destroyBuffer(uniform_buffer);
+            m_renderer.destroyGraphicsPipeline(m_sponza_shadow_double_sided_pipeline);
+            m_sponza_shadow_double_sided_pipeline = {};
         }
-    }
-    m_sponza_shadow_diagnostic_uniform_buffers.clear();
-    for (BufferHandle uniform_buffer : m_sponza_scene_uniform_buffers)
-    {
-        if (uniform_buffer.isValid())
+        if (m_sponza_shadow_pipeline.isValid())
         {
-            m_renderer.destroyBuffer(uniform_buffer);
+            m_renderer.destroyGraphicsPipeline(m_sponza_shadow_pipeline);
+            m_sponza_shadow_pipeline = {};
+        }
+        if (m_shadow_comparison_pipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_shadow_comparison_pipeline);
+            m_shadow_comparison_pipeline = {};
+        }
+        if (m_msaa_comparison_pipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_msaa_comparison_pipeline);
+            m_msaa_comparison_pipeline = {};
+        }
+        if (m_shadow_inset_pipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_shadow_inset_pipeline);
+            m_shadow_inset_pipeline = {};
+        }
+        if (m_shadow_preview_pipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_shadow_preview_pipeline);
+            m_shadow_preview_pipeline = {};
+        }
+        if (m_composite_pipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_composite_pipeline);
+            m_composite_pipeline = {};
+        }
+        if (m_shadow_pipeline.isValid())
+        {
+            m_renderer.destroyGraphicsPipeline(m_shadow_pipeline);
+            m_shadow_pipeline = {};
+        }
+        if (m_fullscreen_index_buffer.isValid())
+        {
+            m_renderer.destroyBuffer(m_fullscreen_index_buffer);
+            m_fullscreen_index_buffer = {};
+        }
+        if (m_fullscreen_vertex_buffer.isValid())
+        {
+            m_renderer.destroyBuffer(m_fullscreen_vertex_buffer);
+            m_fullscreen_vertex_buffer = {};
+        }
+        if (m_scene_index_buffer.isValid())
+        {
+            m_renderer.destroyBuffer(m_scene_index_buffer);
+            m_scene_index_buffer = {};
+        }
+        if (m_scene_vertex_buffer.isValid())
+        {
+            m_renderer.destroyBuffer(m_scene_vertex_buffer);
+            m_scene_vertex_buffer = {};
+        }
+        if (m_sponza_shadow_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_sponza_shadow_shader_program);
+            m_sponza_shadow_shader_program = {};
+        }
+        if (m_sponza_scene_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_sponza_scene_shader_program);
+            m_sponza_scene_shader_program = {};
+        }
+        if (m_shadow_comparison_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_shadow_comparison_shader_program);
+            m_shadow_comparison_shader_program = {};
+        }
+        if (m_msaa_comparison_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_msaa_comparison_shader_program);
+            m_msaa_comparison_shader_program = {};
+        }
+        if (m_shadow_inset_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_shadow_inset_shader_program);
+            m_shadow_inset_shader_program = {};
+        }
+        if (m_shadow_preview_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_shadow_preview_shader_program);
+            m_shadow_preview_shader_program = {};
+        }
+        if (m_composite_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_composite_shader_program);
+            m_composite_shader_program = {};
+        }
+        if (m_shadow_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_shadow_shader_program);
+            m_shadow_shader_program = {};
+        }
+        if (m_scene_shader_program.isValid())
+        {
+            m_renderer.destroyShaderProgram(m_scene_shader_program);
+            m_scene_shader_program = {};
         }
     }
-    m_sponza_scene_uniform_buffers.clear();
-    if (m_sponza_scene.draw_items)
-    {
-        m_renderer.destroyGltfScene(m_sponza_scene);
-    }
-    m_sponza_scene = {};
-    m_uses_sponza = false;
-}
-
-void MultiPassRenderingSample::cleanup()
-{
-    m_initialized = false;
-    destroyAttachmentResources(m_attachment_resources);
-    destroyAttachmentPipelines(m_attachment_pipelines);
-    destroySponzaResources();
-    if (m_shadow_inset_sampler.isValid())
-    {
-        m_renderer.destroySampler(m_shadow_inset_sampler);
-        m_shadow_inset_sampler = {};
-    }
-    if (m_scene_sampler.isValid())
-    {
-        m_renderer.destroySampler(m_scene_sampler);
-        m_scene_sampler = {};
-    }
-    if (m_sponza_shadow_double_sided_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_sponza_shadow_double_sided_pipeline);
-        m_sponza_shadow_double_sided_pipeline = {};
-    }
-    if (m_sponza_shadow_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_sponza_shadow_pipeline);
-        m_sponza_shadow_pipeline = {};
-    }
-    if (m_shadow_comparison_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_shadow_comparison_pipeline);
-        m_shadow_comparison_pipeline = {};
-    }
-    if (m_msaa_comparison_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_msaa_comparison_pipeline);
-        m_msaa_comparison_pipeline = {};
-    }
-    if (m_shadow_inset_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_shadow_inset_pipeline);
-        m_shadow_inset_pipeline = {};
-    }
-    if (m_shadow_preview_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_shadow_preview_pipeline);
-        m_shadow_preview_pipeline = {};
-    }
-    if (m_composite_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_composite_pipeline);
-        m_composite_pipeline = {};
-    }
-    if (m_shadow_pipeline.isValid())
-    {
-        m_renderer.destroyGraphicsPipeline(m_shadow_pipeline);
-        m_shadow_pipeline = {};
-    }
-    if (m_fullscreen_index_buffer.isValid())
-    {
-        m_renderer.destroyBuffer(m_fullscreen_index_buffer);
-        m_fullscreen_index_buffer = {};
-    }
-    if (m_fullscreen_vertex_buffer.isValid())
-    {
-        m_renderer.destroyBuffer(m_fullscreen_vertex_buffer);
-        m_fullscreen_vertex_buffer = {};
-    }
-    if (m_scene_index_buffer.isValid())
-    {
-        m_renderer.destroyBuffer(m_scene_index_buffer);
-        m_scene_index_buffer = {};
-    }
-    if (m_scene_vertex_buffer.isValid())
-    {
-        m_renderer.destroyBuffer(m_scene_vertex_buffer);
-        m_scene_vertex_buffer = {};
-    }
-    if (m_sponza_shadow_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_sponza_shadow_shader_program);
-        m_sponza_shadow_shader_program = {};
-    }
-    if (m_sponza_scene_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_sponza_scene_shader_program);
-        m_sponza_scene_shader_program = {};
-    }
-    if (m_shadow_comparison_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_shadow_comparison_shader_program);
-        m_shadow_comparison_shader_program = {};
-    }
-    if (m_msaa_comparison_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_msaa_comparison_shader_program);
-        m_msaa_comparison_shader_program = {};
-    }
-    if (m_shadow_inset_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_shadow_inset_shader_program);
-        m_shadow_inset_shader_program = {};
-    }
-    if (m_shadow_preview_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_shadow_preview_shader_program);
-        m_shadow_preview_shader_program = {};
-    }
-    if (m_composite_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_composite_shader_program);
-        m_composite_shader_program = {};
-    }
-    if (m_shadow_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_shadow_shader_program);
-        m_shadow_shader_program = {};
-    }
-    if (m_scene_shader_program.isValid())
-    {
-        m_renderer.destroyShaderProgram(m_scene_shader_program);
-        m_scene_shader_program = {};
-    }
-}
 }  // namespace kera

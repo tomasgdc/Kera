@@ -282,6 +282,7 @@ namespace kera
     struct VulkanFrameSyncResource
     {
         VkSemaphore m_image_available_semaphore = VK_NULL_HANDLE;
+        VkSemaphore m_render_finished_semaphore = VK_NULL_HANDLE;
         VkQueryPool m_gpu_timing_query_pool = VK_NULL_HANDLE;
         uint64_t m_timeline_value = 0;
         VulkanFrameResourceUse m_resource_use;
