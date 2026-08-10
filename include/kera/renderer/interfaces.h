@@ -72,7 +72,6 @@ namespace kera
         uint32_t slot_count = 0;
     };
 
-
     // Internal test-only readback payload. This is intentionally not exposed through a public ABI table.
     struct TestAttachmentCapture
     {

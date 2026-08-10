@@ -262,7 +262,6 @@ namespace kera
         std::vector<DescriptorSetHandle> m_descriptor_sets;
     };
 
-
     struct VulkanFrameResource
     {
         VkCommandBuffer m_command_buffer = VK_NULL_HANDLE;

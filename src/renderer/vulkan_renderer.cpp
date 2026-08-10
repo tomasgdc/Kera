@@ -3426,7 +3426,6 @@ namespace kera
         return RendererResult<void>::success();
     }
 
-
     RendererResult<void> VulkanRenderer::requestTestAttachmentCapture(FrameHandle frame_handle,
                                                                       TextureHandle texture_handle,
                                                                       const std::string& name)
@@ -4134,7 +4133,6 @@ namespace kera
 
         m_frames.remove(frame_handle);
     }
-
 
     void VulkanRenderer::cancelUnsubmittedTestAttachmentCaptures(uint32_t sync_index)
     {

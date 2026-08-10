@@ -50,7 +50,6 @@ namespace kera
             COUNT = 11,
         };
 
-
         struct AttachmentPipelines
         {
             GraphicsPipelineHandle scene;
@@ -108,7 +107,8 @@ namespace kera
                                       AttachmentResources& resources);
         bool createSceneDescriptor(const AttachmentPipelines& pipelines, AttachmentResources& resources);
         bool createMsaaReferenceSceneDescriptor(const AttachmentPipelines& pipelines, AttachmentResources& resources);
-        bool createShadowComparisonSceneDescriptor(const AttachmentPipelines& pipelines, AttachmentResources& resources);
+        bool createShadowComparisonSceneDescriptor(const AttachmentPipelines& pipelines,
+                                                   AttachmentResources& resources);
         bool createSponzaDescriptors(const AttachmentPipelines& pipelines, AttachmentResources& resources);
         bool createCompositeDescriptor(AttachmentResources& resources);
         bool createShadowPreviewDescriptor(AttachmentResources& resources);
@@ -119,8 +119,8 @@ namespace kera
         bool applyAttachmentConfiguration(Extent2D extent, const AttachmentPlaygroundConfig& config,
                                           bool wait_for_idle);
         KeraAttachmentSampleCount selectAttachmentSampleCount(Extent2D extent, const AttachmentPlaygroundConfig& config,
-                                                               AttachmentPipelines& pipelines,
-                                                               AttachmentResources& resources);
+                                                              AttachmentPipelines& pipelines,
+                                                              AttachmentResources& resources);
         bool destroyAttachmentResources(AttachmentResources& resources);
         bool destroyAttachmentPipelines(AttachmentPipelines& pipelines);
         bool uploadSponzaUniforms(FrameHandle frame);
