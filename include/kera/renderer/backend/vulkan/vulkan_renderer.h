@@ -67,9 +67,13 @@ namespace kera
         VkImageLayout m_current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
         VkImageLayout m_descriptor_layout = VK_IMAGE_LAYOUT_UNDEFINED;
         VkImageLayout m_render_target_final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        uint32_t m_sample_count = 1;
         bool m_sampled = false;
+        bool m_transfer_src = false;
+        bool m_transfer_dst = false;
         bool m_render_target = false;
         bool m_depth_stencil = false;
+        bool m_attachment_contents_defined = false;
 
         VulkanTextureResource() = default;
         ~VulkanTextureResource()
@@ -95,9 +99,13 @@ namespace kera
             , m_current_layout(other.m_current_layout)
             , m_descriptor_layout(other.m_descriptor_layout)
             , m_render_target_final_layout(other.m_render_target_final_layout)
+            , m_sample_count(other.m_sample_count)
             , m_sampled(other.m_sampled)
+            , m_transfer_src(other.m_transfer_src)
+            , m_transfer_dst(other.m_transfer_dst)
             , m_render_target(other.m_render_target)
             , m_depth_stencil(other.m_depth_stencil)
+            , m_attachment_contents_defined(other.m_attachment_contents_defined)
         {
         }
 
@@ -120,9 +128,13 @@ namespace kera
                 m_current_layout = other.m_current_layout;
                 m_descriptor_layout = other.m_descriptor_layout;
                 m_render_target_final_layout = other.m_render_target_final_layout;
+                m_sample_count = other.m_sample_count;
                 m_sampled = other.m_sampled;
+                m_transfer_src = other.m_transfer_src;
+                m_transfer_dst = other.m_transfer_dst;
                 m_render_target = other.m_render_target;
                 m_depth_stencil = other.m_depth_stencil;
+                m_attachment_contents_defined = other.m_attachment_contents_defined;
             }
             return *this;
         }
@@ -154,9 +166,13 @@ namespace kera
             m_current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
             m_descriptor_layout = VK_IMAGE_LAYOUT_UNDEFINED;
             m_render_target_final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_sample_count = 1;
             m_sampled = false;
+            m_transfer_src = false;
+            m_transfer_dst = false;
             m_render_target = false;
             m_depth_stencil = false;
+            m_attachment_contents_defined = false;
         }
     };
 
@@ -254,8 +270,12 @@ namespace kera
         uint32_t m_image_index = 0;
         uint32_t m_sync_index = 0;
         bool m_render_pass_active = false;
+        bool m_attachment_rendering_active = false;
         TextureHandle m_active_render_target_texture;
         TextureHandle m_active_depth_texture;
+        std::vector<TextureHandle> m_active_attachment_color_textures;
+        TextureHandle m_active_attachment_depth_texture;
+        AttachmentPipelineSignature m_active_attachment_signature;
         VkImageLayout m_render_pass_final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
 
@@ -263,6 +283,7 @@ namespace kera
     {
         VkSemaphore m_image_available_semaphore = VK_NULL_HANDLE;
         VkSemaphore m_render_finished_semaphore = VK_NULL_HANDLE;
+        VkQueryPool m_gpu_timing_query_pool = VK_NULL_HANDLE;
         uint64_t m_timeline_value = 0;
         VulkanFrameResourceUse m_resource_use;
     };
@@ -292,6 +313,17 @@ namespace kera
         std::vector<Buffer> available_staging_buffers;
         std::vector<PendingTextureUpload> pending_texture_uploads;
         bool batch_active = false;
+    };
+
+    struct VulkanTestAttachmentCapture
+    {
+        std::string m_name;
+        TextureHandle m_texture;
+        Buffer m_readback_buffer;
+        VkExtent2D m_extent{};
+        ETextureFormat m_format = ETextureFormat::RGBA8;
+        uint64_t m_timeline_value = 0;
+        uint32_t m_sync_index = 0;
     };
 
     struct VulkanDescriptorPoolResource
@@ -367,10 +399,14 @@ namespace kera
         bool destroySampler(SamplerHandle sampler) override;
         RenderTargetHandle createRenderTarget(const RenderTargetDesc& desc) override;
         bool destroyRenderTarget(RenderTargetHandle render_target) override;
+        uint32_t getAttachmentSupportedSampleCounts() const override;
+        RendererResult<TextureHandle> createAttachmentTexture(const AttachmentTextureDesc& desc) override;
 
         GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineDesc& desc,
                                                       ShaderProgramHandle program) override;
         GraphicsPipelineHandle createGraphicsPipeline(const GraphicsPipelineCreateDesc& desc) override;
+        RendererResult<GraphicsPipelineHandle> createAttachmentGraphicsPipeline(
+            const AttachmentGraphicsPipelineCreateDesc& desc) override;
         std::vector<DescriptorSetLayoutDesc> getGraphicsPipelineDescriptorSets(
             GraphicsPipelineHandle pipeline) const override;
         VertexLayoutDesc getGraphicsPipelineVertexLayout(GraphicsPipelineHandle pipeline) const override;
@@ -402,6 +438,15 @@ namespace kera
         void beginRenderPass(FrameHandle frame, const RenderPassDesc& desc) override;
         void beginRenderPass(FrameHandle frame, RenderTargetHandle target, const RenderPassDesc& desc) override;
         void endRenderPass(FrameHandle frame) override;
+        RendererResult<void> validateAttachmentRendering(const AttachmentRenderingDesc& desc) const override;
+        RendererResult<void> beginAttachmentRendering(FrameHandle frame, const AttachmentRenderingDesc& desc) override;
+        RendererResult<void> endAttachmentRendering(FrameHandle frame) override;
+        RendererResult<void> resolveAttachmentTexture(FrameHandle frame, TextureHandle source,
+                                                      TextureHandle destination) override;
+        RendererResult<void> requestTestAttachmentCapture(FrameHandle frame, TextureHandle texture,
+                                                          const std::string& name) override;
+        RendererResult<TestAttachmentCapture> takeTestAttachmentCapture(const std::string& name,
+                                                                        bool wait_for_completion) override;
         void bindPipeline(FrameHandle frame, GraphicsPipelineHandle pipeline) override;
         void bindVertexBuffer(FrameHandle frame, uint32_t slot, BufferHandle buffer, std::size_t offset = 0) override;
         void bindIndexBuffer(FrameHandle frame, BufferHandle buffer, EIndexFormat format,
@@ -420,6 +465,7 @@ namespace kera
         bool refreshSwapchainSupport();
         bool hasActiveFrames() const;
         void releaseFrame(FrameHandle frame, uint32_t sync_index);
+        void cancelUnsubmittedTestAttachmentCaptures(uint32_t sync_index);
         bool waitForTimelineValue(uint64_t timeline_value);
         uint64_t reserveTimelineValue();
         uint64_t getLastSubmittedTimelineValue() const;
@@ -455,8 +501,8 @@ namespace kera
         bool validateDescriptorBinding(const VulkanDescriptorSetResource& descriptor_set, uint32_t binding,
                                        EDescriptorType type) const;
         RendererValidationReport validateDescriptorSetResource(const VulkanDescriptorSetResource& descriptor_set) const;
-        bool resolvePipelineRenderingFormats(RenderTargetHandle render_target, VkFormat& color_format,
-                                             VkFormat& depth_format) const;
+        bool resolvePipelineRenderingFormats(const GraphicsPipelineDesc& desc, std::vector<VkFormat>& color_formats,
+                                             VkFormat& depth_format, VkSampleCountFlagBits& sample_count) const;
         void transitionSwapchainImageLayout(VkCommandBuffer command_buffer, uint32_t image_index,
                                             VkImageLayout new_layout);
         void waitForDeviceIdle();
@@ -478,10 +524,12 @@ namespace kera
         std::vector<std::unique_ptr<CommandBuffer>> m_command_buffers;
 
         std::vector<VulkanFrameSyncResource> m_frame_sync_resources;
+        std::vector<VkSemaphore> m_render_finished_semaphores;
         std::vector<uint64_t> m_images_in_flight;
         std::vector<VkImageLayout> m_swapchain_image_layouts;
         std::vector<VulkanDeferredDeletion> m_deferred_deletions;
         VulkanUploadContext m_upload_context;
+        std::vector<VulkanTestAttachmentCapture> m_test_attachment_captures;
         std::vector<FrameHandle> m_active_frame_handles;
         VkSemaphore m_frame_timeline_semaphore = VK_NULL_HANDLE;
         uint64_t m_next_frame_timeline_value = 1;

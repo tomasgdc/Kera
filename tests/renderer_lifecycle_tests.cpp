@@ -138,7 +138,11 @@ TEST(KeraRendererLifecycle, VulkanImageLayoutMasksUseSync2Stages)
     EXPECT_EQ(kera::vulkanAccessMaskForImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
               VK_ACCESS_2_TRANSFER_WRITE_BIT);
     EXPECT_EQ(kera::vulkanStageMaskForImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-              VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+              VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT);
     EXPECT_EQ(kera::vulkanAccessMaskForImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+              VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+    EXPECT_EQ(kera::vulkanStageMaskForImageLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL),
+              VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT);
+    EXPECT_EQ(kera::vulkanAccessMaskForImageLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL),
               VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 }

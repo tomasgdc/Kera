@@ -32,6 +32,9 @@ namespace
         int32_t upload_batch_begin_count = 0;
         int32_t upload_batch_end_count = 0;
         int32_t upload_batch_cancel_count = 0;
+        int32_t destroyed_buffer_count = 0;
+        int32_t destroyed_texture_count = 0;
+        int32_t destroyed_sampler_count = 0;
         bool upload_batch_begin_succeeds = true;
         bool upload_batch_end_succeeds = true;
         bool texture_uploads_suceed = true;
@@ -103,6 +106,7 @@ namespace
         }
         bool destroyBuffer(kera::BufferHandle) override
         {
+            ++destroyed_buffer_count;
             return m_create_resources;
         }
         bool mapBuffer(kera::BufferHandle, void**) override
@@ -177,6 +181,7 @@ namespace
         }
         bool destroyTexture(kera::TextureHandle) override
         {
+            ++destroyed_texture_count;
             return m_create_resources;
         }
         kera::SamplerHandle createSampler(const kera::SamplerDesc& desc) override
@@ -190,6 +195,7 @@ namespace
         }
         bool destroySampler(kera::SamplerHandle) override
         {
+            ++destroyed_sampler_count;
             return m_create_resources;
         }
         kera::RenderTargetHandle createRenderTarget(const kera::RenderTargetDesc&) override
@@ -421,6 +427,198 @@ namespace
 
         return static_cast<bool>(gltf);
     }
+
+    bool writeMultiPrimitiveSceneFixture(const std::string& base_path)
+    {
+        std::vector<uint8_t> bytes;
+        const float positions[] = {
+            0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        };
+        const float normals[] = {
+            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+        };
+        const float uvs[] = {
+            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+        };
+        const uint16_t indices[] = {0, 1, 2};
+        for (float value : positions)
+        {
+            appendFloat(bytes, value);
+        }
+        for (float value : normals)
+        {
+            appendFloat(bytes, value);
+        }
+        for (float value : uvs)
+        {
+            appendFloat(bytes, value);
+        }
+        for (uint16_t value : indices)
+        {
+            appendUInt16(bytes, value);
+        }
+
+        const std::string bin_path = base_path + ".bin";
+        std::ofstream bin(bin_path, std::ios::binary);
+        if (!bin)
+        {
+            return false;
+        }
+        bin.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        if (!bin)
+        {
+            return false;
+        }
+
+        std::ofstream gltf(base_path + ".gltf");
+        if (!gltf)
+        {
+            return false;
+        }
+        gltf << "{\n"
+             << "  \"asset\": {\"version\": \"2.0\"},\n"
+             << "  \"buffers\": [{\"uri\": \"" << base_path << ".bin\", \"byteLength\": " << bytes.size() << "}],\n"
+             << "  \"bufferViews\": [\n"
+             << "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36, \"target\": 34962},\n"
+             << "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36, \"target\": 34962},\n"
+             << "    {\"buffer\": 0, \"byteOffset\": 72, \"byteLength\": 24, \"target\": 34962},\n"
+             << "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 6, \"target\": 34963}\n"
+             << "  ],\n"
+             << "  \"accessors\": [\n"
+             << "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+             << "    {\"bufferView\": 1, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+             << "    {\"bufferView\": 2, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC2\"},\n"
+             << "    {\"bufferView\": 3, \"componentType\": 5123, \"count\": 3, \"type\": \"SCALAR\"}\n"
+             << "  ],\n"
+             << "  \"materials\": [{\"alphaMode\": \"MASK\", \"alphaCutoff\": 0.42, \"doubleSided\": true,\n"
+             << "    \"pbrMetallicRoughness\": {\"baseColorFactor\": [0.2, 0.3, 0.4, 0.6],\n"
+             << "      \"metallicFactor\": 0.25, \"roughnessFactor\": 0.75}}],\n"
+             << "  \"meshes\": [{\"primitives\": [\n"
+             << "    {\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": 2}, \"indices\": 3, "
+                "\"material\": 0},\n"
+             << "    {\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": 2}, \"indices\": 3, "
+                "\"material\": 0}\n"
+             << "  ]}],\n"
+             << "  \"nodes\": [{\"translation\": [1, 0, 0], \"children\": [1]}, {\"translation\": [0, 2, 0], \"mesh\": "
+                "0}],\n"
+             << "  \"scenes\": [{\"nodes\": [0]}],\n"
+             << "  \"scene\": 0\n"
+             << "}\n";
+        return static_cast<bool>(gltf);
+    }
+
+    enum class EStaticMaterialContractFixture
+    {
+        TEXCOORD_ONE,
+        INCOMPATIBLE_SAMPLERS,
+        NORMAL_ONLY,
+    };
+
+    bool writeStaticMaterialContractFixture(const std::string& base_path, EStaticMaterialContractFixture fixture)
+    {
+        std::vector<uint8_t> bytes;
+        const float positions[] = {
+            0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        };
+        const float normals[] = {
+            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+        };
+        const float uvs[] = {
+            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+        };
+        const uint16_t indices[] = {0, 1, 2};
+        for (float value : positions)
+        {
+            appendFloat(bytes, value);
+        }
+        for (float value : normals)
+        {
+            appendFloat(bytes, value);
+        }
+        for (float value : uvs)
+        {
+            appendFloat(bytes, value);
+        }
+        for (uint16_t value : indices)
+        {
+            appendUInt16(bytes, value);
+        }
+
+        std::ofstream bin(base_path + ".bin", std::ios::binary);
+        if (!bin)
+        {
+            return false;
+        }
+        bin.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        if (!bin)
+        {
+            return false;
+        }
+
+        const bool normal_only = fixture == EStaticMaterialContractFixture::NORMAL_ONLY;
+        const bool incompatible_samplers = fixture == EStaticMaterialContractFixture::INCOMPATIBLE_SAMPLERS;
+        const int normal_texture_index = normal_only ? 0 : 1;
+        const int normal_tex_coord = fixture == EStaticMaterialContractFixture::TEXCOORD_ONE ? 1 : 0;
+
+        std::ofstream gltf(base_path + ".gltf");
+        if (!gltf)
+        {
+            return false;
+        }
+        gltf
+            << "{\n"
+            << "  \"asset\": {\"version\": \"2.0\"},\n"
+            << "  \"buffers\": [{\"uri\": \"" << base_path << ".bin\", \"byteLength\": " << bytes.size() << "}],\n"
+            << "  \"bufferViews\": [\n"
+            << "    {\"buffer\": 0, \"byteOffset\": 0, \"byteLength\": 36, \"target\": 34962},\n"
+            << "    {\"buffer\": 0, \"byteOffset\": 36, \"byteLength\": 36, \"target\": 34962},\n"
+            << "    {\"buffer\": 0, \"byteOffset\": 72, \"byteLength\": 24, \"target\": 34962},\n"
+            << "    {\"buffer\": 0, \"byteOffset\": 96, \"byteLength\": 6, \"target\": 34963}\n"
+            << "  ],\n"
+            << "  \"accessors\": [\n"
+            << "    {\"bufferView\": 0, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+            << "    {\"bufferView\": 1, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC3\"},\n"
+            << "    {\"bufferView\": 2, \"componentType\": 5126, \"count\": 3, \"type\": \"VEC2\"},\n"
+            << "    {\"bufferView\": 3, \"componentType\": 5123, \"count\": 3, \"type\": \"SCALAR\"}\n"
+            << "  ],\n"
+            << "  \"images\": [{\"uri\": \"data:image/png;base64,"
+               "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/6QAAAABJRU5ErkJggg==\"}],\n"
+            << "  \"samplers\": [\n";
+        if (incompatible_samplers)
+        {
+            gltf << "    {\"magFilter\": 9729, \"minFilter\": 9729, \"wrapS\": 10497, \"wrapT\": 10497},\n";
+        }
+        gltf << "    {\"magFilter\": 9728, \"minFilter\": 9728, \"wrapS\": 33071, \"wrapT\": 33648}\n"
+             << "  ],\n"
+             << "  \"textures\": [\n";
+        if (!normal_only)
+        {
+            gltf << "    {\"sampler\": 0, \"source\": 0},\n";
+        }
+        gltf << "    {\"sampler\": " << (incompatible_samplers ? 1 : 0) << ", \"source\": 0}\n"
+             << "  ],\n"
+             << "  \"materials\": [{\n"
+             << "    \"normalTexture\": {\"index\": " << normal_texture_index;
+        if (normal_tex_coord != 0)
+        {
+            gltf << ", \"texCoord\": " << normal_tex_coord;
+        }
+        gltf << "},\n"
+             << "    \"pbrMetallicRoughness\": {";
+        if (!normal_only)
+        {
+            gltf << "\"baseColorTexture\": {\"index\": 0}";
+        }
+        gltf << "}\n"
+             << "  }],\n"
+             << "  \"meshes\": [{\"primitives\": [{\"attributes\": {\"POSITION\": 0, \"NORMAL\": 1, \"TEXCOORD_0\": "
+                "2}, \"indices\": 3, \"material\": 0}]}],\n"
+             << "  \"nodes\": [{\"mesh\": 0}],\n"
+             << "  \"scenes\": [{\"nodes\": [0]}],\n"
+             << "  \"scene\": 0\n"
+             << "}\n";
+        return static_cast<bool>(gltf);
+    }
 }  // namespace
 
 TEST(KeraGltfLoader, ReportsValidationFailuresForMissingPaths)
@@ -498,6 +696,121 @@ TEST(KeraGltfLoader, LoadsDamagedHelmetResourcesAndGeneratedTangents)
     }
     EXPECT_TRUE(found_generated_tangent);
     kera::destroyGltfModel(resource_renderer, damaged_helmet.value());
+}
+
+TEST(KeraGltfLoader, LoadsAllDrawItemsFromDefaultScene)
+{
+    NullRenderer resource_renderer(true);
+    const std::string damaged_helmet_path =
+        std::string(KERA_SOURCE_DIR) + "/samples/assets/gltf/DamagedHelmet/DamagedHelmet.gltf";
+
+    kera::RendererResult<kera::GltfLoadedScene> scene =
+        kera::loadGltfScene(resource_renderer, {.path = damaged_helmet_path, .debug_name = "DamagedHelmet Scene"});
+
+    ASSERT_TRUE(scene.ok());
+    ASSERT_EQ(scene.value().draw_items.size(), 1u);
+    EXPECT_EQ(scene.value().draw_items[0].index_count, 46356u);
+    EXPECT_EQ(scene.value().draw_items[0].material_factors.alpha_mode, kera::EGltfAlphaMode::ALPHA_OPAQUE);
+    kera::destroyGltfScene(resource_renderer, scene.value());
+    EXPECT_TRUE(scene.value().draw_items.empty());
+}
+
+TEST(KeraGltfLoader, CachesSceneMaterialsUsesFallbackMapsAndDestroysSharedResourcesOnce)
+{
+    const std::string fixture_path = "multi_primitive_scene";
+    ASSERT_TRUE(writeMultiPrimitiveSceneFixture(fixture_path));
+
+    NullRenderer renderer(true);
+    kera::RendererResult<kera::GltfLoadedScene> scene =
+        kera::loadGltfScene(renderer, {.path = fixture_path + ".gltf", .debug_name = "Multi Primitive Scene"});
+
+    ASSERT_TRUE(scene.ok());
+    ASSERT_EQ(scene.value().draw_items.size(), 2u);
+    EXPECT_EQ(renderer.upload_batch_begin_count, 1);
+    EXPECT_EQ(renderer.upload_batch_end_count, 1);
+    EXPECT_EQ(renderer.texture_descs.size(), 5u);
+    EXPECT_EQ(renderer.sampler_descs.size(), 1u);
+
+    const kera::GltfLoadedModel& first_draw = scene.value().draw_items[0];
+    const kera::GltfLoadedModel& second_draw = scene.value().draw_items[1];
+    EXPECT_EQ(first_draw.index_count, 3u);
+    EXPECT_EQ(second_draw.index_count, 3u);
+    EXPECT_EQ(first_draw.transform[3], glm::vec4(1.0f, 2.0f, 0.0f, 1.0f));
+    EXPECT_EQ(second_draw.transform[3], glm::vec4(1.0f, 2.0f, 0.0f, 1.0f));
+    EXPECT_EQ(first_draw.material_factors.alpha_mode, kera::EGltfAlphaMode::ALPHA_MASK);
+    EXPECT_TRUE(first_draw.material_factors.double_sided);
+    EXPECT_EQ(first_draw.texture_names.base_color, "fallback-base-color");
+    EXPECT_EQ(first_draw.texture_names.metal_roughness, "fallback-metal-roughness");
+    EXPECT_EQ(first_draw.texture_names.emissive, "fallback-emissive");
+    EXPECT_EQ(first_draw.texture_names.occlusion, "fallback-occlusion");
+    EXPECT_EQ(first_draw.texture_names.normal, "fallback-normal");
+    EXPECT_EQ(first_draw.material_textures.base_color, second_draw.material_textures.base_color);
+    EXPECT_EQ(first_draw.material_textures.metal_roughness, second_draw.material_textures.metal_roughness);
+    EXPECT_EQ(first_draw.material_textures.emissive, second_draw.material_textures.emissive);
+    EXPECT_EQ(first_draw.material_textures.occlusion, second_draw.material_textures.occlusion);
+    EXPECT_EQ(first_draw.material_textures.normal, second_draw.material_textures.normal);
+    EXPECT_EQ(first_draw.material_sampler, second_draw.material_sampler);
+
+    kera::destroyGltfScene(renderer, scene.value());
+    EXPECT_TRUE(scene.value().draw_items.empty());
+    EXPECT_EQ(renderer.destroyed_buffer_count, 4);
+    EXPECT_EQ(renderer.destroyed_texture_count, 5);
+    EXPECT_EQ(renderer.destroyed_sampler_count, 1);
+}
+
+TEST(KeraGltfLoader, RejectsStaticMaterialUsingTexCoordOne)
+{
+    const std::string fixture_path = "static_material_texcoord_one";
+    ASSERT_TRUE(writeStaticMaterialContractFixture(fixture_path, EStaticMaterialContractFixture::TEXCOORD_ONE));
+
+    NullRenderer renderer(true);
+    const kera::RendererResult<kera::GltfLoadedScene> scene =
+        kera::loadGltfScene(renderer, {.path = fixture_path + ".gltf", .debug_name = "TexCoord One"});
+
+    EXPECT_FALSE(scene.ok());
+    EXPECT_EQ(scene.errorCode(), kera::ERendererErrorCode::UNSUPPORTED);
+    EXPECT_NE(scene.errorMessage().find("TEXCOORD_1"), std::string::npos);
+    EXPECT_TRUE(renderer.sampler_descs.empty());
+    EXPECT_EQ(renderer.upload_batch_begin_count, 0);
+}
+
+TEST(KeraGltfLoader, RejectsStaticMaterialUsingIncompatibleSamplers)
+{
+    const std::string fixture_path = "static_material_incompatible_samplers";
+    ASSERT_TRUE(
+        writeStaticMaterialContractFixture(fixture_path, EStaticMaterialContractFixture::INCOMPATIBLE_SAMPLERS));
+
+    NullRenderer renderer(true);
+    const kera::RendererResult<kera::GltfLoadedScene> scene =
+        kera::loadGltfScene(renderer, {.path = fixture_path + ".gltf", .debug_name = "Incompatible Samplers"});
+
+    EXPECT_FALSE(scene.ok());
+    EXPECT_EQ(scene.errorCode(), kera::ERendererErrorCode::UNSUPPORTED);
+    EXPECT_NE(scene.errorMessage().find("incompatible samplers"), std::string::npos);
+    EXPECT_TRUE(renderer.sampler_descs.empty());
+    EXPECT_EQ(renderer.upload_batch_begin_count, 0);
+}
+
+TEST(KeraGltfLoader, UsesActiveTextureSamplerWhenStaticMaterialHasNoBaseColorTexture)
+{
+    const std::string fixture_path = "static_material_normal_only";
+    ASSERT_TRUE(writeStaticMaterialContractFixture(fixture_path, EStaticMaterialContractFixture::NORMAL_ONLY));
+
+    NullRenderer renderer(true);
+    kera::RendererResult<kera::GltfLoadedScene> scene =
+        kera::loadGltfScene(renderer, {.path = fixture_path + ".gltf", .debug_name = "Normal Only"});
+
+    ASSERT_TRUE(scene.ok()) << scene.errorMessage();
+    ASSERT_EQ(scene.value().draw_items.size(), 1u);
+    EXPECT_TRUE(scene.value().draw_items[0].material_textures.normal.isValid());
+    ASSERT_EQ(renderer.sampler_descs.size(), 1u);
+    EXPECT_EQ(renderer.sampler_descs[0].min_filter, kera::ESamplerFilter::NEAREST);
+    EXPECT_EQ(renderer.sampler_descs[0].mag_filter, kera::ESamplerFilter::NEAREST);
+    EXPECT_EQ(renderer.sampler_descs[0].address_mode_u, kera::ESamplerAddressMode::CLAMP_TO_EDGE);
+    EXPECT_EQ(renderer.sampler_descs[0].address_mode_v, kera::ESamplerAddressMode::MIRRORED_REPEAT);
+    EXPECT_EQ(renderer.sampler_descs[0].max_lod, 0.0f);
+
+    kera::destroyGltfScene(renderer, scene.value());
 }
 
 TEST(KeraGltfLoader, CancelsFailedMaterialTextureUploadBatches)

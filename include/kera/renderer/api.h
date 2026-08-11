@@ -125,6 +125,7 @@ namespace kera
     using DescriptorSetHandle = KeraDescriptorSetHandle;
     using FrameHandle = KeraFrameHandle;
     using GltfLoadedModel = KeraGltfLoadedModel;
+    using GltfLoadedScene = KeraGltfLoadedScene;
     using GltfVertex = KeraGltfVertex;
 
     using SamplerDesc = KeraSamplerDesc;
@@ -530,6 +531,116 @@ namespace kera
             return m_api->create_graphics_pipeline(m_renderer, &abi_desc);
         }
 
+        bool supportsAttachmentRendering() const noexcept
+        {
+            return isValid() && KERA_RENDERER_API_HAS_MEMBER(m_api, get_attachment_capabilities) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, validate_attachment_texture_desc) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, validate_attachment_rendering_desc) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, validate_attachment_graphics_pipeline_desc) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, create_attachment_texture) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, create_attachment_graphics_pipeline) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, begin_attachment_rendering) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, end_attachment_rendering);
+        }
+
+        bool supportsAttachmentResolve() const noexcept
+        {
+            return isValid() && KERA_RENDERER_API_HAS_MEMBER(m_api, resolve_attachment_texture);
+        }
+
+        KeraAttachmentCapabilities getAttachmentCapabilities() const noexcept
+        {
+            return isValid() && KERA_RENDERER_API_HAS_MEMBER(m_api, get_attachment_capabilities)
+                       ? m_api->get_attachment_capabilities(m_renderer)
+                       : KeraAttachmentCapabilities{};
+        }
+
+        bool validateAttachmentTextureDesc(const KeraAttachmentTextureDesc& desc,
+                                           KeraAttachmentError* error = nullptr) const noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, validate_attachment_texture_desc))
+            {
+                setAttachmentUnavailableError(error);
+                return false;
+            }
+            return m_api->validate_attachment_texture_desc(&desc, error) != 0;
+        }
+
+        bool validateAttachmentRenderingDesc(const KeraAttachmentRenderingDesc& desc,
+                                             KeraAttachmentError* error = nullptr) const noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, validate_attachment_rendering_desc))
+            {
+                setAttachmentUnavailableError(error);
+                return false;
+            }
+            return m_api->validate_attachment_rendering_desc(&desc, error) != 0;
+        }
+
+        bool validateAttachmentGraphicsPipelineDesc(const KeraAttachmentGraphicsPipelineDesc& desc,
+                                                    KeraAttachmentError* error = nullptr) const noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, validate_attachment_graphics_pipeline_desc))
+            {
+                setAttachmentUnavailableError(error);
+                return false;
+            }
+            return m_api->validate_attachment_graphics_pipeline_desc(&desc, error) != 0;
+        }
+
+        KeraTextureHandle createAttachmentTexture(const KeraAttachmentTextureDesc& desc,
+                                                  KeraAttachmentError* error = nullptr) noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, create_attachment_texture))
+            {
+                setAttachmentUnavailableError(error);
+                return {};
+            }
+            return m_api->create_attachment_texture(m_renderer, &desc, error);
+        }
+
+        KeraGraphicsPipelineHandle createAttachmentGraphicsPipeline(const KeraAttachmentGraphicsPipelineDesc& desc,
+                                                                    KeraAttachmentError* error = nullptr) noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, create_attachment_graphics_pipeline))
+            {
+                setAttachmentUnavailableError(error);
+                return {};
+            }
+            return m_api->create_attachment_graphics_pipeline(m_renderer, &desc, error);
+        }
+
+        bool beginAttachmentRendering(KeraFrameHandle frame, const KeraAttachmentRenderingDesc& desc,
+                                      KeraAttachmentError* error = nullptr) noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, begin_attachment_rendering))
+            {
+                setAttachmentUnavailableError(error);
+                return false;
+            }
+            return m_api->begin_attachment_rendering(m_renderer, frame, &desc, error) != 0;
+        }
+
+        bool endAttachmentRendering(KeraFrameHandle frame, KeraAttachmentError* error = nullptr) noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, end_attachment_rendering))
+            {
+                setAttachmentUnavailableError(error);
+                return false;
+            }
+            return m_api->end_attachment_rendering(m_renderer, frame, error) != 0;
+        }
+
+        bool resolveAttachmentTexture(KeraFrameHandle frame, KeraTextureHandle source, KeraTextureHandle destination,
+                                      KeraAttachmentError* error = nullptr) noexcept
+        {
+            if (!isValid() || !KERA_RENDERER_API_HAS_MEMBER(m_api, resolve_attachment_texture))
+            {
+                setAttachmentUnavailableError(error);
+                return false;
+            }
+            return m_api->resolve_attachment_texture(m_renderer, frame, source, destination, error) != 0;
+        }
         KeraRendererValidationReport validateVertexInputLayout(KeraShaderProgramHandle shader_program,
                                                                const VertexInputLayout& vertex_input) const noexcept
         {
@@ -617,6 +728,22 @@ namespace kera
             if (isValid()) m_api->destroy_gltf_model(m_renderer, &model);
         }
 
+        bool supportsGltfSceneLoading() const noexcept
+        {
+            return isValid() && KERA_RENDERER_API_HAS_MEMBER(m_api, load_gltf_scene) &&
+                   KERA_RENDERER_API_HAS_MEMBER(m_api, destroy_gltf_scene);
+        }
+
+        bool loadGltfScene(const KeraGltfLoadDesc& desc, KeraGltfLoadedScene& out_scene) noexcept
+        {
+            return supportsGltfSceneLoading() && m_api->load_gltf_scene(m_renderer, &desc, &out_scene) != 0;
+        }
+
+        void destroyGltfScene(KeraGltfLoadedScene& scene) noexcept
+        {
+            if (supportsGltfSceneLoading()) m_api->destroy_gltf_scene(m_renderer, &scene);
+        }
+
         bool loadIblEnvironment(const IblEnvironmentLoadDesc& desc, KeraIblEnvironment& out_environment) noexcept
         {
             return isValid() && m_api->load_ibl_environment(m_renderer, &desc, &out_environment) != 0;
@@ -628,6 +755,15 @@ namespace kera
         }
 
     private:
+        static void setAttachmentUnavailableError(KeraAttachmentError* error) noexcept
+        {
+            if (error)
+            {
+                error->code = KERA_ATTACHMENT_ERROR_UNSUPPORTED;
+                error->message = stringView("Core attachment rendering is unavailable.");
+            }
+        }
+
         KeraRenderer* m_renderer = nullptr;
         const KeraRendererApiV1* m_api = nullptr;
     };

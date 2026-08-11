@@ -18,7 +18,7 @@ if(NOT DEFINED KERA_FAIL_ON_VALIDATION_ERRORS)
 endif()
 
 if(NOT "$ENV{KERA_RUN_GPU_SMOKE}" STREQUAL "1")
-    message(STATUS "${KERA_SAMPLE_LABEL} skipped; set KERA_RUN_GPU_SMOKE=1 to run GPU-backed sample smoke tests.")
+    message(STATUS "KERA_GPU_SMOKE_SKIPPED ${KERA_SAMPLE_LABEL}; set KERA_RUN_GPU_SMOKE=1 to run GPU-backed sample smoke tests.")
     return()
 endif()
 
@@ -31,9 +31,14 @@ if(DEFINED KERA_SAMPLE_SCREENSHOT_DIR AND NOT KERA_SAMPLE_SCREENSHOT_DIR STREQUA
     if(existing_screenshots)
         file(REMOVE ${existing_screenshots})
     endif()
+    set(vk_instance_layers "VK_LAYER_LUNARG_screenshot")
+    if(DEFINED ENV{VK_INSTANCE_LAYERS} AND NOT "$ENV{VK_INSTANCE_LAYERS}" STREQUAL "")
+        set(vk_instance_layers "$ENV{VK_INSTANCE_LAYERS};${vk_instance_layers}")
+    endif()
+    string(REPLACE ";" "\\;" vk_instance_layers "${vk_instance_layers}")
     set(sample_command
         ${CMAKE_COMMAND} -E env
-            "VK_INSTANCE_LAYERS=VK_LAYER_LUNARG_screenshot"
+            "VK_INSTANCE_LAYERS=${vk_instance_layers}"
             "VK_SCREENSHOT_FRAMES=${KERA_SAMPLE_SCREENSHOT_FRAMES}"
             "VK_SCREENSHOT_DIR=${KERA_SAMPLE_SCREENSHOT_DIR}"
             "${KERA_SAMPLE_EXE}" ${KERA_SAMPLE_ARGS}
@@ -58,6 +63,16 @@ if(NOT sample_result EQUAL 0)
     message(STATUS "${sample_stdout}")
     message(STATUS "${sample_stderr}")
     message(FATAL_ERROR "${KERA_SAMPLE_LABEL} failed with exit code ${sample_result}")
+endif()
+
+if(DEFINED KERA_SAMPLE_REQUIRED_OUTPUT AND NOT KERA_SAMPLE_REQUIRED_OUTPUT STREQUAL "")
+    set(sample_output "${sample_stdout}\n${sample_stderr}")
+    string(FIND "${sample_output}" "${KERA_SAMPLE_REQUIRED_OUTPUT}" required_output_index)
+    if(required_output_index EQUAL -1)
+        message(STATUS "${sample_stdout}")
+        message(STATUS "${sample_stderr}")
+        message(FATAL_ERROR "${KERA_SAMPLE_LABEL} did not emit required output: ${KERA_SAMPLE_REQUIRED_OUTPUT}")
+    endif()
 endif()
 
 if(DEFINED KERA_SAMPLE_SCREENSHOT_DIR AND NOT KERA_SAMPLE_SCREENSHOT_DIR STREQUAL "")

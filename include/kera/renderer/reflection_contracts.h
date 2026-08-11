@@ -88,6 +88,12 @@ namespace kera
         std::string debug_name;
     };
 
+    struct AttachmentGraphicsPipelineCreateDesc
+    {
+        GraphicsPipelineCreateDesc graphics;
+        AttachmentPipelineSignature attachment_signature;
+    };
+
     class VertexInputLayoutBuilder
     {
     public:

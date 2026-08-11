@@ -8,6 +8,7 @@
 #include "damaged_helmet_sample.h"
 #include "instanced_triangle_many_lights_sample.h"
 #include "instanced_triangle_sample.h"
+#include "multi_pass_rendering_sample.h"
 #include "render_context.h"
 #include "sample_utils.h"
 #include "stats_overlay.h"
@@ -25,6 +26,8 @@ namespace kera
         constexpr int kInitialWindowHeight = 720;
         constexpr Extent2D kResizeSmokeExtent{800, 600};
         constexpr Extent2D kZeroResizeSmokeExtent{0, 0};
+        constexpr Extent2D kMultiPassRestoreSmokeExtent{960, 540};
+        constexpr Extent2D kMultiPassSecondResizeSmokeExtent{1024, 640};
 
         bool isPreviousSampleKey(const SDL_Event& event)
         {
@@ -306,6 +309,20 @@ namespace kera
         addSample(std::make_unique<DamagedHelmetIBLLightingSample>(*m_renderer, options.damaged_helmet_debug_view,
                                                                    options.damaged_helmet_fixed_yaw,
                                                                    options.damaged_helmet_yaw_radians));
+        AttachmentPlaygroundConfig attachment_config{
+            .requested_msaa_samples = options.multi_pass_requested_msaa_samples,
+            .shadow_resolution = options.multi_pass_shadow_resolution,
+            .shadows_enabled = options.multi_pass_shadows_enabled,
+            .preview_shadow_map = options.multi_pass_preview_shadow_map,
+            .preview_shadow_inset = options.multi_pass_preview_shadow_inset,
+            .preview_msaa_comparison = options.multi_pass_preview_msaa_comparison,
+            .preview_shadow_comparison = options.multi_pass_preview_shadow_comparison,
+        };
+        addSample(std::make_unique<MultiPassRenderingSample>(
+            *m_renderer, options.multi_pass_capture_smoke,
+            options.multi_pass_capture_smoke && options.multi_pass_resize_smoke, attachment_config,
+            options.multi_pass_reconfigure_smoke, options.multi_pass_performance_smoke,
+            options.multi_pass_sun_orbit_phase_radians, options.multi_pass_sun_orbit_enabled));
 
         sampleLogInfo("Available samples:");
         for (size_t i = 0; i < m_samples.size(); ++i)
@@ -319,19 +336,34 @@ namespace kera
             return;
         }
 
-        if (options.initial_sample_index >= m_samples.size())
+        uint32_t initial_sample_index = options.initial_sample_index;
+        if (!options.initial_sample_id.empty())
         {
-            sampleLogError("Requested sample index is out of range: " + std::to_string(options.initial_sample_index));
+            if (options.initial_sample_id == "attachment-playground")
+            {
+                initial_sample_index = static_cast<uint32_t>(m_samples.size() - 1);
+            }
+            else
+            {
+                sampleLogError("Unknown sample id: " + options.initial_sample_id);
+                return;
+            }
+        }
+
+        if (initial_sample_index >= m_samples.size())
+        {
+            sampleLogError("Requested sample index is out of range: " + std::to_string(initial_sample_index));
             return;
         }
 
-        setActiveSample(static_cast<int>(options.initial_sample_index));
+        setActiveSample(static_cast<int>(initial_sample_index));
         sampleLogInfo("Running windowed render loop");
 
         auto previous_frame_time = std::chrono::steady_clock::now();
         uint32_t rendered_frames = 0;
         bool resize_smoke_triggered = false;
         bool zero_resize_smoke_triggered = false;
+        uint32_t multi_pass_resize_smoke_stage = 0;
         while (!m_window->should_close)
         {
             const auto current_frame_time = std::chrono::steady_clock::now();
@@ -374,6 +406,42 @@ namespace kera
                 zero_resize_smoke_triggered = true;
                 break;
             }
+            if (options.multi_pass_resize_smoke && rendered_frames > 0 && multi_pass_resize_smoke_stage < 4)
+            {
+                Extent2D extent{};
+                const char* step_name = "";
+                switch (multi_pass_resize_smoke_stage)
+                {
+                    case 0:
+                        extent = kResizeSmokeExtent;
+                        step_name = "first non-zero resize";
+                        break;
+                    case 1:
+                        extent = kZeroResizeSmokeExtent;
+                        step_name = "zero-size minimize";
+                        break;
+                    case 2:
+                        extent = kMultiPassRestoreSmokeExtent;
+                        step_name = "restore resize";
+                        break;
+                    default:
+                        extent = kMultiPassSecondResizeSmokeExtent;
+                        step_name = "second non-zero resize";
+                        break;
+                }
+                sampleLogInfo(std::string("Running Multi-Pass resize smoke step: ") + step_name + ".");
+                if (!m_renderer->resize(extent))
+                {
+                    sampleLogError("Multi-Pass resize smoke step failed.");
+                    break;
+                }
+                m_samples[m_active_sample_index]->resize(extent);
+                ++multi_pass_resize_smoke_stage;
+                if (extent.width == 0 || extent.height == 0)
+                {
+                    continue;
+                }
+            }
 
             if (m_window->was_resized)
             {
@@ -395,7 +463,10 @@ namespace kera
             if (m_renderer->isUiAvailable())
             {
                 m_renderer->beginUi();
-                active_sample.drawUi();
+                if (options.show_sample_ui)
+                {
+                    active_sample.drawUi();
+                }
                 if (m_stats_overlay)
                 {
                     m_stats_overlay->draw(*m_renderer, m_active_sample_index, active_sample.getName(), frame_time_ms);
