@@ -1167,20 +1167,22 @@ namespace kera
         Extent2D extent, const AttachmentPlaygroundConfig& config, AttachmentPipelines& pipelines,
         AttachmentResources& resources)
     {
-        constexpr std::array<KeraAttachmentSampleCount, 4> candidates = {
+        constexpr std::array<KeraAttachmentSampleCount, 4> kCandidates = {
             KERA_ATTACHMENT_SAMPLE_COUNT_8,
             KERA_ATTACHMENT_SAMPLE_COUNT_4,
             KERA_ATTACHMENT_SAMPLE_COUNT_2,
             KERA_ATTACHMENT_SAMPLE_COUNT_1,
         };
+
         const KeraAttachmentCapabilities capabilities = m_renderer.getAttachmentCapabilities();
-        for (const KeraAttachmentSampleCount candidate : candidates)
+        for (const KeraAttachmentSampleCount candidate : kCandidates)
         {
             const uint32_t candidate_value = attachmentSampleCountValue(candidate);
             if (config.requested_msaa_samples != 0 && candidate_value > config.requested_msaa_samples)
             {
                 continue;
             }
+
             if ((capabilities.supported_sample_counts & candidate) == 0 ||
                 (candidate != KERA_ATTACHMENT_SAMPLE_COUNT_1 && !m_renderer.supportsAttachmentResolve()))
             {
@@ -1193,6 +1195,7 @@ namespace kera
             {
                 continue;
             }
+
             if (!buildAttachmentResources(extent, candidate, config, candidate_pipelines, candidate_resources))
             {
                 destroyAttachmentPipelines(candidate_pipelines);
@@ -1493,7 +1496,7 @@ namespace kera
             ImGui::SetWindowSize(default_size, ImGuiCond_Always);
         }
 
-        constexpr const char* msaa_options[] = {"Auto", "1x", "2x", "4x", "8x"};
+        constexpr const char* kMsaaOptions[] = {"Auto", "1x", "2x", "4x", "8x"};
         int msaa_index = 3;
         switch (m_requested_config.requested_msaa_samples)
         {
@@ -1512,14 +1515,15 @@ namespace kera
             default:
                 break;
         }
-        if (ImGui::Combo("Requested MSAA", &msaa_index, msaa_options, IM_ARRAYSIZE(msaa_options)))
+
+        if (ImGui::Combo("Requested MSAA", &msaa_index, kMsaaOptions, IM_ARRAYSIZE(kMsaaOptions)))
         {
-            constexpr uint32_t msaa_values[] = {0, 1, 2, 4, 8};
-            m_requested_config.requested_msaa_samples = msaa_values[msaa_index];
+            constexpr uint32_t kMsaaValues[] = {0, 1, 2, 4, 8};
+            m_requested_config.requested_msaa_samples = kMsaaValues[msaa_index];
         }
 
         ImGui::Checkbox("Shadows", &m_requested_config.shadows_enabled);
-        if (ImGui::Checkbox("Shadow map full screen", &m_requested_config.preview_shadow_map) &&
+        if (ImGui::Checkbox("Preview Shadow Map Full Screen", &m_requested_config.preview_shadow_map) &&
             m_requested_config.preview_shadow_map)
         {
             m_requested_config.preview_shadow_inset = false;
@@ -1527,7 +1531,7 @@ namespace kera
             m_requested_config.preview_shadow_comparison = false;
         }
 
-        if (ImGui::Checkbox("Beauty + shadow inset", &m_requested_config.preview_shadow_inset) &&
+        if (ImGui::Checkbox("Preview Shadow Map", &m_requested_config.preview_shadow_inset) &&
             m_requested_config.preview_shadow_inset)
         {
             m_requested_config.preview_shadow_map = false;
@@ -1535,7 +1539,7 @@ namespace kera
             m_requested_config.preview_shadow_comparison = false;
         }
 
-        if (ImGui::Checkbox("Beauty + MSAA lens", &m_requested_config.preview_msaa_comparison) &&
+        if (ImGui::Checkbox("Preview MSAA Comparison", &m_requested_config.preview_msaa_comparison) &&
             m_requested_config.preview_msaa_comparison)
         {
             m_requested_config.preview_shadow_map = false;
@@ -1543,7 +1547,7 @@ namespace kera
             m_requested_config.preview_shadow_comparison = false;
         }
 
-        if (ImGui::Checkbox("Beauty + shadow lens", &m_requested_config.preview_shadow_comparison) &&
+        if (ImGui::Checkbox("Prewview Shadow Comparison", &m_requested_config.preview_shadow_comparison) &&
             m_requested_config.preview_shadow_comparison)
         {
             m_requested_config.preview_shadow_map = false;
@@ -1551,13 +1555,13 @@ namespace kera
             m_requested_config.preview_msaa_comparison = false;
         }
 
-        constexpr const char* shadow_options[] = {"1024 px", "2048 px", "4096 px"};
+        constexpr const char* kShadowOptions[] = {"1024 px", "2048 px", "4096 px"};
         int shadow_index =
             m_requested_config.shadow_resolution == 1024 ? 0 : (m_requested_config.shadow_resolution == 4096 ? 2 : 1);
-        if (ImGui::Combo("Shadow map", &shadow_index, shadow_options, IM_ARRAYSIZE(shadow_options)))
+        if (ImGui::Combo("Shadow Map Resolution", &shadow_index, kShadowOptions, IM_ARRAYSIZE(kShadowOptions)))
         {
-            constexpr uint32_t shadow_resolutions[] = {1024, 2048, 4096};
-            m_requested_config.shadow_resolution = shadow_resolutions[shadow_index];
+            constexpr uint32_t kShadowResolutions[] = {1024, 2048, 4096};
+            m_requested_config.shadow_resolution = kShadowResolutions[shadow_index];
         }
 
         if (m_uses_sponza)
@@ -1580,7 +1584,7 @@ namespace kera
         }
         ImGui::Separator();
         ImGui::Text("Active MSAA: %ux", attachmentSampleCountValue(m_scene_sample_count));
-        ImGui::Text("Active shadow map: %u px", m_active_config.shadow_resolution);
+        ImGui::Text("Active Shadow Map: %u px", m_active_config.shadow_resolution);
         if (m_active_config.preview_msaa_comparison)
         {
             if (m_attachment_resources.msaa_reference_scene.isValid())

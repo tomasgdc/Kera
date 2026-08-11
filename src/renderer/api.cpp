@@ -1064,10 +1064,10 @@ namespace
                                "Attachment texture format is invalid.");
             return 0;
         }
-        constexpr uint32_t known_usage_flags =
+        constexpr uint32_t kNownUsageFlags =
             KERA_ATTACHMENT_TEXTURE_USAGE_COLOR_ATTACHMENT | KERA_ATTACHMENT_TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT |
             KERA_ATTACHMENT_TEXTURE_USAGE_SAMPLED | KERA_ATTACHMENT_TEXTURE_USAGE_TRANSFER_SRC;
-        if ((desc->usage_flags & ~known_usage_flags) != 0)
+        if ((desc->usage_flags & ~kNownUsageFlags) != 0)
         {
             setAttachmentError(nullptr, error, KERA_ATTACHMENT_ERROR_VALIDATION_FAILED,
                                "Attachment texture usage contains unsupported flags.");
